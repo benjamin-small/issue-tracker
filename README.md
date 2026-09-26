@@ -68,6 +68,6 @@ and [docs/architecture.md](docs/architecture.md) for how the pieces fit.
 | M4        | Generated client and the `tracker` CLI                                                       | ✅ done |
 | M5        | Web UI: shell, list view, issue detail, comments, links                                      | ✅ done |
 | M6        | Kanban board, customizable cards, saved views                                                | ✅ done |
-| M7        | Live updates (event tailer, SSE)                                                             | planned |
+| M7        | Live updates (event tailer, SSE)                                                             | ✅ done |
 | M8–M10    | Custom fields, attachments, webhooks                                                         | planned |
 | M11       | Production hardening: Docker, Postgres end-to-end, docs                                      | planned |

@@ -28,6 +28,11 @@ export interface Db {
   onCommit(listener: () => void): () => void;
   /** @internal called by withWriteTx */
   notifyCommit(): void;
+  /**
+   * Subscribes to a Postgres NOTIFY channel on a dedicated connection (cross-process wake-ups).
+   * On SQLite this is a no-op: other processes' writes are found by polling. Returns an unsubscribe function.
+   */
+  listen(channel: string, onNotify: () => void): Promise<() => Promise<void>>;
   destroy(): Promise<void>;
 }
 
@@ -73,6 +78,20 @@ export function createDb(url: string | DatabaseConfig, options: CreateDbOptions 
           // listeners must never break the writer
         }
       }
+    },
+    async listen(channel, onNotify) {
+      if (config.dialect !== 'postgres') return async () => {};
+      if (!/^[a-z_][a-z0-9_]*$/.test(channel)) throw new Error(`Invalid channel name "${channel}"`);
+      const client = new pg.Client({ connectionString: config.connectionString });
+      client.on('error', () => {}); // a dropped listener only delays wake-ups; polling still delivers
+      await client.connect();
+      client.on('notification', (msg) => {
+        if (msg.channel === channel) onNotify();
+      });
+      await client.query(`LISTEN ${channel}`);
+      return async () => {
+        await client.end().catch(() => {});
+      };
     },
     destroy: () => kysely.destroy(),
   };

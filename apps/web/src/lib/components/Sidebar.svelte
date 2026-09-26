@@ -10,6 +10,7 @@
   import Settings from '@lucide/svelte/icons/settings';
   import Sun from '@lucide/svelte/icons/sun';
   import { api, type Project, type User } from '../api.ts';
+  import { live } from '../live.svelte.ts';
   import { applyTheme } from '../theme.ts';
   import { openCreateIssue } from '../ui.svelte.ts';
   import Avatar from './Avatar.svelte';
@@ -39,6 +40,12 @@
   <div class="flex items-center gap-2 px-3 py-3">
     <img src="/favicon.svg" alt="" class="size-5" />
     <span class="font-semibold">Tracker</span>
+    <span
+      class="ml-auto size-2 rounded-full {live.connected ? 'bg-success' : 'bg-border-strong'}"
+      title={live.connected ? 'Live updates connected' : 'Live updates disconnected'}
+      data-testid="live-indicator"
+      data-connected={live.connected}
+    ></span>
   </div>
   <div class="px-2 pb-2">
     <button

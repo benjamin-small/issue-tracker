@@ -17,6 +17,7 @@ import { registerAuthRoutes } from './routes/auth.ts';
 import { registerCollaborationRoutes } from './routes/collaboration.ts';
 import { registerIssueRoutes } from './routes/issues.ts';
 import { registerProjectRoutes } from './routes/projects.ts';
+import { registerStreamRoute } from './routes/stream.ts';
 import { registerUserRoutes } from './routes/users.ts';
 
 export const API_VERSION = '1.0.0';
@@ -99,6 +100,7 @@ function buildApi(resolved: ResolvedDeps): TrackerApp {
   registerProjectRoutes(api);
   registerIssueRoutes(api);
   registerCollaborationRoutes(api);
+  registerStreamRoute(api, resolved);
   for (const extension of resolved.extensions ?? []) extension(api, resolved);
 
   api.notFound((c) => problem(c, 'NOT_FOUND', `No route for ${c.req.method} ${c.req.path}`));

@@ -112,7 +112,7 @@ Every change is appended to the event log. Each event carries a full resource sn
 - `GET /events?after=<seq>` pages through all events in commit order.
 - `GET /issues/{issue}/activity` gives one issue's history, including comments and links.
 
-See [events.md](events.md) for the catalogue, live streaming and webhooks.
+`GET /events/stream` streams them live (Server-Sent Events). See [events.md](events.md) for the catalogue, live streaming and webhooks.
 
 ## Discovery for agents
 

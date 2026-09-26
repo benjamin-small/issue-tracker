@@ -6136,6 +6136,53 @@
           }
         }
       }
+    },
+    "/events/stream": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Live event stream (Server-Sent Events)",
+        "description": "Streams events as `text/event-stream`: `id` is the event seq, `event` its type, `data` the Event JSON. Reconnect with `Last-Event-ID` (or `?after=<seq>`) to resume without gaps. A `reset` event means the gap was too large to replay: refetch state. Comment lines are heartbeats.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only events of this project (key or id)."
+            },
+            "required": false,
+            "description": "Only events of this project (key or id).",
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "description": "Resume after this seq."
+            },
+            "required": false,
+            "description": "Resume after this seq.",
+            "name": "after",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "webhooks": {}

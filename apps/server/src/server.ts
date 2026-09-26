@@ -1,7 +1,13 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { serve } from '@hono/node-server';
-import { createContext, ensureBuiltins, seedDemoData, SYSTEM_ACTOR } from '@tracker/core';
+import {
+  createContext,
+  ensureBuiltins,
+  EventTailer,
+  seedDemoData,
+  SYSTEM_ACTOR,
+} from '@tracker/core';
 import { createDb, type Db, migrateToLatest, migrationStatus, parseDatabaseUrl } from '@tracker/db';
 import { createApp } from './app.ts';
 import type { ServerConfig } from './config.ts';
@@ -10,6 +16,7 @@ import type { AppExtension } from './env.ts';
 export interface RunningServer {
   url: string;
   db: Db;
+  tailer: EventTailer;
   close(): Promise<void>;
 }
 
@@ -54,6 +61,8 @@ export async function startServer(
     mkdirSync(dirname(dbConfig.filename), { recursive: true });
   const db = createDb(dbConfig);
   await prepareDatabase(db, config);
+  const tailer = new EventTailer(db);
+  await tailer.start();
 
   const app = createApp({
     db,
@@ -64,6 +73,7 @@ export async function startServer(
       allowedOrigins: config.TRACKER_ALLOWED_ORIGINS,
     },
     ...(config.TRACKER_WEB_DIR && { webDir: config.TRACKER_WEB_DIR }),
+    tailer,
     extensions,
   });
 
@@ -75,10 +85,16 @@ export async function startServer(
         resolve({
           url,
           db,
+          tailer,
           close: () =>
             new Promise<void>((done) => {
+              // Open SSE streams would keep the server alive; drop connections before waiting for close().
+              (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
               server.close(() => {
-                void db.destroy().then(() => done());
+                void tailer
+                  .stop()
+                  .then(() => db.destroy())
+                  .then(() => done());
               });
             }),
         });

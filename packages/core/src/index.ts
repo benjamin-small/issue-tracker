@@ -1,6 +1,6 @@
 export * from './context.ts';
 export * from './errors.ts';
-export { diff, recordEvent } from './events.ts';
+export { diff, EVENTS_CHANNEL, recordEvent } from './events.ts';
 export { loadIssue, loadIssues, queryIssues } from './issue-query.ts';
 export { projectFieldRegistry } from './custom-field-query.ts';
 export * from './permissions.ts';
@@ -18,3 +18,4 @@ export * from './services/statuses.ts';
 export * from './services/users.ts';
 export * from './services/views.ts';
 export * from './services/schema.ts';
+export * from './events/tailer.ts';

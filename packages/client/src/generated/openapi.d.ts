@@ -3515,6 +3515,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/events/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live event stream (Server-Sent Events)
+         * @description Streams events as `text/event-stream`: `id` is the event seq, `event` its type, `data` the Event JSON. Reconnect with `Last-Event-ID` (or `?after=<seq>`) to resume without gaps. A `reset` event means the gap was too large to replay: refetch state. Comment lines are heartbeats.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only events of this project (key or id). */
+                    project?: string;
+                    /** @description Resume after this seq. */
+                    after?: number | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Event stream */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {

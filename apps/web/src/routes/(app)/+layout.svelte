@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { createQuery } from '@tanstack/svelte-query';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { connectLive } from '$lib/live.svelte.ts';
   import { fetchers, keys } from '$lib/queries.ts';
   import { openCreateIssue, ui } from '$lib/ui.svelte.ts';
   import CreateIssueDialog from '$components/CreateIssueDialog.svelte';
@@ -20,6 +21,13 @@
       projects.data?.[0]?.key ??
       '',
   );
+
+  const qc = useQueryClient();
+  // One live event stream for the project in view; reconnects when the project changes.
+  $effect(() => {
+    if (!me.data || !currentProject) return;
+    return connectLive(qc, currentProject);
+  });
 
   function onkeydown(event: KeyboardEvent) {
     const target = event.target as HTMLElement;

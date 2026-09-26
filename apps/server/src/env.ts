@@ -1,5 +1,5 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Actor, Clock, IdGenerator, ServiceContext } from '@tracker/core';
+import type { Actor, Clock, EventTailer, IdGenerator, ServiceContext } from '@tracker/core';
 import type { Db } from '@tracker/db';
 
 /**
@@ -26,7 +26,9 @@ export interface AppDeps {
   ids?: IdGenerator;
   /** Directory with the built web app to serve at `/` (production). */
   webDir?: string;
-  /** Extra hooks for features that attach to the app (SSE hub, attachments, …). */
+  /** Follows the event log for live streaming (`GET /events/stream`) and webhooks. */
+  tailer?: EventTailer;
+  /** Extra hooks for features that attach to the app (attachments, …). */
   extensions?: AppExtension[];
 }
 
