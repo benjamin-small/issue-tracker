@@ -1,0 +1,18 @@
+{
+  "name": "@tracker/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "HTTP API server (Hono) exposing @tracker/core over /api/v1.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@tracker/core": "workspace:*",
+    "@tracker/db": "workspace:*",
+    "@tracker/schema": "workspace:*"
+  }
+}

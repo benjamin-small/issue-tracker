@@ -1,0 +1,17 @@
+{
+  "name": "@tracker/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Transport-agnostic domain services and business rules.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@tracker/db": "workspace:*",
+    "@tracker/schema": "workspace:*"
+  }
+}

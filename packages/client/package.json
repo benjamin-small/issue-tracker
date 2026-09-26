@@ -1,0 +1,16 @@
+{
+  "name": "@tracker/client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Typed API client generated from the OpenAPI document.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@tracker/schema": "workspace:*"
+  }
+}

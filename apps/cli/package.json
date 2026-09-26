@@ -1,0 +1,18 @@
+{
+  "name": "@tracker/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The tracker CLI: agent-friendly command line over the tracker API.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@tracker/client": "workspace:*",
+    "@tracker/schema": "workspace:*",
+    "@tracker/server": "workspace:*"
+  }
+}

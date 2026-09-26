@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.svelte-kit/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-shm
+*.db-wal
+test-results/
+playwright-report/
+.DS_Store
