@@ -11,6 +11,9 @@ pnpm test             # Vitest, all packages, SQLite
 pnpm test:pg          # same suites against Postgres (run `pnpm pg start` first)
 pnpm format           # apply Prettier
 pnpm pg start|stop|reset|status|url   # throwaway local Postgres, no Docker
+pnpm e2e              # build the web app, run Playwright (E2E_DATABASE_URL=postgres://… for Postgres)
+pnpm build            # web app + dist/server.mjs + dist/tracker.mjs (tsdown bundles)
+docker compose up -d --build --wait tracker   # production shape: Postgres + S3 storage
 pnpm openapi:gen      # regenerate docs/openapi.json + client types after API changes
 pnpm vitest run --project cli -u      # refresh CLI golden files + docs/cli-reference.md after CLI changes
 pnpm tracker …        # run the CLI from source

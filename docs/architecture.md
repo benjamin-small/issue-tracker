@@ -42,8 +42,19 @@ flowchart LR
 5. **Write transaction.** The service runs in `withWriteTx` ([ADR 0003](adr/0003-write-transactions.md)). It validates and resolves refs, writes, and appends an event, all in one transaction.
 6. **Publication.** After commit, consumers pick up the event from the `events` table ([ADR 0004](adr/0004-event-log-bus-and-outbox.md)).
 
+## Background work
+
+Each server process also runs two loops over the event log:
+
+- **The event tailer** feeds live SSE streams. It is woken by local commits and Postgres `NOTIFY`, with a poll as a fallback ([events.md](events.md)).
+- **The webhook runner** fans events out to deliveries and sends them with retries ([ADR 0013](adr/0013-webhook-delivery.md)).
+
+Neither holds in-memory state that matters. Restart any replica at any time; `SIGTERM` drains it gracefully ([deployment.md](deployment.md#health-logs-and-shutdown)).
+
 ## Where to look
 
 - Data model: [data-model.md](data-model.md)
 - API conventions: [api.md](api.md)
 - Decisions: [adr/](adr/)
+- Running it: [deployment.md](deployment.md), [security.md](security.md)
+- Recipes for changes: [extending.md](extending.md)

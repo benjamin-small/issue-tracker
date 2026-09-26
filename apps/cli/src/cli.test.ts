@@ -419,6 +419,19 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
     expect((await cli(['db', 'migrate'], { env, fetch: null })).stdout).toMatch(
       /Applied: 0001_init, 0002_webhook_delivery_details/,
     );
+    const fresh = { TRACKER_DATABASE_URL: `sqlite:${join(dir, 'fresh.db')}` };
+    const boot = await cli(['db', 'bootstrap', '--handle', 'root', '--name', 'Root', '--json'], {
+      env: fresh,
+      fetch: null,
+    });
+    expect(boot.json()).toMatchObject({ user: { handle: 'root', role: 'admin' } });
+    expect(boot.json().token).toMatch(/^trk_/);
+    const again = await cli(['db', 'bootstrap', '--handle', 'x', '--name', 'X'], {
+      env: fresh,
+      fetch: null,
+    });
+    expect(again.code).toBe(4);
+    expect((await cli(['whoami', '-q'], { env: fresh, fetch: null })).stdout).toMatch(/usr_/);
     const seeded = await cli(['db', 'seed', '--json'], { env, fetch: null });
     expect(seeded.json().agentToken).toMatch(/^trk_/);
     const list = await cli(['issue', 'list', '--project', 'ENG', '-q', '--sort', 'key'], {

@@ -29,10 +29,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     TRACKER_S3_ACCESS_KEY_ID: z.string().optional(),
     TRACKER_S3_SECRET_ACCESS_KEY: z.string().optional(),
     TRACKER_S3_FORCE_PATH_STYLE: z.string().optional(),
+    TRACKER_S3_PRESIGN: z.string().optional(),
+    TRACKER_S3_PUBLIC_ENDPOINT: z.string().optional(),
     /** Run the background webhook worker in this process (turn off on replicas that should only serve API). */
     TRACKER_WEBHOOKS: bool(true),
     /** Let webhooks use http and reach private/loopback addresses. Never enable in production. */
     TRACKER_WEBHOOK_ALLOW_PRIVATE: bool(!production),
+    TRACKER_LOG_LEVEL: z
+      .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
+      .default(process.env.VITEST ? 'silent' : 'info'),
+    /** `json` for log collectors (production default); `pretty` for terminals. */
+    TRACKER_LOG_FORMAT: z.enum(['json', 'pretty']).default(production ? 'json' : 'pretty'),
+    /** How long shutdown waits for in-flight requests before closing connections. */
+    TRACKER_SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
     TRACKER_MAX_UPLOAD_MB: z.coerce.number().positive().max(1024).default(25),
     TRACKER_ALLOWED_ORIGINS: z
       .string()
@@ -51,6 +60,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   }
   if (production && parsed.data.TRACKER_AUTH_MODE === 'dev')
     throw new Error('TRACKER_AUTH_MODE=dev is not allowed when NODE_ENV=production');
+  if (production && parsed.data.TRACKER_WEBHOOK_ALLOW_PRIVATE)
+    throw new Error('TRACKER_WEBHOOK_ALLOW_PRIVATE is not allowed when NODE_ENV=production');
+  if (parsed.data.TRACKER_BLOB_STORE === 's3')
+    for (const name of [
+      'TRACKER_S3_ENDPOINT',
+      'TRACKER_S3_BUCKET',
+      'TRACKER_S3_ACCESS_KEY_ID',
+      'TRACKER_S3_SECRET_ACCESS_KEY',
+    ] as const)
+      if (!parsed.data[name]) throw new Error(`${name} is required when TRACKER_BLOB_STORE=s3`);
   return parsed.data;
 }
 

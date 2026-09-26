@@ -1976,6 +1976,35 @@
       "options": []
     },
     {
+      "name": "db bootstrap",
+      "aliases": [],
+      "description": "Create the first admin of a fresh installation (migrating if needed) and print their API token",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--handle <handle>",
+          "name": "handle",
+          "description": "admin handle, e.g. ada",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "--name <name>",
+          "name": "name",
+          "description": "display name",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "--email <email>",
+          "name": "email",
+          "description": "email address",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
       "name": "db seed",
       "aliases": [],
       "description": "Create demo users (ada, grace, claude), project ENG and sample issues; prints API tokens",

@@ -9,6 +9,7 @@ import type {
   WebhookPolicy,
 } from '@tracker/core';
 import type { Db } from '@tracker/db';
+import type { Logger } from './logger.ts';
 
 /**
  * How requests are authenticated.
@@ -42,6 +43,10 @@ export interface AppDeps {
   webhooks?: WebhookPolicy;
   /** Follows the event log for live streaming (`GET /events/stream`) and webhooks. */
   tailer?: EventTailer;
+  /** Structured logger (default: silent — embedded apps such as tests and the CLI stay quiet). */
+  logger?: Logger;
+  /** Aborted when the server begins shutting down: long-lived streams end so clients reconnect elsewhere. */
+  shutdownSignal?: AbortSignal;
   /** Extra hooks for features that attach to the app (attachments, …). */
   extensions?: AppExtension[];
 }
@@ -56,6 +61,7 @@ export interface ResolvedDeps extends Omit<AppDeps, 'db'> {
 export interface AppEnv {
   Variables: {
     requestId: string;
+    logger: Logger;
     actor: Actor | null;
     authVia: 'bearer' | 'session' | 'trusted' | null;
     ctx: ServiceContext;

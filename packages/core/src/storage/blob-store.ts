@@ -6,7 +6,7 @@ import { AwsClient } from 'aws4fetch';
 /**
  * Where attachment bytes live. Metadata is in the `attachments` table; bytes are stored under random keys
  * (never user-supplied names). Implementations: local disk (development, single node) and S3-compatible
- * object storage (production: AWS S3, MinIO, R2, …).
+ * object storage (production: AWS S3, R2, SeaweedFS, MinIO, …).
  */
 export interface BlobStore {
   readonly kind: 'local' | 's3';
@@ -82,8 +82,15 @@ export interface S3Config {
   region?: string;
   accessKeyId: string;
   secretAccessKey: string;
-  /** Path-style URLs (`endpoint/bucket/key`), needed for MinIO and most S3-compatible stores. Default true. */
+  /** Path-style URLs (`endpoint/bucket/key`), needed for most S3-compatible stores. Default true. */
   forcePathStyle?: boolean;
+  /**
+   * Serve downloads by redirecting to presigned URLs (default true). Turn off to stream bytes through the
+   * server, e.g. when the object store is not reachable from browsers.
+   */
+  presign?: boolean;
+  /** Browser-facing endpoint for presigned URLs when it differs from `endpoint` (e.g. behind a proxy). */
+  publicEndpoint?: string;
 }
 
 /** S3-compatible object storage using SigV4 (aws4fetch — no AWS SDK needed). */
@@ -100,10 +107,11 @@ export class S3BlobStore implements BlobStore {
       region: config.region ?? 'us-east-1',
       service: 's3',
     });
+    if (config.presign !== false) this.presignedGetUrl = (key, opts) => this.#presign(key, opts);
   }
 
-  #url(key: string): string {
-    const endpoint = this.#config.endpoint.replace(/\/+$/, '');
+  #url(key: string, base = this.#config.endpoint): string {
+    const endpoint = base.replace(/\/+$/, '');
     const path = key.split('/').map(encodeURIComponent).join('/');
     if (this.#config.forcePathStyle ?? true) return `${endpoint}/${this.#config.bucket}/${path}`;
     const url = new URL(endpoint);
@@ -137,11 +145,17 @@ export class S3BlobStore implements BlobStore {
     if (res.status !== 404) await this.#check(res, 'DELETE');
   }
 
-  async presignedGetUrl(
+  /** Present unless presigning is turned off (then the server streams downloads itself). */
+  readonly presignedGetUrl?: (
+    key: string,
+    opts: { contentType: string; disposition: string; expiresIn?: number },
+  ) => Promise<string>;
+
+  async #presign(
     key: string,
     opts: { contentType: string; disposition: string; expiresIn?: number },
   ): Promise<string> {
-    const url = new URL(this.#url(key));
+    const url = new URL(this.#url(key, this.#config.publicEndpoint));
     url.searchParams.set('X-Amz-Expires', String(opts.expiresIn ?? 300));
     url.searchParams.set('response-content-type', opts.contentType);
     url.searchParams.set('response-content-disposition', opts.disposition);
@@ -171,6 +185,8 @@ export function blobStoreFromEnv(
       accessKeyId: need('TRACKER_S3_ACCESS_KEY_ID'),
       secretAccessKey: need('TRACKER_S3_SECRET_ACCESS_KEY'),
       forcePathStyle: env.TRACKER_S3_FORCE_PATH_STYLE !== 'false',
+      presign: !['0', 'false'].includes(env.TRACKER_S3_PRESIGN ?? ''),
+      ...(env.TRACKER_S3_PUBLIC_ENDPOINT && { publicEndpoint: env.TRACKER_S3_PUBLIC_ENDPOINT }),
     });
   }
   return new LocalDiskBlobStore(env.TRACKER_BLOB_DIR ?? defaultDir);

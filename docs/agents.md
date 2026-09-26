@@ -56,6 +56,7 @@ tracker issue edit ENG-42 --status "In Review"
 
 - **Polling:** keep the last `seq` you processed and call `tracker event list --after <seq>`. The log is commit-ordered, so no event is ever skipped.
 - **Streaming:** `tracker event tail --types issue.updated,comment.created` prints one JSON event per line.
+- **Push:** an admin can register a webhook (`tracker webhook create URL --events 'issue.*'`) so your service is called on each event. See [events.md](events.md#webhooks).
 - **Payload:** each event carries the full resource snapshot, plus `changes: { field: { from, to } }` for updates, so a refetch is never needed.
 
 ## Handling failures

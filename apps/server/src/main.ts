@@ -1,15 +1,27 @@
 import { loadConfig } from './config.ts';
 import { startServer } from './server.ts';
 
-const config = loadConfig();
-const server = await startServer(config);
-console.log(
-  `Tracker API listening on ${server.url}  (docs: ${server.url}/api/docs, auth mode: ${config.TRACKER_AUTH_MODE})`,
-);
+let config;
+try {
+  config = loadConfig();
+} catch (error) {
+  console.error((error as Error).message);
+  process.exit(2);
+}
+const server = await startServer(config).catch((error: unknown) => {
+  console.error(`Tracker failed to start: ${(error as Error).message}`);
+  process.exit(1);
+});
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
-    console.log(`${signal} received, shutting down`);
-    void server.close().then(() => process.exit(0));
+    server.logger.info({ signal }, 'signal received');
+    server.close().then(
+      () => process.exit(0),
+      (error: unknown) => {
+        server.logger.error({ err: error }, 'shutdown failed');
+        process.exit(1);
+      },
+    );
   });
 }

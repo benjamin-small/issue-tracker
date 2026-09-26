@@ -101,14 +101,22 @@ export function registerStreamRoute(
           }
         }
         await stream.writeSSE({ event: 'ready', data: JSON.stringify({ seq: last }) });
-        while (!stream.aborted) {
+        const stopping = () => stream.aborted || deps.shutdownSignal?.aborted === true;
+        const onShutdown = () => wake?.();
+        deps.shutdownSignal?.addEventListener('abort', onShutdown);
+        stream.onAbort(() => deps.shutdownSignal?.removeEventListener('abort', onShutdown));
+        while (!stopping()) {
           while (queue.length) await send(queue.shift()!);
           await new Promise<void>((resolve) => {
             wake = resolve;
             setTimeout(resolve, HEARTBEAT_MS);
           });
           wake = undefined;
-          if (!queue.length && !stream.aborted) await stream.write(': heartbeat\n\n');
+          if (!queue.length && !stopping()) await stream.write(': heartbeat\n\n');
+        }
+        if (deps.shutdownSignal?.aborted) {
+          // Ask the browser to reconnect soon (to another replica, or this one once restarted).
+          await stream.writeSSE({ event: 'shutdown', data: '{}', retry: 1000 });
         }
       } finally {
         unsubscribe();

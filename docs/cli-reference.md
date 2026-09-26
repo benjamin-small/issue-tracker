@@ -826,6 +826,16 @@ Apply pending migrations
 
 Show applied and pending migrations
 
+### `tracker db bootstrap`
+
+Create the first admin of a fresh installation (migrating if needed) and print their API token
+
+| Option | Description |
+| --- | --- |
+| `--handle <handle>` | admin handle, e.g. ada **(required)** |
+| `--name <name>` | display name **(required)** |
+| `--email <email>` | email address |
+
 ### `tracker db seed`
 
 Create demo users (ada, grace, claude), project ENG and sample issues; prints API tokens

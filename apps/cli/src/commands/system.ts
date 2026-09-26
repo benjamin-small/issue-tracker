@@ -2,6 +2,7 @@ import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createClient, unwrap } from '@tracker/client';
 import {
+  bootstrapAdmin,
   createContext,
   ensureBuiltins,
   inputSchema,
@@ -227,6 +228,33 @@ export function dbCommand(io: CliIO): Command {
             `Applied: ${status.applied.join(', ') || '—'}\nPending: ${status.pending.join(', ') || '—'}\n`,
           );
         else io.stdout(`${JSON.stringify({ database: config.database, ...status }, null, 2)}\n`);
+      } finally {
+        await db.destroy();
+      }
+    });
+  cmd
+    .command('bootstrap')
+    .description(
+      'Create the first admin of a fresh installation (migrating if needed) and print their API token',
+    )
+    .requiredOption('--handle <handle>', 'admin handle, e.g. ada')
+    .requiredOption('--name <name>', 'display name')
+    .option('--email <email>', 'email address')
+    .action(async (o: Opts, command: Command) => {
+      const { config, db } = await localDb(command.optsWithGlobals());
+      try {
+        await migrateToLatest(db);
+        await ensureBuiltins(db);
+        const { user, token } = await bootstrapAdmin(db, {
+          handle: String(o.handle),
+          name: String(o.name),
+          email: o.email === undefined ? undefined : String(o.email),
+        });
+        if (config.format === 'table')
+          io.stdout(
+            `Created admin @${user.handle}.\nAPI token (store it now; it is not shown again):\n${token}\n`,
+          );
+        else io.stdout(`${JSON.stringify({ user, token }, null, 2)}\n`);
       } finally {
         await db.destroy();
       }

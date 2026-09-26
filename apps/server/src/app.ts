@@ -12,6 +12,8 @@ import {
 } from './env.ts';
 import { authenticate, requestId, requireActor } from './middleware/auth.ts';
 import { idempotency } from './middleware/idempotency.ts';
+import { silentLogger } from './logger.ts';
+import { sql } from '@tracker/db';
 import { problem, problemFromError } from './problem.ts';
 import { registerAttachmentRoutes } from './routes/attachments.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
@@ -121,8 +123,39 @@ export function createApp(deps: AppDeps = {}): OpenAPIHono<AppEnv> {
   const resolved = resolveDeps(deps);
   const root = new OpenAPIHono<AppEnv>();
   root.onError((error, c) => problemFromError(c, error));
+  const logger = deps.logger ?? silentLogger;
   root.use('*', requestId);
+  // Access log (health probes and static assets only at debug level).
+  root.use('*', async (c, next) => {
+    const started = performance.now();
+    const log = logger.child({ reqId: c.get('requestId') });
+    c.set('logger', log);
+    await next();
+    const path = c.req.path;
+    const quiet = path === '/healthz' || path === '/readyz' || !path.startsWith('/api/');
+    log[quiet ? 'debug' : 'info'](
+      {
+        method: c.req.method,
+        path,
+        status: c.res.status,
+        ms: Math.round(performance.now() - started),
+        actor: c.var.actor?.handle,
+      },
+      'request',
+    );
+  });
+  // Liveness: the process is serving. Readiness: it can reach the database and is not shutting down.
   root.get('/healthz', (c) => c.json({ ok: true }));
+  root.get('/readyz', async (c) => {
+    if (deps.shutdownSignal?.aborted) return c.json({ ok: false, reason: 'shutting down' }, 503);
+    try {
+      await sql`select 1`.execute(resolved.getDb().kysely);
+      return c.json({ ok: true });
+    } catch (error) {
+      c.get('logger').warn({ err: error }, 'readiness check failed');
+      return c.json({ ok: false, reason: 'database unavailable' }, 503);
+    }
+  });
   root.route(API_PREFIX, buildApi(resolved));
   root.get('/api/docs', Scalar({ url: `${API_PREFIX}/openapi.json`, pageTitle: 'Tracker API' }));
 

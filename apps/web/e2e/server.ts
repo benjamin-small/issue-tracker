@@ -19,6 +19,7 @@ const server = await startServer(
     TRACKER_AUTH_MODE: 'dev',
     TRACKER_SEED: '1',
     TRACKER_BLOB_DIR: blobDir,
+    TRACKER_LOG_LEVEL: process.env.TRACKER_LOG_LEVEL ?? 'warn',
   }),
 );
 console.log(`e2e server on ${server.url}`);

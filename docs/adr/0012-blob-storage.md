@@ -14,7 +14,7 @@ Attachments must work with zero setup in development (SQLite, one machine) and s
 - Storage keys are random. The database stores metadata only: filename, detected content type, size and sha256.
 - Bytes are written before the write transaction and deleted if it fails. Blob deletes after a soft-delete are best effort. An orphaned blob is harmless; a row without bytes is not.
 - The server sniffs the media type from the bytes. Only raster images are served inline, and every download carries `nosniff` and a sandboxing CSP.
-- Tests run the S3 contract against the `s3rver` emulator locally, and against real MinIO in CI (`TEST_S3_ENDPOINT`).
+- Tests run the S3 contract against the `s3rver` emulator locally, and against SeaweedFS in CI (`TEST_S3_ENDPOINT`).
 
 ## Consequences
 

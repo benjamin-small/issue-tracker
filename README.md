@@ -8,7 +8,9 @@ A custom issue tracker built for teams where **humans and AI agents work side by
 - **SQLite for development, Postgres for production**, from one codebase. Every test suite runs against both.
 - **A Svelte web UI** with a list view and a kanban board with customizable cards.
 
-> **Status:** early bootstrap. See the [roadmap](#roadmap) for what exists today.
+It also has live updates (SSE), webhooks, file attachments (local disk or S3), and a single Docker image for production.
+
+> **Status:** v1 feature-complete. See the [roadmap](#roadmap).
 
 ## Quickstart
 
@@ -41,8 +43,24 @@ pnpm tracker issue list -P ENG
 pnpm tracker commands --json      # the full command surface, for agents
 ```
 
-See [docs/cli.md](docs/cli.md) and [docs/agents.md](docs/agents.md) for the CLI, [docs/development.md](docs/development.md) for details, [docs/api.md](docs/api.md) for API conventions
-and [docs/architecture.md](docs/architecture.md) for how the pieces fit.
+Run it in production shape (Postgres + S3-compatible storage) with Docker:
+
+```sh
+docker compose up -d --build --wait tracker
+docker compose exec tracker tracker db bootstrap --handle you --name "Your Name"   # prints an API token
+```
+
+## Documentation
+
+| Topic                          | Guide                                                                                                         |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| How the pieces fit             | [architecture.md](docs/architecture.md), [data-model.md](docs/data-model.md), [decision records](docs/adr/)   |
+| HTTP API                       | [api.md](docs/api.md), with the full contract in [openapi.json](docs/openapi.json) (browsable at `/api/docs`) |
+| CLI                            | [cli.md](docs/cli.md), [cli-reference.md](docs/cli-reference.md)                                              |
+| Agents                         | [agents.md](docs/agents.md)                                                                                   |
+| Events, live updates, webhooks | [events.md](docs/events.md)                                                                                   |
+| Running it                     | [deployment.md](docs/deployment.md), [security.md](docs/security.md)                                          |
+| Working on it                  | [development.md](docs/development.md), [extending.md](docs/extending.md), [AGENTS.md](AGENTS.md)              |
 
 ## Repository layout
 
@@ -72,4 +90,4 @@ and [docs/architecture.md](docs/architecture.md) for how the pieces fit.
 | M8        | Custom fields                                                                                | ✅ done |
 | M9        | File attachments (local disk or S3), paste/drop upload                                       | ✅ done |
 | M10       | Webhooks: signed deliveries, retries, SSRF guard, CLI and web management                     | ✅ done |
-| M11       | Production hardening: Docker, Postgres end-to-end, docs                                      | planned |
+| M11       | Production hardening: bundles, Docker/compose, logs, graceful shutdown, Postgres e2e, docs   | ✅ done |

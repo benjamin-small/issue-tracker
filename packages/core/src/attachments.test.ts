@@ -66,13 +66,13 @@ describe('blob stores', () => {
     let server: S3rver | undefined;
     let store: S3BlobStore;
     beforeAll(async () => {
-      // Real S3-compatible storage when configured (CI runs MinIO); otherwise an in-process emulator.
+      // Real S3-compatible storage when configured (CI runs SeaweedFS); otherwise an in-process emulator.
       if (process.env.TEST_S3_ENDPOINT) {
         store = new S3BlobStore({
           endpoint: process.env.TEST_S3_ENDPOINT,
           bucket: process.env.TEST_S3_BUCKET ?? 'tracker',
-          accessKeyId: process.env.TEST_S3_ACCESS_KEY_ID ?? 'minioadmin',
-          secretAccessKey: process.env.TEST_S3_SECRET_ACCESS_KEY ?? 'minioadmin',
+          accessKeyId: process.env.TEST_S3_ACCESS_KEY_ID ?? 'tracker',
+          secretAccessKey: process.env.TEST_S3_SECRET_ACCESS_KEY ?? 'tracker-secret',
         });
         return;
       }
@@ -101,7 +101,7 @@ describe('blob stores', () => {
 
     it('presigns downloads with response headers', async () => {
       await store.put('att/cd/presigned', PNG, 'image/png');
-      const url = await store.presignedGetUrl('att/cd/presigned', {
+      const url = await store.presignedGetUrl!('att/cd/presigned', {
         contentType: 'image/png',
         disposition: contentDisposition('inline', 'shot.png'),
       });
@@ -110,6 +110,21 @@ describe('blob stores', () => {
       expect(res.status).toBe(200);
       expect(new Uint8Array(await res.arrayBuffer())).toEqual(PNG);
       expect(res.headers.get('content-disposition')).toContain('inline');
+    });
+
+    it('can stream instead of presigning, or presign for a public endpoint', async () => {
+      const base = {
+        endpoint: 'http://minio:9000',
+        bucket: 'b',
+        accessKeyId: 'k',
+        secretAccessKey: 's',
+      };
+      expect(new S3BlobStore({ ...base, presign: false }).presignedGetUrl).toBeUndefined();
+      const url = await new S3BlobStore({
+        ...base,
+        publicEndpoint: 'https://files.example.com',
+      }).presignedGetUrl!('att/x', { contentType: 'image/png', disposition: 'inline' });
+      expect(url).toMatch(/^https:\/\/files\.example\.com\/b\/att\/x\?/);
     });
   });
 });

@@ -115,6 +115,8 @@ export function connectLive(qc: QueryClient, projectKey: string): () => void {
     opened = true;
   });
   source.addEventListener('reset', () => void qc.invalidateQueries());
+  // The server is restarting; the browser reconnects on its own (and replays from Last-Event-ID).
+  source.addEventListener('shutdown', () => (live.connected = false));
   source.onerror = () => {
     live.connected = false;
   };

@@ -22,6 +22,8 @@
     "tracker": "node apps/cli/src/bin.ts",
     "dev": "node scripts/dev.ts",
     "build:web": "pnpm --filter @tracker/web build",
+    "build": "pnpm build:web && tsdown",
+    "start": "node dist/server.mjs",
     "e2e": "pnpm build:web && pnpm --filter @tracker/web e2e"
   },
   "devDependencies": {
@@ -34,6 +36,7 @@
     "prettier": "^3.9.9",
     "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.57.1",
+    "tsdown": "^0.23.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.1",
     "vitest": "^5.0.2"
