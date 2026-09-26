@@ -8,6 +8,7 @@
   import { useProjectData } from '$lib/project-data.svelte.ts';
   import { keys } from '$lib/queries.ts';
   import { toast } from '$lib/toast.svelte.ts';
+  import CustomFieldsSettings from '$components/CustomFieldsSettings.svelte';
   import StatusIcon from '$components/StatusIcon.svelte';
 
   const key = $derived(page.params.key!.toUpperCase());
@@ -243,5 +244,7 @@
         >
       </form>
     </section>
+
+    <CustomFieldsSettings projectKey={key} />
   </div>
 </div>

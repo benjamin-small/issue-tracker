@@ -249,6 +249,38 @@ describe(`HTTP API (${testDialect()})`, () => {
     expect(bulk.body.data.map((i: { priority: number }) => i.priority)).toEqual([4, 4]);
   });
 
+  it('manages custom fields and filters issues by them', async () => {
+    const field = await call('POST', '/projects/API/fields', {
+      body: {
+        key: 'env',
+        name: 'Environment',
+        type: 'select',
+        options: [{ value: 'prod' }, { value: 'staging' }],
+      },
+    });
+    expect(field.status).toBe(201);
+    const issue = await call('POST', '/projects/API/issues', {
+      body: { title: 'Prod incident', customFields: { env: 'prod' } },
+    });
+    expect(issue.body.customFields).toEqual({ env: 'prod' });
+    const listed = await call('GET', '/projects/API/issues?cf.env=prod');
+    expect(listed.body.data.map((i: { key: string }) => i.key)).toEqual([issue.body.key]);
+    const option = await call('POST', `/fields/${field.body.id}/options`, {
+      body: { value: 'dev' },
+    });
+    expect(option.body.options.map((o: { value: string }) => o.value)).toEqual([
+      'prod',
+      'staging',
+      'dev',
+    ]);
+    const archived = await call('PATCH', `/fields/${field.body.id}`, { body: { archived: true } });
+    expect(archived.body.archivedAt).not.toBeNull();
+    expect((await call('GET', '/projects/API/fields')).body.data).toHaveLength(0);
+    expect((await call('DELETE', `/fields/${field.body.id}`, { token: memberToken })).status).toBe(
+      403,
+    );
+  });
+
   it('describes the issue input schema with live enums for agents', async () => {
     const res = await call('GET', '/projects/API/schema/issue');
     expect(res.status).toBe(200);

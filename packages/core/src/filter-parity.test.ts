@@ -6,9 +6,18 @@ import {
   type IssueFilter,
   matchesFilter,
   type SortSpec,
+  FieldRegistry,
 } from '@tracker/schema';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createIssue, createLabel, createProject, listIssues, listStatuses } from './index.ts';
+import {
+  createCustomField,
+  createIssue,
+  createLabel,
+  createProject,
+  listCustomFields,
+  listIssues,
+  listStatuses,
+} from './index.ts';
 import { createTestContext, type TestContext } from './testing.ts';
 
 /** Deterministic PRNG (mulberry32) so failures are reproducible. */
@@ -26,6 +35,7 @@ let t: TestContext;
 let issues: Issue[];
 let statusIds: string[];
 let labelIds: string[];
+let registry: FieldRegistry;
 const rand = prng(20260926);
 const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)]!;
 const WORDS = [
@@ -45,6 +55,22 @@ beforeAll(async () => {
   t = await createTestContext();
   await createProject(t.ctx, { key: 'PROP', name: 'Property' });
   for (const name of ['a', 'b', 'c']) await createLabel(t.ctx, 'PROP', { name });
+  await createCustomField(t.ctx, 'PROP', {
+    key: 'sev',
+    name: 'Sev',
+    type: 'select',
+    options: [{ value: 'lo' }, { value: 'hi' }],
+  });
+  await createCustomField(t.ctx, 'PROP', { key: 'pts', name: 'Pts', type: 'number' });
+  await createCustomField(t.ctx, 'PROP', { key: 'ok', name: 'Ok', type: 'boolean' });
+  await createCustomField(t.ctx, 'PROP', {
+    key: 'tags',
+    name: 'Tags',
+    type: 'multi_select',
+    options: [{ value: 'x' }, { value: 'y' }],
+  });
+  await createCustomField(t.ctx, 'PROP', { key: 'memo', name: 'Memo', type: 'text' });
+  registry = new FieldRegistry(await listCustomFields(t.ctx, 'PROP'));
   statusIds = (await listStatuses(t.ctx, 'PROP')).map((s) => s.id);
   labelIds = [];
   const created: Issue[] = [];
@@ -58,6 +84,13 @@ beforeAll(async () => {
       assignee: pick([null, 'admin', 'member', 'bot']),
       labels,
       estimate: rand() < 0.3 ? null : Math.round(rand() * 80) / 8,
+      customFields: {
+        ...(rand() < 0.7 && { sev: pick(['lo', 'hi']) }),
+        ...(rand() < 0.7 && { pts: Math.round(rand() * 10) }),
+        ...(rand() < 0.6 && { ok: rand() < 0.5 }),
+        ...(rand() < 0.6 && { tags: ['x', 'y'].filter(() => rand() < 0.5) }),
+        ...(rand() < 0.6 && { memo: pick(WORDS) }),
+      },
       dueDate:
         rand() < 0.4
           ? null
@@ -73,6 +106,33 @@ afterAll(() => t.destroy());
 function randomCondition(): FilterCondition {
   const users = [t.admin.id, 'me', null, issues[0]!.creatorId as string];
   const gens: Array<() => FilterCondition> = [
+    () => ({ field: 'cf:sev', op: pick(['eq', 'neq'] as const), value: pick(['lo', 'hi']) }),
+    () => ({
+      field: 'cf:sev',
+      op: pick(['in', 'nin'] as const),
+      value: ['lo', 'hi', null].filter(() => rand() < 0.5),
+    }),
+    () => ({ field: 'cf:sev', op: 'isNull', value: rand() < 0.5 }),
+    () => ({
+      field: 'cf:pts',
+      op: pick(['eq', 'neq', 'gt', 'gte', 'lt', 'lte'] as const),
+      value: Math.round(rand() * 10),
+    }),
+    () => ({ field: 'cf:pts', op: 'isNull', value: rand() < 0.5 }),
+    () => ({ field: 'cf:ok', op: 'eq', value: rand() < 0.5 }),
+    () => ({ field: 'cf:ok', op: 'isNull', value: rand() < 0.5 }),
+    () => ({ field: 'cf:tags', op: pick(['eq', 'neq'] as const), value: pick(['x', 'y']) }),
+    () => ({
+      field: 'cf:tags',
+      op: pick(['in', 'nin'] as const),
+      value: ['x', 'y'].filter(() => rand() < 0.5),
+    }),
+    () => ({ field: 'cf:tags', op: 'isNull', value: rand() < 0.5 }),
+    () => ({
+      field: 'cf:memo',
+      op: pick(['eq', 'neq', 'contains'] as const),
+      value: pick(['crash', 'Crash', 'API', 'ash']),
+    }),
     () => ({ field: 'status', op: pick(['eq', 'neq'] as const), value: pick(statusIds) }),
     () => ({
       field: 'status',
@@ -149,7 +209,7 @@ describe(`filter & sort parity: SQL vs matchesFilter (${testDialect()})`, () => 
       };
       const sql = await listIssues(t.ctx, { project: 'PROP', filter, limit: 200 });
       const expected = issues
-        .filter((i) => matchesFilter(i, filter, { meId: t.admin.id }))
+        .filter((i) => matchesFilter(i, filter, { meId: t.admin.id, registry }))
         .map((i) => i.id)
         .sort();
       expect({ filter, ids: sql.data.map((i) => i.id).sort() }).toEqual({ filter, ids: expected });

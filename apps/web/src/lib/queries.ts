@@ -12,6 +12,7 @@ export const keys = {
   views: (key: string) => ['views', key] as const,
   users: ['users'] as const,
   linkTypes: ['link-types'] as const,
+  fields: (key: string) => ['fields', key] as const,
   issueLists: (project: string) => ['issues', project] as const,
   issueList: (project: string, query: IssueListQuery) => ['issues', project, query] as const,
   issue: (key: string) => ['issue', key] as const,
@@ -43,6 +44,12 @@ export const fetchers = {
     (await call(api.GET('/projects/{project}/views', { params: { path: { project: key } } }))).data,
   users: async () => (await call(api.GET('/users', { params: { query: {} } }))).data,
   linkTypes: async () => (await call(api.GET('/link-types'))).data,
+  fields: async (key: string) =>
+    (
+      await call(
+        api.GET('/projects/{project}/fields', { params: { path: { project: key }, query: {} } }),
+      )
+    ).data,
   /** Every issue matching a query (pages through the results; views show whole projects). */
   issues: async (project: string, query: IssueListQuery): Promise<Issue[]> => {
     const all: Issue[] = [];

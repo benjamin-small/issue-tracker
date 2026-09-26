@@ -10,6 +10,7 @@ import {
 } from './admin.ts';
 import { commentCommand, eventCommand, linkCommand } from './collab.ts';
 import { issueCommand } from './issues.ts';
+import { fieldCommand } from './fields.ts';
 import {
   apiCommand,
   authCommand,
@@ -30,6 +31,7 @@ export function adminCommands(io: CliIO, program: () => Command): Command[] {
     projectCommand(io),
     statusCommand(io),
     labelCommand(io),
+    fieldCommand(io),
     viewCommand(io),
     eventCommand(io),
     userCommand(io),

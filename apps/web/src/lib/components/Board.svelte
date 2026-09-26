@@ -154,13 +154,14 @@
       );
     } else if (groupBy.startsWith('cf:')) {
       const key = groupBy.slice(3);
-      if ((issue.customFields[key] ?? null) === value) return;
-      await updateIssue(
-        qc,
-        issue,
-        { customFields: { [key]: value } },
-        { customFields: { ...issue.customFields, [key]: value } },
-      );
+      const field = project.customFields.find((f) => f.key === key);
+      // Boolean columns are keyed "true"/"false"; other types use the stored value itself.
+      const next = field?.type === 'boolean' && value !== null ? value === 'true' : value;
+      if ((issue.customFields[key] ?? null) === next) return;
+      const customFields = { ...issue.customFields };
+      if (next === null) delete customFields[key];
+      else customFields[key] = next;
+      await updateIssue(qc, issue, { customFields: { [key]: next } }, { customFields });
     }
   }
 

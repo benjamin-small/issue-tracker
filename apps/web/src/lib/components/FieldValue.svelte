@@ -6,6 +6,7 @@
   import { isOverdue, relativeTime, shortDate } from '../format.ts';
   import type { ProjectData } from '../project-data.svelte.ts';
   import AssigneePicker from './AssigneePicker.svelte';
+  import CustomFieldValue from './CustomFieldValue.svelte';
   import Avatar from './Avatar.svelte';
   import LabelChip from './LabelChip.svelte';
   import PriorityPicker from './PriorityPicker.svelte';
@@ -75,16 +76,6 @@
       >{relativeTime(issue[field]!)}</span
     >{/if}
 {:else if field.startsWith('cf:')}
-  {@const value = issue.customFields[field.slice(3)]}
-  {#if value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0)}
-    <span class="truncate rounded bg-bg-muted px-1.5 text-xs text-fg-muted" title={field.slice(3)}>
-      {Array.isArray(value)
-        ? value.join(', ')
-        : typeof value === 'boolean'
-          ? value
-            ? '✓'
-            : '✗'
-          : String(value)}
-    </span>
-  {/if}
+  {@const cf = project.customFields.find((f) => f.key === field.slice(3))}
+  {#if cf}<CustomFieldValue {issue} field={cf} users={project.users} />{/if}
 {/if}

@@ -16,6 +16,7 @@ import { problem, problemFromError } from './problem.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerCollaborationRoutes } from './routes/collaboration.ts';
 import { registerIssueRoutes } from './routes/issues.ts';
+import { registerFieldRoutes } from './routes/fields.ts';
 import { registerProjectRoutes } from './routes/projects.ts';
 import { registerStreamRoute } from './routes/stream.ts';
 import { registerUserRoutes } from './routes/users.ts';
@@ -100,6 +101,7 @@ function buildApi(resolved: ResolvedDeps): TrackerApp {
   registerProjectRoutes(api);
   registerIssueRoutes(api);
   registerCollaborationRoutes(api);
+  registerFieldRoutes(api);
   registerStreamRoute(api, resolved);
   for (const extension of resolved.extensions ?? []) extension(api, resolved);
 

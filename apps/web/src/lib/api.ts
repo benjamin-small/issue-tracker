@@ -11,6 +11,7 @@ export type Comment = Schemas['Comment'];
 export type IssueLink = Schemas['IssueLink'];
 export type TrackerEvent = Schemas['Event'];
 export type LinkType = Schemas['LinkType'];
+export type CustomField = Schemas['CustomField'];
 export type UpdateIssueInput = Schemas['UpdateIssueInput'];
 export type CreateIssueInput = Schemas['CreateIssueInput'];
 export { ApiError };

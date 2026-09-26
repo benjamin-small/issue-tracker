@@ -1,6 +1,7 @@
 import { SYSTEM_ACTOR, type ServiceContext, withActor } from '../context.ts';
 import { createToken } from './auth.ts';
 import { createComment } from './comments.ts';
+import { createCustomField } from './custom-fields.ts';
 import { createIssue, moveIssue, updateIssue } from './issues.ts';
 import { createLabel } from './labels.ts';
 import { createLink } from './links.ts';
@@ -54,6 +55,19 @@ export async function seedDemoData(ctx: ServiceContext): Promise<SeedResult> {
     await createLabel(asAda, 'ENG', { name, color });
   }
 
+  await createCustomField(asAda, 'ENG', {
+    key: 'severity',
+    name: 'Severity',
+    type: 'select',
+    description: 'Customer impact of a bug',
+    options: [
+      { value: 'low', label: 'Low', color: '#95a2b3' },
+      { value: 'medium', label: 'Medium', color: '#f2c94c' },
+      { value: 'high', label: 'High', color: '#f2994a' },
+      { value: 'critical', label: 'Critical', color: '#eb5757' },
+    ],
+  });
+
   const epic = await createIssue(asAda, 'ENG', {
     title: 'Ship the v1 issue tracker',
     description:
@@ -88,6 +102,7 @@ export async function seedDemoData(ctx: ServiceContext): Promise<SeedResult> {
     status: 'Todo',
     labels: ['bug'],
     dueDate: '2026-10-15',
+    customFields: { severity: 'high' },
   });
   await createIssue(asAda, 'ENG', {
     title: 'Write the API guide',

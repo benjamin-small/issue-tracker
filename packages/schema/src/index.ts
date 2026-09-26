@@ -1,4 +1,5 @@
 export * from './common.ts';
+export * from './custom-fields.ts';
 export * from './entities.ts';
 export * from './errors.ts';
 export * from './events.ts';

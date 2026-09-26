@@ -413,6 +413,85 @@ Aliases: `rm`
 | --- | --- |
 | `label` | label name or id |
 
+### `tracker field list`
+
+List custom fields
+
+Aliases: `ls`
+
+| Option | Description |
+| --- | --- |
+| `--include-archived` | include archived fields |
+
+### `tracker field create <key>`
+
+Create a custom field, e.g. `field create severity --type select --option low,high`
+
+| Argument | Description |
+| --- | --- |
+| `key` | immutable key (lowercase, digits, _) |
+
+| Option | Description |
+| --- | --- |
+| `--type <type>` | text\|number\|date\|boolean\|select\|multi_select\|user\|url **(required)** |
+| `-n, --name <name>` | display name (default: the key) |
+| `--description <text>` | description |
+| `--option <values>` | options for select types (repeatable or comma-separated) |
+| `--config <json|@file|->` | display hints JSON, e.g. {"unit":"pts"} |
+
+### `tracker field edit <field>`
+
+Rename, describe, reorder or (un)archive a field
+
+| Argument | Description |
+| --- | --- |
+| `field` | field key or id |
+
+| Option | Description |
+| --- | --- |
+| `-n, --name <name>` | display name |
+| `--description <text>` | description |
+| `--position <n>` | display position |
+| `--archive` | hide the field (values are kept) |
+| `--unarchive` | show the field again |
+
+### `tracker field delete <field>`
+
+Delete a field and all its values permanently (admin; prefer `field edit --archive`)
+
+| Argument | Description |
+| --- | --- |
+| `field` | field key or id |
+
+### `tracker field option-add <field> <values...>`
+
+Add options to a select / multi_select field
+
+| Argument | Description |
+| --- | --- |
+| `field` | field key or id |
+| `values` | option values |
+
+| Option | Description |
+| --- | --- |
+| `--color <hex>` | color for the new options |
+
+### `tracker field option-edit <field> <value>`
+
+Relabel, recolor or (un)archive an option
+
+| Argument | Description |
+| --- | --- |
+| `field` | field key or id |
+| `value` | option value |
+
+| Option | Description |
+| --- | --- |
+| `--label <label>` | display label |
+| `--color <hex>` | color |
+| `--archive` | archive (cannot be chosen anymore; existing values stay) |
+| `--unarchive` | unarchive |
+
 ### `tracker view list`
 
 List views (shared + yours)

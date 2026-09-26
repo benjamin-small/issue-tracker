@@ -1011,6 +1011,214 @@
       "options": []
     },
     {
+      "name": "field list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List custom fields",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--include-archived",
+          "name": "includeArchived",
+          "description": "include archived fields",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "field create",
+      "aliases": [],
+      "description": "Create a custom field, e.g. `field create severity --type select --option low,high`",
+      "arguments": [
+        {
+          "name": "key",
+          "required": true,
+          "variadic": false,
+          "description": "immutable key (lowercase, digits, _)"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--type <type>",
+          "name": "type",
+          "description": "text|number|date|boolean|select|multi_select|user|url",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "display name (default: the key)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "description",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--option <values>",
+          "name": "option",
+          "description": "options for select types (repeatable or comma-separated)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--config <json|@file|->",
+          "name": "config",
+          "description": "display hints JSON, e.g. {\"unit\":\"pts\"}",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "field edit",
+      "aliases": [],
+      "description": "Rename, describe, reorder or (un)archive a field",
+      "arguments": [
+        {
+          "name": "field",
+          "required": true,
+          "variadic": false,
+          "description": "field key or id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "display name",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "description",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--position <n>",
+          "name": "position",
+          "description": "display position",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--archive",
+          "name": "archive",
+          "description": "hide the field (values are kept)",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--unarchive",
+          "name": "unarchive",
+          "description": "show the field again",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "field delete",
+      "aliases": [],
+      "description": "Delete a field and all its values permanently (admin; prefer `field edit --archive`)",
+      "arguments": [
+        {
+          "name": "field",
+          "required": true,
+          "variadic": false,
+          "description": "field key or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "field option-add",
+      "aliases": [],
+      "description": "Add options to a select / multi_select field",
+      "arguments": [
+        {
+          "name": "field",
+          "required": true,
+          "variadic": false,
+          "description": "field key or id"
+        },
+        {
+          "name": "values",
+          "required": true,
+          "variadic": true,
+          "description": "option values"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--color <hex>",
+          "name": "color",
+          "description": "color for the new options",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "field option-edit",
+      "aliases": [],
+      "description": "Relabel, recolor or (un)archive an option",
+      "arguments": [
+        {
+          "name": "field",
+          "required": true,
+          "variadic": false,
+          "description": "field key or id"
+        },
+        {
+          "name": "value",
+          "required": true,
+          "variadic": false,
+          "description": "option value"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--label <label>",
+          "name": "label",
+          "description": "display label",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--color <hex>",
+          "name": "color",
+          "description": "color",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--archive",
+          "name": "archive",
+          "description": "archive (cannot be chosen anymore; existing values stay)",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--unarchive",
+          "name": "unarchive",
+          "description": "unarchive",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
       "name": "view list",
       "aliases": [
         "ls"

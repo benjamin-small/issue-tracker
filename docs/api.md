@@ -54,6 +54,32 @@ Lists return `{ "data": [...], "nextCursor": "…" | null }`. Pass `cursor=<next
 - **Filter semantics:** conditions are ANDed. `in` gives OR within a field. Labels and multi-selects use "has" semantics.
 - **Sortable fields:** `rank` (board order), `priority` (urgent first, none last), `createdAt`, `updatedAt`, `dueDate` and `estimate` (nulls last), `title`, `key`.
 
+## Custom fields
+
+Projects define typed fields with `POST /projects/{project}/fields`. The types are `text`, `number`, `date`, `boolean`, `select`, `multi_select`, `user` and `url`. `select` and `multi_select` fields also take `options`.
+
+- **Setting values.** Issues carry values in `customFields`, keyed by field key:
+
+  ```json
+  {
+    "customFields": {
+      "severity": "high",
+      "points": 3,
+      "platforms": ["web", "ios"],
+      "reviewer": "@ada"
+    }
+  }
+  ```
+
+  - Updates merge: only the fields you send change, and `null` clears one.
+  - Select fields take option _values_.
+  - User fields accept handles, `me` or ids. They are returned as ids.
+  - Unset fields are omitted from responses.
+
+- **Filtering.** Use `cf.<key>` in query strings (`cf.severity=high,critical`, `cf.points.gte=3`) and `cf:<key>` in `IssueFilter`.
+- **Discovery.** `GET /projects/{project}/schema/issue` lists every field, with its options as enums.
+- **Archiving.** Archiving a field or an option hides it without deleting stored values. Option values are immutable, while labels and colors can change.
+
 ## Errors
 
 Every error is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json` body:

@@ -6,12 +6,11 @@ export type GroupHeaderSpec =
   | { kind: 'status'; label: string; category: string; color: string }
   | { kind: 'priority'; label: string; priority: number }
   | { kind: 'user'; label: string; user: User | null }
+  | { kind: 'option'; label: string; color: string }
   | { kind: 'plain'; label: string };
 
-const groupHeader = (spec: GroupHeaderSpec) => spec;
-
 export interface IssueGroup {
-  /** Group value: status id, priority number (string), user id, option value, or `__none__`. */
+  /** Group value: status id, priority number, user id, option value, `true`/`false`, or `__none__`. */
   id: string;
   label: string;
   issues: Issue[];
@@ -20,9 +19,62 @@ export interface IssueGroup {
 
 export const NONE = '__none__';
 
+type GroupSpec = Omit<IssueGroup, 'issues'> & { match: (i: Issue) => boolean };
+
+function group(id: string, header: GroupHeaderSpec, match: (i: Issue) => boolean): GroupSpec {
+  return { id, label: header.label, header, match };
+}
+
+function userGroups(project: ProjectData, value: (i: Issue) => unknown): GroupSpec[] {
+  return [...project.users]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((u) => group(u.id, { kind: 'user', label: u.name, user: u }, (i) => value(i) === u.id));
+}
+
+function customFieldGroups(issues: Issue[], key: string, project: ProjectData): GroupSpec[] {
+  const field = project.customFields.find((f) => f.key === key);
+  const value = (i: Issue) => i.customFields[key];
+  const isNone = (i: Issue) => value(i) === null || value(i) === undefined;
+  const none = group(NONE, { kind: 'plain', label: `No ${field?.name ?? key}` }, isNone);
+  switch (field?.type) {
+    case 'select':
+      return [
+        none,
+        ...field.options
+          // Archived options stay as columns only while issues still use them.
+          .filter((o) => !o.archivedAt || issues.some((i) => value(i) === o.value))
+          .map((o) =>
+            group(
+              o.value,
+              { kind: 'option', label: o.label, color: o.color },
+              (i) => value(i) === o.value,
+            ),
+          ),
+      ];
+    case 'boolean':
+      return [
+        none,
+        group('true', { kind: 'plain', label: `${field.name}: yes` }, (i) => value(i) === true),
+        group('false', { kind: 'plain', label: `${field.name}: no` }, (i) => value(i) === false),
+      ];
+    case 'user':
+      return [none, ...userGroups(project, value)];
+    default: {
+      const values = [
+        ...new Set(issues.filter((i) => !isNone(i)).map((i) => String(value(i)))),
+      ].sort();
+      return [
+        none,
+        ...values.map((v) => group(v, { kind: 'plain', label: v }, (i) => String(value(i)) === v)),
+      ];
+    }
+  }
+}
+
 /**
  * Splits issues into groups for a groupable field (list groups / board columns). Group order follows the
- * domain: statuses by position, priorities urgent→none, users alphabetically with "No assignee" first.
+ * domain: statuses by position, priorities urgent→none, users alphabetically with "No assignee" first,
+ * select options in their configured order.
  */
 export function groupIssues(
   issues: Issue[],
@@ -30,75 +82,39 @@ export function groupIssues(
   project: ProjectData,
   includeEmpty: boolean,
 ): IssueGroup[] {
-  if (!groupBy)
-    return [
-      { id: 'all', label: 'All', issues, header: groupHeader({ kind: 'plain', label: 'All' }) },
-    ];
+  const all: IssueGroup[] = [
+    { id: 'all', label: 'All', issues, header: { kind: 'plain', label: 'All' } },
+  ];
+  if (!groupBy) return all;
 
-  let groups: Array<Omit<IssueGroup, 'issues'> & { match: (i: Issue) => boolean }>;
+  let groups: GroupSpec[];
   if (groupBy === 'status') {
-    groups = project.statuses.map((s) => ({
-      id: s.id,
-      label: s.name,
-      header: groupHeader({ kind: 'status', label: s.name, category: s.category, color: s.color }),
-      match: (i) => i.statusId === s.id,
-    }));
-  } else if (groupBy === 'priority') {
-    groups = PRIORITY_ORDER.map((p) => ({
-      id: String(p),
-      label: PRIORITY_LABELS[p],
-      header: groupHeader({ kind: 'priority', label: PRIORITY_LABELS[p], priority: p }),
-      match: (i) => i.priority === p,
-    }));
-  } else if (groupBy === 'assignee' || groupBy === 'creator') {
-    const users = [...project.users].sort((a, b) => a.name.localeCompare(b.name));
-    const field = groupBy === 'assignee' ? 'assigneeId' : 'creatorId';
-    groups = [
-      ...(groupBy === 'assignee'
-        ? [
-            {
-              id: NONE,
-              label: 'No assignee',
-              header: groupHeader({ kind: 'user', label: 'No assignee', user: null }),
-              match: (i: Issue) => i.assigneeId === null,
-            },
-          ]
-        : []),
-      ...users.map((u) => ({
-        id: u.id,
-        label: u.name,
-        header: groupHeader({ kind: 'user', label: u.name, user: u }),
-        match: (i: Issue) => i[field] === u.id,
-      })),
-    ];
-  } else if (groupBy.startsWith('cf:')) {
-    const key = groupBy.slice(3);
-    const values = [
-      ...new Set(
-        issues
-          .map((i) => i.customFields[key])
-          .filter((v) => v !== null && v !== undefined)
-          .map(String),
+    groups = project.statuses.map((s) =>
+      group(
+        s.id,
+        { kind: 'status', label: s.name, category: s.category, color: s.color },
+        (i) => i.statusId === s.id,
       ),
-    ].sort();
+    );
+  } else if (groupBy === 'priority') {
+    groups = PRIORITY_ORDER.map((p) =>
+      group(
+        String(p),
+        { kind: 'priority', label: PRIORITY_LABELS[p], priority: p },
+        (i) => i.priority === p,
+      ),
+    );
+  } else if (groupBy === 'assignee') {
     groups = [
-      {
-        id: NONE,
-        label: 'None',
-        header: groupHeader({ kind: 'plain', label: 'None' }),
-        match: (i) => i.customFields[key] === null || i.customFields[key] === undefined,
-      },
-      ...values.map((v) => ({
-        id: v,
-        label: v,
-        header: groupHeader({ kind: 'plain', label: v }),
-        match: (i: Issue) => String(i.customFields[key]) === v,
-      })),
+      group(NONE, { kind: 'user', label: 'No assignee', user: null }, (i) => i.assigneeId === null),
+      ...userGroups(project, (i) => i.assigneeId),
     ];
+  } else if (groupBy === 'creator') {
+    groups = userGroups(project, (i) => i.creatorId);
+  } else if (groupBy.startsWith('cf:')) {
+    groups = customFieldGroups(issues, groupBy.slice(3), project);
   } else {
-    return [
-      { id: 'all', label: 'All', issues, header: groupHeader({ kind: 'plain', label: 'All' }) },
-    ];
+    return all;
   }
   return groups
     .map(({ match, ...g }) => ({ ...g, issues: issues.filter(match) }))

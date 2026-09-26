@@ -82,6 +82,11 @@ function handle(qc: QueryClient, event: TrackerEvent, meId: string | undefined) 
     void qc.invalidateQueries({ queryKey: ['labels'] });
     void qc.invalidateQueries({ queryKey: keys.projects });
     void qc.invalidateQueries({ queryKey: ['issues'] });
+  } else if (event.type.startsWith('field.')) {
+    // Field definitions changed: refetch them and anything embedding custom field values.
+    void qc.invalidateQueries({ queryKey: ['fields'] });
+    void qc.invalidateQueries({ queryKey: ['issues'] });
+    void qc.invalidateQueries({ queryKey: ['issue'] });
   } else if (event.type.startsWith('user.')) {
     void qc.invalidateQueries({ queryKey: keys.users });
   }
@@ -136,6 +141,9 @@ export function connectLive(qc: QueryClient, projectKey: string): () => void {
     'label.deleted',
     'user.created',
     'user.updated',
+    'field.created',
+    'field.updated',
+    'field.deleted',
   ])
     source.addEventListener(type, onEvent);
 

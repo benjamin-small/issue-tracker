@@ -258,6 +258,57 @@ describe(`tracker CLI (${testDialect()})`, () => {
           });
   });
 
+  it('defines custom fields and sets/filters them', async () => {
+    const created = await cli([
+      'field',
+      'create',
+      'severity',
+      '--type',
+      'select',
+      '--option',
+      'low,high',
+      '--json',
+    ]);
+    expect(created.json()).toMatchObject({
+      key: 'severity',
+      type: 'select',
+      options: [{ value: 'low' }, { value: 'high' }],
+    });
+    await cli(['field', 'create', 'points', '--type', 'number', '-n', 'Points']);
+    const issue = await cli([
+      'issue',
+      'create',
+      '-t',
+      'With fields',
+      '--set',
+      'severity=high',
+      '--set',
+      'points=3',
+      '--json',
+    ]);
+    expect(issue.json().customFields).toEqual({ severity: 'high', points: 3 });
+    const found = await cli([
+      'issue',
+      'list',
+      '-w',
+      'cf.severity=high',
+      '-w',
+      'cf.points.gte=2',
+      '-q',
+    ]);
+    expect(found.stdout.trim()).toBe(issue.json().key);
+    const bad = await cli(['issue', 'edit', issue.json().key, '--set', 'severity=medium']);
+    expect(bad.code).toBe(2);
+    expect(bad.stderr).toMatch(/unknown option "medium"/);
+    await cli(['field', 'option-add', 'severity', 'medium']);
+    expect((await cli(['issue', 'edit', issue.json().key, '--set', 'severity=medium'])).code).toBe(
+      0,
+    );
+    const list = await cli(['field', 'list']);
+    expect(list.stdout).toContain('severity  severity  [select]');
+    expect(list.stdout).toContain('options: low, high, medium');
+  });
+
   it('calls arbitrary endpoints with `api`', async () => {
     const res = await cli(['api', 'GET', '/issues/CLI-1']);
     expect(JSON.parse(res.stdout).key).toBe('CLI-1');

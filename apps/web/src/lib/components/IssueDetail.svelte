@@ -10,6 +10,7 @@
   import { fetchers, keys } from '../queries.ts';
   import { toast } from '../toast.svelte.ts';
   import ActivityTimeline from './ActivityTimeline.svelte';
+  import CustomFieldEditor from './CustomFieldEditor.svelte';
   import IssueProperties from './IssueProperties.svelte';
   import LinksSection from './LinksSection.svelte';
   import Markdown from './Markdown.svelte';
@@ -196,7 +197,21 @@
           ? 'order-first border-b'
           : 'w-72 overflow-y-auto border-l'}"
       >
-        <IssueProperties {issue} {project} />
+        <IssueProperties {issue} {project}>
+          {#snippet extra()}
+            {#each project.customFields as field (field.id)}
+              <div class="grid grid-cols-[88px_1fr] items-center gap-2 py-0.5">
+                <span
+                  class="truncate text-xs text-fg-subtle"
+                  title={field.description || field.name}>{field.name}</span
+                >
+                <div class="min-w-0">
+                  <CustomFieldEditor {issue} {field} users={project.users} />
+                </div>
+              </div>
+            {/each}
+          {/snippet}
+        </IssueProperties>
       </aside>
     </div>
   </article>

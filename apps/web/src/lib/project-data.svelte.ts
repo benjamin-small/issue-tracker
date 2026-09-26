@@ -1,6 +1,5 @@
 import { createQuery } from '@tanstack/svelte-query';
-import type { CustomFieldLike } from '@tracker/schema';
-import type { Label, Status, User, View } from './api.ts';
+import type { CustomField, Label, Status, User, View } from './api.ts';
 import { fetchers, keys } from './queries.ts';
 
 export interface ProjectData {
@@ -9,12 +8,12 @@ export interface ProjectData {
   readonly labels: Label[];
   readonly users: User[];
   readonly views: View[];
-  /** Active custom field definitions (key, name, type) for the field registry. */
-  readonly customFields: CustomFieldLike[];
+  /** Active custom field definitions (they also feed the field registry). */
+  readonly customFields: CustomField[];
   readonly loaded: boolean;
 }
 
-/** Reactive reference data for a project (statuses, labels, users, views), cached by TanStack Query. */
+/** Reactive reference data for a project (statuses, labels, users, views, fields), cached by TanStack Query. */
 export function useProjectData(key: () => string): ProjectData {
   const statuses = createQuery(() => ({
     queryKey: keys.statuses(key()),
@@ -33,6 +32,10 @@ export function useProjectData(key: () => string): ProjectData {
     queryKey: keys.views(key()),
     queryFn: () => fetchers.views(key()),
   }));
+  const fields = createQuery(() => ({
+    queryKey: keys.fields(key()),
+    queryFn: () => fetchers.fields(key()),
+  }));
   return {
     get key() {
       return key();
@@ -50,10 +53,10 @@ export function useProjectData(key: () => string): ProjectData {
       return views.data ?? [];
     },
     get customFields() {
-      return [];
+      return fields.data ?? [];
     },
     get loaded() {
-      return statuses.isSuccess && labels.isSuccess && users.isSuccess;
+      return statuses.isSuccess && labels.isSuccess && users.isSuccess && fields.isSuccess;
     },
   };
 }
