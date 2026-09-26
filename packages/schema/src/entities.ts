@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { ColorSchema, DateOnlySchema, MetadataSchema, TimestampSchema } from './common.ts';
+import {
+  ColorSchema,
+  DateOnlySchema,
+  MetadataSchema,
+  nullableRef,
+  TimestampSchema,
+} from './common.ts';
 
 // ---------------------------------------------------------------------------
 // Users & auth
@@ -261,11 +267,11 @@ export const IssueSchema = z
     status: StatusSummarySchema,
     priority: PrioritySchema,
     assigneeId: z.string().nullable(),
-    assignee: UserSummarySchema.nullable(),
+    assignee: nullableRef(UserSummarySchema),
     creatorId: z.string(),
     creator: UserSummarySchema,
     parentId: z.string().nullable(),
-    parent: IssueRefSchema.nullable(),
+    parent: nullableRef(IssueRefSchema),
     labelIds: z.array(z.string()),
     labels: z.array(LabelSummarySchema),
     estimate: z.number().nullable(),

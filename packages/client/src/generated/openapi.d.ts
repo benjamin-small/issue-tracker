@@ -3888,11 +3888,11 @@ export interface components {
              */
             priority: number;
             assigneeId: string | null;
-            assignee: components["schemas"]["UserSummary"] & (Record<string, never> | null);
+            assignee: components["schemas"]["UserSummary"] | null;
             creatorId: string;
             creator: components["schemas"]["UserSummary"];
             parentId: string | null;
-            parent: components["schemas"]["IssueRef"];
+            parent: components["schemas"]["IssueRef"] | null;
             labelIds: string[];
             labels: components["schemas"]["LabelSummary"][];
             estimate: number | null;
@@ -3978,7 +3978,7 @@ export interface components {
             /** @example ENG-7 */
             key: string;
             title: string;
-        } | null;
+        };
         LabelSummary: {
             id: string;
             /** @example bug */
@@ -4235,7 +4235,7 @@ export interface components {
             /** @enum {string} */
             type: "issue.created" | "issue.updated" | "issue.deleted" | "issue.restored" | "comment.created" | "comment.updated" | "comment.deleted" | "link.created" | "link.deleted" | "project.created" | "project.updated" | "status.created" | "status.updated" | "status.deleted" | "label.created" | "label.updated" | "label.deleted" | "user.created" | "user.updated";
             actorId: string | null;
-            actor: components["schemas"]["UserSummary"] & (Record<string, never> | null);
+            actor: components["schemas"]["UserSummary"] | null;
             projectId: string | null;
             issueId: string | null;
             /** @description Payload; shape depends on `type`. */

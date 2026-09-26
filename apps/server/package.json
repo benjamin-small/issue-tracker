@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p .",
-    "dev": "node --watch src/main.ts",
+    "dev": "node --watch --watch-path=src --watch-path=../../packages src/main.ts",
     "start": "node src/main.ts",
     "openapi:gen": "node src/scripts/gen-openapi.ts",
     "openapi:check": "node src/scripts/gen-openapi.ts --check"

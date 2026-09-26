@@ -1,0 +1,38 @@
+{
+  "name": "@tracker/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Svelte web app for the tracker (SPA served by the API server in production).",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@internationalized/date": "^3.12.4",
+    "@lucide/svelte": "^1.48.0",
+    "@tanstack/svelte-query": "^6.3.0",
+    "@tracker/client": "workspace:*",
+    "@tracker/schema": "workspace:*",
+    "bits-ui": "^2.19.3",
+    "dompurify": "^3.4.16",
+    "marked": "^18.0.14",
+    "svelte-dnd-action": "^0.9.79"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/kit": "^2.70.3",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "eslint-plugin-svelte": "^3.23.0",
+    "svelte": "^5.57.1",
+    "svelte-check": "^4.7.6",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.1"
+  }
+}

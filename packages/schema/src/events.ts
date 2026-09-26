@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TimestampSchema } from './common.ts';
+import { nullableRef, TimestampSchema } from './common.ts';
 import {
   CommentSchema,
   IssueRefSchema,
@@ -110,7 +110,7 @@ export const EventSchema = z
     id: z.string(),
     type: EventTypeSchema,
     actorId: z.string().nullable(),
-    actor: UserSummarySchema.nullable(),
+    actor: nullableRef(UserSummarySchema),
     projectId: z.string().nullable(),
     issueId: z.string().nullable(),
     data: z

@@ -42,3 +42,11 @@ export const LimitSchema = z.coerce
   .max(200)
   .default(50)
   .meta({ description: 'Page size (1–200).' });
+
+/**
+ * A nullable reference to a registered (`.meta({ id })`) schema. Use instead of `.nullable()`, which OpenAPI
+ * generation renders incorrectly for registered schemas (drops the null or emits an unsatisfiable allOf).
+ */
+export function nullableRef<T extends z.ZodType>(schema: T) {
+  return z.union([schema, z.null()]);
+}

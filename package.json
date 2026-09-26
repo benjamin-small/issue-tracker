@@ -19,15 +19,21 @@
     "openapi:gen": "pnpm --filter @tracker/server openapi:gen && pnpm --filter @tracker/client gen",
     "openapi:check": "pnpm --filter @tracker/server openapi:check && pnpm --filter @tracker/client gen && git diff --exit-code -- packages/client/src/generated",
     "dev:server": "pnpm --filter @tracker/server dev",
-    "tracker": "node apps/cli/src/bin.ts"
+    "tracker": "node apps/cli/src/bin.ts",
+    "dev": "node scripts/dev.ts",
+    "build:web": "pnpm --filter @tracker/web build",
+    "e2e": "pnpm build:web && pnpm --filter @tracker/web e2e"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.4",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-svelte": "^3.23.0",
     "globals": "^17.12.0",
     "prettier": "^3.9.9",
+    "prettier-plugin-svelte": "^4.1.1",
+    "svelte": "^5.57.1",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.1",
     "vitest": "^5.0.2"
