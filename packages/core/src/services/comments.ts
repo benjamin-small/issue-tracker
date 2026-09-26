@@ -1,0 +1,172 @@
+import { type Tx, withWriteTx } from '@tracker/db';
+import {
+  type Comment,
+  type CreateCommentInput,
+  CreateCommentInputSchema,
+  formatIssueKey,
+  isIdOf,
+  type UpdateCommentInput,
+  UpdateCommentInputSchema,
+} from '@tracker/schema';
+import { nowIso, type ServiceContext } from '../context.ts';
+import { conflict, forbidden, notFound, parseInput } from '../errors.ts';
+import { recordEvent } from '../events.ts';
+import { toComment, toUserSummary } from '../mappers.ts';
+import { isAdmin } from '../permissions.ts';
+import { getIssueRow } from '../refs.ts';
+
+async function loadComment(db: Tx, id: string): Promise<Comment | undefined> {
+  const row = await db
+    .selectFrom('comments as c')
+    .innerJoin('users as u', 'u.id', 'c.author_id')
+    .selectAll('c')
+    .select(['u.handle', 'u.name', 'u.kind', 'u.avatar_url'])
+    .where('c.id', '=', id)
+    .executeTakeFirst();
+  return row
+    ? toComment(
+        row,
+        toUserSummary({
+          id: row.author_id,
+          handle: row.handle,
+          name: row.name,
+          kind: row.kind,
+          avatarUrl: row.avatar_url,
+        }),
+      )
+    : undefined;
+}
+
+async function issueRefFor(db: Tx, issueId: string) {
+  const row = await db
+    .selectFrom('issues as i')
+    .innerJoin('projects as p', 'p.id', 'i.project_id')
+    .select(['i.id', 'i.number', 'i.title', 'i.project_id', 'p.key'])
+    .where('i.id', '=', issueId)
+    .executeTakeFirstOrThrow();
+  return {
+    ref: { id: row.id, key: formatIssueKey(row.key, row.number), title: row.title },
+    projectId: row.project_id,
+  };
+}
+
+/** Comments on an issue, oldest first. Deleted comments are excluded unless requested. */
+export async function listComments(
+  ctx: ServiceContext,
+  issueRef: string,
+  opts: { includeDeleted?: boolean } = {},
+): Promise<Comment[]> {
+  const issue = await getIssueRow(ctx.db.kysely, issueRef);
+  let q = ctx.db.kysely
+    .selectFrom('comments as c')
+    .innerJoin('users as u', 'u.id', 'c.author_id')
+    .selectAll('c')
+    .select(['u.handle', 'u.name', 'u.kind', 'u.avatar_url'])
+    .where('c.issue_id', '=', issue.id)
+    .orderBy('c.created_at')
+    .orderBy('c.id');
+  if (!opts.includeDeleted) q = q.where('c.deleted_at', 'is', null);
+  const rows = await q.execute();
+  return rows.map((row) =>
+    toComment(
+      row,
+      toUserSummary({
+        id: row.author_id,
+        handle: row.handle,
+        name: row.name,
+        kind: row.kind,
+        avatarUrl: row.avatar_url,
+      }),
+    ),
+  );
+}
+
+export async function createComment(
+  ctx: ServiceContext,
+  issueRef: string,
+  input: CreateCommentInput,
+): Promise<Comment> {
+  const data = parseInput(CreateCommentInputSchema, input);
+  return withWriteTx(ctx.db, async (tx) => {
+    const issue = await getIssueRow(tx, issueRef);
+    if (issue.deleted_at) throw conflict('Cannot comment on a deleted issue');
+    const now = nowIso(ctx);
+    const id = ctx.ids('comment');
+    await tx
+      .insertInto('comments')
+      .values({
+        id,
+        issue_id: issue.id,
+        author_id: ctx.actor.id,
+        parent_comment_id: null,
+        body: data.body,
+        created_at: now,
+        updated_at: now,
+        edited_at: null,
+        deleted_at: null,
+      })
+      .execute();
+    const comment = (await loadComment(tx, id))!;
+    const { ref } = await issueRefFor(tx, issue.id);
+    await recordEvent(tx, ctx, 'comment.created', {
+      projectId: issue.project_id,
+      issueId: issue.id,
+      data: { comment, issue: ref },
+    });
+    return comment;
+  });
+}
+
+async function editableComment(tx: Tx, ctx: ServiceContext, id: string) {
+  const comment = isIdOf('comment', id) ? await loadComment(tx, id) : undefined;
+  if (!comment || comment.deletedAt) throw notFound('Comment', id);
+  if (comment.authorId !== ctx.actor.id && !isAdmin(ctx))
+    throw forbidden('You can only change your own comments');
+  return comment;
+}
+
+export async function updateComment(
+  ctx: ServiceContext,
+  id: string,
+  input: UpdateCommentInput,
+): Promise<Comment> {
+  const data = parseInput(UpdateCommentInputSchema, input);
+  return withWriteTx(ctx.db, async (tx) => {
+    const existing = await editableComment(tx, ctx, id);
+    if (existing.body === data.body) return existing;
+    const now = nowIso(ctx);
+    await tx
+      .updateTable('comments')
+      .set({ body: data.body, updated_at: now, edited_at: now })
+      .where('id', '=', id)
+      .execute();
+    const comment = (await loadComment(tx, id))!;
+    const { ref, projectId } = await issueRefFor(tx, comment.issueId);
+    await recordEvent(tx, ctx, 'comment.updated', {
+      projectId,
+      issueId: comment.issueId,
+      data: { comment, issue: ref },
+    });
+    return comment;
+  });
+}
+
+export async function deleteComment(ctx: ServiceContext, id: string): Promise<Comment> {
+  return withWriteTx(ctx.db, async (tx) => {
+    await editableComment(tx, ctx, id);
+    const now = nowIso(ctx);
+    await tx
+      .updateTable('comments')
+      .set({ deleted_at: now, updated_at: now })
+      .where('id', '=', id)
+      .execute();
+    const comment = (await loadComment(tx, id))!;
+    const { ref, projectId } = await issueRefFor(tx, comment.issueId);
+    await recordEvent(tx, ctx, 'comment.deleted', {
+      projectId,
+      issueId: comment.issueId,
+      data: { comment, issue: ref },
+    });
+    return comment;
+  });
+}

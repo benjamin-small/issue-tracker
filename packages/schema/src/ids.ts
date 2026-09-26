@@ -1,3 +1,5 @@
+import { typeid } from 'typeid-js';
+
 /**
  * Prefixes for TypeID-style identifiers (`<prefix>_<base32 UUIDv7>`).
  *
@@ -36,4 +38,24 @@ const SUFFIX = '[0-7][0-9a-hjkmnp-tv-z]{25}';
 /** Returns true if `value` is a well-formed id for the given entity kind. */
 export function isIdOf(kind: EntityKind, value: string): boolean {
   return new RegExp(`^${ID_PREFIXES[kind]}_${SUFFIX}$`).test(value);
+}
+
+/** Generates a new time-ordered id for an entity kind, e.g. `newId('issue')` → `iss_01h455vb4pex5vsknk084sn02q`. */
+export function newId(kind: EntityKind): string {
+  return typeid(ID_PREFIXES[kind]).toString();
+}
+
+/** Human issue keys: `<PROJECT KEY>-<number>`, e.g. `ENG-42`. */
+export const ISSUE_KEY_PATTERN = /^([A-Z][A-Z0-9]{1,9})-(\d+)$/;
+export const PROJECT_KEY_PATTERN = /^[A-Z][A-Z0-9]{1,9}$/;
+
+/** Parses `ENG-42` into its parts, or returns null. Case-insensitive on input (`eng-42` works). */
+export function parseIssueKey(value: string): { projectKey: string; number: number } | null {
+  const match = ISSUE_KEY_PATTERN.exec(value.trim().toUpperCase());
+  if (!match) return null;
+  return { projectKey: match[1]!, number: Number(match[2]) };
+}
+
+export function formatIssueKey(projectKey: string, number: number): string {
+  return `${projectKey}-${number}`;
 }

@@ -18,7 +18,7 @@ export const WRITE_LOCK_KEY = 7_424_242;
  *   upgrades to a write fails with `SQLITE_BUSY` *without* honouring `busy_timeout` when another
  *   process (e.g. the CLI in local mode) wrote in between; an immediate transaction waits instead.
  * - **Postgres:** a regular transaction that first takes a transaction-scoped advisory lock, serializing
- *   writers. That makes `events.seq` values commit in order, so consumers reading `seq > cursor` never
+ *   writers. That makes `events.seq` values become visible in increasing order, so consumers reading `seq > cursor` never
  *   skip a row that commits late. Tracker write volume makes this cheap; see ADR 0003 for the escape hatch.
  *
  * After commit, {@link Db.onCommit} listeners fire. Never perform network or blob I/O inside `fn`.

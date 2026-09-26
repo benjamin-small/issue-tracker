@@ -47,7 +47,7 @@ See [docs/development.md](docs/development.md) for details.
 | --------- | -------------------------------------------------------------------------------------------- | ------- |
 | M0        | Workspace scaffold, tooling, CI, local Postgres, docs skeleton                               | ✅ done |
 | M1        | Database layer: dual-dialect factory, migrations, `withWriteTx`, test harness                | ✅ done |
-| M2        | Domain schemas and core services: issues, comments, links, labels, statuses, events, filters | planned |
+| M2        | Domain schemas and core services: issues, comments, links, labels, statuses, events, filters | ✅ done |
 | M3        | HTTP API, auth (actors + tokens), OpenAPI 3.1 contract, Scalar docs                          | planned |
 | M4        | Generated client and the `tracker` CLI                                                       | planned |
 | M5        | Web UI: shell, list view, issue detail, comments, links                                      | planned |

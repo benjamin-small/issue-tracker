@@ -1,0 +1,127 @@
+import { type Database, fromJson, type Selectable, toBool } from '@tracker/db';
+import type {
+  ApiToken,
+  Comment,
+  Label,
+  LinkType,
+  Project,
+  Status,
+  User,
+  UserSummary,
+  View,
+} from '@tracker/schema';
+import { migrateViewConfig } from '@tracker/schema';
+
+type Row<T extends keyof Database> = Selectable<Database[T]>;
+
+export function toUser(r: Row<'users'>): User {
+  return {
+    id: r.id,
+    handle: r.handle,
+    name: r.name,
+    kind: r.kind,
+    avatarUrl: r.avatar_url,
+    email: r.email,
+    role: r.role,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    deactivatedAt: r.deactivated_at,
+  };
+}
+
+export function toUserSummary(
+  u: Pick<User, 'id' | 'handle' | 'name' | 'kind' | 'avatarUrl'>,
+): UserSummary {
+  return { id: u.id, handle: u.handle, name: u.name, kind: u.kind, avatarUrl: u.avatarUrl };
+}
+
+export function toApiToken(r: Row<'api_tokens'>): ApiToken {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    name: r.name,
+    prefix: r.prefix,
+    scopes: fromJson<string[]>(r.scopes, []),
+    createdAt: r.created_at,
+    lastUsedAt: r.last_used_at,
+    expiresAt: r.expires_at,
+    revokedAt: r.revoked_at,
+  };
+}
+
+export function toProject(r: Row<'projects'>): Project {
+  return {
+    id: r.id,
+    key: r.key,
+    name: r.name,
+    description: r.description,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    archivedAt: r.archived_at,
+  };
+}
+
+export function toStatus(r: Row<'statuses'>): Status {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name,
+    category: r.category,
+    color: r.color,
+    position: r.position,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function toLabel(r: Row<'labels'>): Label {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name,
+    color: r.color,
+    description: r.description,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function toLinkType(r: Row<'link_types'>): LinkType {
+  return {
+    id: r.id,
+    key: r.key,
+    name: r.name,
+    outwardLabel: r.outward_label,
+    inwardLabel: r.inward_label,
+    symmetric: toBool(r.symmetric),
+    builtIn: toBool(r.built_in),
+  };
+}
+
+export function toComment(r: Row<'comments'>, author: UserSummary): Comment {
+  return {
+    id: r.id,
+    issueId: r.issue_id,
+    authorId: r.author_id,
+    author,
+    body: r.body,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    editedAt: r.edited_at,
+    deletedAt: r.deleted_at,
+  };
+}
+
+export function toView(r: Row<'views'>): View {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    ownerId: r.owner_id,
+    name: r.name,
+    layout: r.layout,
+    config: migrateViewConfig(fromJson(r.config, {})),
+    position: r.position,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}

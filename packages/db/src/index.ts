@@ -5,4 +5,11 @@ export * from './types.ts';
 export * from './url.ts';
 export * from './values.ts';
 export { sql } from 'kysely';
-export type { Kysely, Selectable, Insertable, Updateable } from 'kysely';
+export type {
+  Kysely,
+  Selectable,
+  Insertable,
+  Updateable,
+  RawBuilder,
+  ExpressionBuilder,
+} from 'kysely';

@@ -15,7 +15,7 @@ Two problems need a single answer.
 `withWriteTx(db, fn)` in `packages/db/src/tx.ts` is the only way application code writes:
 
 - **SQLite:** `BEGIN IMMEDIATE`, which takes the write lock up front. A writer in another process waits up to `busy_timeout` instead of failing.
-- **Postgres:** a normal transaction that first calls `pg_advisory_xact_lock(WRITE_LOCK_KEY)`, serializing all writers. Commit order then equals `seq` order.
+- **Postgres:** a normal transaction that first calls `pg_advisory_xact_lock(WRITE_LOCK_KEY)`, serializing all writers. Commit order then equals `seq` order. (Sequence values consumed by rolled-back transactions leave harmless gaps; consumers only rely on monotonicity.)
 - **After commit,** `Db.onCommit` listeners fire, so in-process consumers wake immediately.
 - **No network or blob I/O inside the transaction.** It would hold the global write lock.
 
