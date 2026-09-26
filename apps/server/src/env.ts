@@ -1,5 +1,12 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Actor, Clock, EventTailer, IdGenerator, ServiceContext } from '@tracker/core';
+import type {
+  Actor,
+  BlobStore,
+  Clock,
+  EventTailer,
+  IdGenerator,
+  ServiceContext,
+} from '@tracker/core';
 import type { Db } from '@tracker/db';
 
 /**
@@ -26,6 +33,10 @@ export interface AppDeps {
   ids?: IdGenerator;
   /** Directory with the built web app to serve at `/` (production). */
   webDir?: string;
+  /** Where attachment bytes are stored. Without one, attachment routes answer 503. */
+  blobStore?: BlobStore;
+  /** Upload size limit in bytes (default 25 MB). */
+  maxUploadBytes?: number;
   /** Follows the event log for live streaming (`GET /events/stream`) and webhooks. */
   tailer?: EventTailer;
   /** Extra hooks for features that attach to the app (attachments, …). */

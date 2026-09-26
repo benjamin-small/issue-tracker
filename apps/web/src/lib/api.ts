@@ -12,6 +12,7 @@ export type IssueLink = Schemas['IssueLink'];
 export type TrackerEvent = Schemas['Event'];
 export type LinkType = Schemas['LinkType'];
 export type CustomField = Schemas['CustomField'];
+export type Attachment = Schemas['Attachment'];
 export type UpdateIssueInput = Schemas['UpdateIssueInput'];
 export type CreateIssueInput = Schemas['CreateIssueInput'];
 export { ApiError };
@@ -51,4 +52,25 @@ export async function call<T>(
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   return error instanceof Error ? error.message : String(error);
+}
+
+/** Uploads a file to an issue (multipart). */
+export async function uploadAttachment(issueKey: string, file: File): Promise<Attachment> {
+  const form = new FormData();
+  form.set('file', file, file.name || 'pasted-file');
+  return call(
+    api.POST('/issues/{issue}/attachments', {
+      params: { path: { issue: issueKey } },
+      body: {} as never,
+      bodySerializer: () => form,
+    }),
+  );
+}
+
+/** Markdown for an uploaded file: an inline image for raster images, a link otherwise. */
+export function attachmentMarkdown(attachment: Attachment): string {
+  const name = attachment.filename.replace(/[[\]]/g, '');
+  return attachment.contentType.startsWith('image/') && attachment.contentType !== 'image/svg+xml'
+    ? `![${name}](${attachment.url})`
+    : `[${name}](${attachment.url})`;
 }

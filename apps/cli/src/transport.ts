@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type ApiClient, createClient } from '@tracker/client';
-import { ensureBuiltins } from '@tracker/core';
+import { blobStoreFromEnv, ensureBuiltins } from '@tracker/core';
+import { dirname, join } from 'node:path';
 import { createDb, type Db, migrationStatus } from '@tracker/db';
 import { createApp } from '@tracker/server';
 import type { ResolvedConfig } from './config.ts';
@@ -62,7 +63,13 @@ export async function openTransport(config: ResolvedConfig, io: CliIO): Promise<
   }
   const db = await openLocalDatabase(config.database!, true);
   const actor = config.sources.actor ? config.actor : await defaultLocalActor(db);
-  const app = createApp({ db, auth: { mode: 'trusted', actor } });
+  // Attachments land next to a SQLite file (…/data/blobs, the dev server's default) unless configured.
+  const file = /^sqlite:(\/.+)$/.exec(config.database!)?.[1];
+  const blobStore = blobStoreFromEnv(
+    io.env,
+    file ? join(dirname(file), 'blobs') : join(io.cwd, 'data', 'blobs'),
+  );
+  const app = createApp({ db, auth: { mode: 'trusted', actor }, blobStore });
   return {
     client: createClient({
       baseUrl: 'http://tracker.local',

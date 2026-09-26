@@ -15,3 +15,4 @@ Short records of decisions that constrain future work. Copy `0000-template.md`, 
 | [0005](0005-api-as-contract.md)                    | The HTTP API is the contract; CLI local mode runs it in-process    | Accepted |
 | [0009](0009-auth-v1.md)                            | Auth v1: actors, API tokens and cookie sessions                    | Accepted |
 | [0011](0011-committed-openapi.md)                  | OpenAPI generated from code and committed                          | Accepted |
+| [0012](0012-blob-storage.md)                       | Attachment bytes in a pluggable blob store (local disk or S3)      | Accepted |

@@ -80,6 +80,31 @@ Projects define typed fields with `POST /projects/{project}/fields`. The types a
 - **Discovery.** `GET /projects/{project}/schema/issue` lists every field, with its options as enums.
 - **Archiving.** Archiving a field or an option hides it without deleting stored values. Option values are immutable, while labels and colors can change.
 
+## Attachments
+
+Files belong to an issue (and optionally a comment on it).
+
+- **Upload:** `POST /issues/{issue}/attachments` as `multipart/form-data` with a `file` part and an optional `commentId`. The limit is `TRACKER_MAX_UPLOAD_MB` (default 25); larger bodies get `413 PAYLOAD_TOO_LARGE`. The server detects the media type from the file's bytes and ignores the type the client declares.
+- **Read:** `GET /issues/{issue}/attachments` lists them. `GET /attachments/{id}` returns metadata, including `sha256` and a `url`. `GET /attachments/{id}/content` returns the bytes.
+- **Delete:** `DELETE /attachments/{id}` (the uploader or an admin). The row is soft-deleted and the stored bytes are removed.
+
+Markdown can embed an attachment by its `url`, e.g. `![shot.png](/api/v1/attachments/att_…/content)`. The web editor does this for pasted and dropped files.
+
+**Download safety.** Uploaded files are untrusted, so the content route never lets them run as part of the app:
+
+- Only raster images (PNG, JPEG, GIF, WebP) are served `inline`. Everything else, SVG, HTML and PDF included, is served with `Content-Disposition: attachment`.
+- Every response carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; sandbox`.
+- Filenames are sanitized for the header (RFC 6266 `filename*`).
+
+**Storage** is pluggable (`TRACKER_BLOB_STORE`):
+
+| Setting           | Storage                                                                                                                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `local` (default) | Files under `TRACKER_BLOB_DIR` (`./data/blobs`)                                                                                                                                       |
+| `s3`              | Any S3-compatible store: `TRACKER_S3_ENDPOINT`, `_BUCKET`, `_REGION`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`, `_FORCE_PATH_STYLE`. Downloads redirect to a short-lived presigned URL. |
+
+Storage keys are random and never derived from the filename. Bytes are written before the database transaction and removed if it fails, so no network I/O happens inside a write transaction.
+
 ## Errors
 
 Every error is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json` body:

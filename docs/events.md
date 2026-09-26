@@ -45,6 +45,7 @@ Every change is appended to the `events` table in the same transaction as the ch
 | `issue.created`, `issue.updated`, `issue.deleted`, `issue.restored` | `{ issue, changes? }` (`issue.deleted` with `permanent: true` for hard deletes) |
 | `comment.created`, `comment.updated`, `comment.deleted`             | `{ comment, issue: { id, key, title } }`                                        |
 | `link.created`, `link.deleted`                                      | `{ link: { id, type, source, target } }`                                        |
+| `attachment.created`, `attachment.deleted`                          | `{ attachment, issue: { id, key } }`                                            |
 | `project.created`, `project.updated`                                | `{ project, changes? }`                                                         |
 | `status.created`, `status.updated`, `status.deleted`                | `{ status, changes? }`                                                          |
 | `label.created`, `label.updated`, `label.deleted`                   | `{ label, changes? }`                                                           |

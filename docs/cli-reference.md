@@ -264,6 +264,62 @@ Aliases: `rm`
 
 List link types
 
+### `tracker attachment add <issue> <files...>`
+
+Upload one or more files to an issue (the media type is detected from the content)
+
+| Argument | Description |
+| --- | --- |
+| `issue` | issue key or id |
+| `files` | paths to upload, or - for stdin (with --name) |
+
+| Option | Description |
+| --- | --- |
+| `--name <filename>` | filename to store (default: the file’s basename) |
+| `--comment <id>` | associate the upload with a comment on the issue |
+
+### `tracker attachment list <issue>`
+
+List the files attached to an issue
+
+Aliases: `ls`
+
+| Argument | Description |
+| --- | --- |
+| `issue` | issue key or id |
+
+### `tracker attachment view <id>`
+
+Show an attachment’s metadata
+
+| Argument | Description |
+| --- | --- |
+| `id` | attachment id |
+
+### `tracker attachment download <id>`
+
+Download an attachment’s content to a file (default: its filename) or - for stdout
+
+Aliases: `get`
+
+| Argument | Description |
+| --- | --- |
+| `id` | attachment id |
+
+| Option | Description |
+| --- | --- |
+| `-o, --output <path>` | where to write it; - writes the bytes to stdout |
+
+### `tracker attachment remove <id>`
+
+Delete an attachment (uploader or admin)
+
+Aliases: `rm`
+
+| Argument | Description |
+| --- | --- |
+| `id` | attachment id |
+
 ### `tracker project list`
 
 List projects

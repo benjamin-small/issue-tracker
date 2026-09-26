@@ -264,3 +264,144 @@ export function eventCommand(io: CliIO): Command {
   );
   return cmd;
 }
+
+export function attachmentCommand(io: CliIO): Command {
+  const act = (fn: (rt: Runtime, args: unknown[], o: Opts) => Promise<void>) => makeAction(io, fn);
+  const cmd = new Command('attachment').alias('attach').description('Attach files to issues');
+  cmd
+    .command('add')
+    .description(
+      'Upload one or more files to an issue (the media type is detected from the content)',
+    )
+    .argument('<issue>', 'issue key or id')
+    .argument('<files...>', 'paths to upload, or - for stdin (with --name)')
+    .option('--name <filename>', 'filename to store (default: the file’s basename)')
+    .option('--comment <id>', 'associate the upload with a comment on the issue')
+    .action(
+      act(async (rt, [issue, files], o) => {
+        const { readFile } = await import('node:fs/promises');
+        const { basename, resolve } = await import('node:path');
+        const paths = files as string[];
+        if (o.name && paths.length > 1) throw usage('--name applies to a single file');
+        const api = await rt.api();
+        const uploaded = [];
+        for (const path of paths) {
+          let data: Uint8Array;
+          if (path === '-') {
+            if (!o.name) throw usage('Uploading from stdin needs --name <filename>');
+            data = new TextEncoder().encode(await rt.io.readStdin());
+          } else {
+            try {
+              data = new Uint8Array(await readFile(resolve(rt.io.cwd, path)));
+            } catch (error) {
+              throw usage(`Cannot read ${path}: ${(error as Error).message}`);
+            }
+          }
+          const form = new FormData();
+          form.set(
+            'file',
+            new File([data as Uint8Array<ArrayBuffer>], String(o.name ?? basename(path))),
+          );
+          if (o.comment) form.set('commentId', String(o.comment));
+          uploaded.push(
+            await rt.call(
+              api.POST('/issues/{issue}/attachments', {
+                params: { path: { issue: String(issue) } },
+                body: {} as never,
+                bodySerializer: () => form,
+              }),
+            ),
+          );
+        }
+        if (uploaded.length === 1) rt.out.item('attachment', uploaded[0]);
+        else rt.out.list('attachment', uploaded);
+      }),
+    );
+  cmd
+    .command('list')
+    .alias('ls')
+    .description('List the files attached to an issue')
+    .argument('<issue>', 'issue key or id')
+    .action(
+      act(async (rt, [issue]) => {
+        const api = await rt.api();
+        rt.out.list(
+          'attachment',
+          (
+            await rt.call(
+              api.GET('/issues/{issue}/attachments', {
+                params: { path: { issue: String(issue) } },
+              }),
+            )
+          ).data,
+        );
+      }),
+    );
+  cmd
+    .command('view')
+    .description('Show an attachment’s metadata')
+    .argument('<id>', 'attachment id')
+    .action(
+      act(async (rt, [id]) => {
+        const api = await rt.api();
+        rt.out.item(
+          'attachment',
+          await rt.call(api.GET('/attachments/{id}', { params: { path: { id: String(id) } } })),
+        );
+      }),
+    );
+  cmd
+    .command('download')
+    .alias('get')
+    .description(
+      'Download an attachment’s content to a file (default: its filename) or - for stdout',
+    )
+    .argument('<id>', 'attachment id')
+    .option('-o, --output <path>', 'where to write it; - writes the bytes to stdout')
+    .action(
+      act(async (rt, [id], o) => {
+        const api = await rt.api();
+        const meta = await rt.call(
+          api.GET('/attachments/{id}', { params: { path: { id: String(id) } } }),
+        );
+        const bytes = new Uint8Array(
+          (await rt.call(
+            api.GET('/attachments/{id}/content', {
+              params: { path: { id: String(id) } },
+              parseAs: 'arrayBuffer',
+            }),
+          )) as ArrayBuffer,
+        );
+        if (o.output === '-') {
+          if (rt.io.stdoutBytes) rt.io.stdoutBytes(bytes);
+          else rt.io.stdout(new TextDecoder().decode(bytes));
+          return;
+        }
+        const { writeFile } = await import('node:fs/promises');
+        const { basename, resolve } = await import('node:path');
+        const target = resolve(rt.io.cwd, String(o.output ?? basename(meta.filename)));
+        await writeFile(target, bytes);
+        rt.out.item(
+          'raw',
+          { path: target, size: bytes.byteLength, sha256: meta.sha256 },
+          () => `Saved ${target} (${bytes.byteLength} bytes)\n`,
+        );
+      }),
+    );
+  cmd
+    .command('remove')
+    .alias('rm')
+    .description('Delete an attachment (uploader or admin)')
+    .argument('<id>', 'attachment id')
+    .action(
+      act(async (rt, [id]) => {
+        const api = await rt.api();
+        rt.out.item(
+          'attachment',
+          await rt.call(api.DELETE('/attachments/{id}', { params: { path: { id: String(id) } } })),
+          (r) => `Deleted ${String(r.filename)}\n`,
+        );
+      }),
+    );
+  return cmd;
+}

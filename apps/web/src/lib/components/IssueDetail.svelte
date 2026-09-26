@@ -9,7 +9,9 @@
   import { useProjectData } from '../project-data.svelte.ts';
   import { fetchers, keys } from '../queries.ts';
   import { toast } from '../toast.svelte.ts';
+  import { markdownUploader } from '../attachments.ts';
   import ActivityTimeline from './ActivityTimeline.svelte';
+  import AttachmentsSection from './AttachmentsSection.svelte';
   import CustomFieldEditor from './CustomFieldEditor.svelte';
   import IssueProperties from './IssueProperties.svelte';
   import LinksSection from './LinksSection.svelte';
@@ -38,6 +40,7 @@
   const me = createQuery(() => ({ queryKey: keys.me, queryFn: fetchers.me, staleTime: 300_000 }));
   const project = useProjectData(() => projectKeyOf(issueKey));
   const issue = $derived(query.data);
+  const upload = markdownUploader(qc, () => issueKey);
 
   let title = $state('');
   let editingDescription = $state(false);
@@ -159,6 +162,7 @@
               onsubmit={saveDescription}
               oncancel={() => (editingDescription = false)}
               testid="description-input"
+              {upload}
             />
             <div class="mt-2 flex justify-end gap-2 text-sm">
               <button
@@ -189,6 +193,7 @@
 
         <SubIssues {issue} {onopen} />
         <LinksSection {issue} {onopen} />
+        <AttachmentsSection {issue} />
         <ActivityTimeline {issue} me={me.data} />
       </div>
 

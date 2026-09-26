@@ -683,6 +683,111 @@
       "options": []
     },
     {
+      "name": "attachment add",
+      "aliases": [],
+      "description": "Upload one or more files to an issue (the media type is detected from the content)",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        },
+        {
+          "name": "files",
+          "required": true,
+          "variadic": true,
+          "description": "paths to upload, or - for stdin (with --name)"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--name <filename>",
+          "name": "name",
+          "description": "filename to store (default: the file’s basename)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--comment <id>",
+          "name": "comment",
+          "description": "associate the upload with a comment on the issue",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "attachment list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List the files attached to an issue",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "attachment view",
+      "aliases": [],
+      "description": "Show an attachment’s metadata",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "attachment id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "attachment download",
+      "aliases": [
+        "get"
+      ],
+      "description": "Download an attachment’s content to a file (default: its filename) or - for stdout",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "attachment id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-o, --output <path>",
+          "name": "output",
+          "description": "where to write it; - writes the bytes to stdout",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "attachment remove",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Delete an attachment (uploader or admin)",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "attachment id"
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "project list",
       "aliases": [
         "ls"

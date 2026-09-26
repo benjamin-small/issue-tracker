@@ -6,11 +6,13 @@
   import { fetchers, keys } from '../queries.ts';
   import { toast } from '../toast.svelte.ts';
   import Avatar from './Avatar.svelte';
+  import { markdownUploader } from '../attachments.ts';
   import Markdown from './Markdown.svelte';
   import MarkdownEditor from './MarkdownEditor.svelte';
 
   let { issue, me }: { issue: Issue; me: User | undefined } = $props();
   const qc = useQueryClient();
+  const upload = markdownUploader(qc, () => issue.key);
   const comments = createQuery(() => ({
     queryKey: keys.comments(issue.key),
     queryFn: () => fetchers.comments(issue.key),
@@ -49,6 +51,7 @@
       changes?: Record<string, Change>;
       link?: { type: string; source: { key: string }; target: { key: string } };
       permanent?: boolean;
+      attachment?: { filename: string };
     };
     switch (e.type) {
       case 'issue.created':
@@ -63,6 +66,10 @@
         const verb = e.type === 'link.created' ? 'linked' : 'unlinked';
         return [`${verb}: ${l.source.key} ${l.type} ${l.target.key}`];
       }
+      case 'attachment.created':
+        return [`attached ${data.attachment?.filename ?? 'a file'}`];
+      case 'attachment.deleted':
+        return [`removed attachment ${data.attachment?.filename ?? ''}`.trim()];
       case 'issue.updated': {
         const out: string[] = [];
         for (const [field, c] of Object.entries(data.changes ?? {})) {
@@ -197,6 +204,7 @@
                 autofocus
                 onsubmit={() => saveEdit(c.id)}
                 oncancel={() => (editing = null)}
+                {upload}
               />
               <div class="mt-2 flex justify-end gap-2 text-xs">
                 <button class="rounded px-2 py-1 hover:bg-bg-hover" onclick={() => (editing = null)}
@@ -222,6 +230,7 @@
       placeholder="Leave a comment…"
       onsubmit={post}
       testid="comment-input"
+      {upload}
     />
     <div class="mt-2 flex justify-end">
       <button

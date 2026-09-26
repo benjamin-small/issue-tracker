@@ -49,6 +49,8 @@ jobs:
     env:
       TEST_DB: ${{ matrix.db }}
       TEST_DATABASE_URL: postgres://tracker:tracker@localhost:5432/tracker
+      # The Postgres leg runs the S3 blob-store contract against real MinIO (the SQLite leg uses an emulator).
+      TEST_S3_ENDPOINT: ${{ matrix.db == 'postgres' && 'http://localhost:9000' || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -57,6 +59,14 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Start MinIO
+        if: matrix.db == 'postgres'
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin minio/minio server /data
+          for i in $(seq 30); do curl -sf http://localhost:9000/minio/health/live && break; sleep 1; done
+          docker run --rm --network host --entrypoint sh minio/mc -c \
+            'mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb local/tracker'
       - run: pnpm test
 
   e2e:

@@ -21,6 +21,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     TRACKER_SEED: bool(!production),
     TRACKER_WEB_DIR: z.string().optional(),
     TRACKER_SECURE_COOKIES: bool(production),
+    TRACKER_BLOB_STORE: z.enum(['local', 's3']).default('local'),
+    TRACKER_BLOB_DIR: z.string().default('./data/blobs'),
+    TRACKER_S3_ENDPOINT: z.string().optional(),
+    TRACKER_S3_BUCKET: z.string().optional(),
+    TRACKER_S3_REGION: z.string().optional(),
+    TRACKER_S3_ACCESS_KEY_ID: z.string().optional(),
+    TRACKER_S3_SECRET_ACCESS_KEY: z.string().optional(),
+    TRACKER_S3_FORCE_PATH_STYLE: z.string().optional(),
+    TRACKER_MAX_UPLOAD_MB: z.coerce.number().positive().max(1024).default(25),
     TRACKER_ALLOWED_ORIGINS: z
       .string()
       .default('')

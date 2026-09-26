@@ -1,10 +1,10 @@
 import { execFile } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { createProject } from '@tracker/core';
+import { createProject, LocalDiskBlobStore } from '@tracker/core';
 import { createTestContext, type TestContext } from '@tracker/core/testing';
 import { testDialect } from '@tracker/db/testing';
 import { createApp } from '@tracker/server';
@@ -40,7 +40,11 @@ async function cli(
 beforeAll(async () => {
   t = await createTestContext();
   await createProject(t.ctx, { key: 'CLI', name: 'CLI' });
-  const app = createApp({ db: t.db, auth: { mode: 'trusted', actor: 'admin' } });
+  const app = createApp({
+    db: t.db,
+    auth: { mode: 'trusted', actor: 'admin' },
+    blobStore: new LocalDiskBlobStore(join(dir, 'blobs')),
+  });
   appFetch = (r) => Promise.resolve(app.fetch(r));
 });
 afterAll(async () => {
@@ -315,6 +319,47 @@ describe(`tracker CLI (${testDialect()})`, () => {
     const created = await cli(['api', 'POST', '/projects/CLI/labels', '-f', 'name=api-made']);
     expect(JSON.parse(created.stdout).name).toBe('api-made');
     expect((await cli(['api', 'GET', '/issues/NOPE-1'])).code).toBe(3);
+  });
+
+  it('uploads, lists, downloads and removes attachments', async () => {
+    const issue = (await cli(['issue', 'create', '-t', 'With files', '--json'])).json();
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+      'base64',
+    );
+    writeFileSync(join(dir, 'dot.png'), png);
+    writeFileSync(join(dir, 'notes.txt'), 'hello attachments');
+
+    const added = await cli(['attachment', 'add', issue.key, 'dot.png', 'notes.txt', '--json']);
+    expect(added.code).toBe(0);
+    const [image, text] = added.json().data;
+    expect(image).toMatchObject({
+      filename: 'dot.png',
+      contentType: 'image/png',
+      size: png.length,
+    });
+    expect(text).toMatchObject({ filename: 'notes.txt', contentType: 'text/plain' });
+
+    const fromStdin = await cli(['attach', 'add', issue.key, '-', '--name', 'log.txt', '-q'], {
+      stdin: 'piped',
+    });
+    expect(fromStdin.stdout).toMatch(/^att_/);
+
+    const list = await cli(['attachment', 'list', issue.key]);
+    expect(list.stdout.split('\n')[0]).toMatch(
+      /^ID\s+FILENAME\s+TYPE\s+SIZE\s+UPLOADER\s+CREATED$/,
+    );
+    expect(list.stdout).toContain('notes.txt');
+
+    const out = await cli(['attachment', 'download', image.id, '-o', 'copy.png']);
+    expect(out.code).toBe(0);
+    expect(readFileSync(join(dir, 'copy.png'))).toEqual(png);
+    expect((await cli(['attachment', 'get', text.id, '-o', '-'])).stdout).toBe('hello attachments');
+
+    expect((await cli(['attachment', 'rm', text.id])).stdout).toBe('Deleted notes.txt\n');
+    const missing = await cli(['attachment', 'view', text.id]);
+    expect(missing.code).toBe(3);
+    expect((await cli(['attachment', 'add', issue.key, 'nope.bin'])).code).toBe(2);
   });
 });
 

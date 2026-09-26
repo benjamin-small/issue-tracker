@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig, startServer } from '../../server/src/index.ts';
 
 const dbFile = fileURLToPath(new URL('../test-results/e2e.db', import.meta.url));
+const blobDir = fileURLToPath(new URL('../test-results/e2e-blobs', import.meta.url));
+rmSync(blobDir, { recursive: true, force: true });
 const url = process.env.E2E_DATABASE_URL ?? `sqlite:${dbFile}`;
 if (url.startsWith('sqlite:'))
   for (const suffix of ['', '-wal', '-shm']) rmSync(`${dbFile}${suffix}`, { force: true });
@@ -16,6 +18,7 @@ const server = await startServer(
     TRACKER_WEB_DIR: fileURLToPath(new URL('../build', import.meta.url)),
     TRACKER_AUTH_MODE: 'dev',
     TRACKER_SEED: '1',
+    TRACKER_BLOB_DIR: blobDir,
   }),
 );
 console.log(`e2e server on ${server.url}`);

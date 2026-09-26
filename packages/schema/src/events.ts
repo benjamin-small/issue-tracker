@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { nullableRef, TimestampSchema } from './common.ts';
+import { AttachmentSchema } from './attachments.ts';
 import { CustomFieldSchema } from './custom-fields.ts';
 import {
   CommentSchema,
@@ -39,6 +40,8 @@ export const EVENT_TYPES = [
   'field.created',
   'field.updated',
   'field.deleted',
+  'attachment.created',
+  'attachment.deleted',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 export const EventTypeSchema = z.enum(EVENT_TYPES);
@@ -80,6 +83,9 @@ export const StatusEventDataSchema = z
 export const LabelEventDataSchema = z
   .object({ ...base, label: LabelSchema, changes: ChangesSchema.optional() })
   .meta({ id: 'LabelEventData' });
+export const AttachmentEventDataSchema = z
+  .object({ ...base, attachment: AttachmentSchema, issue: IssueRefSchema })
+  .meta({ id: 'AttachmentEventData' });
 export const FieldEventDataSchema = z
   .object({ ...base, field: CustomFieldSchema, changes: ChangesSchema.optional() })
   .meta({ id: 'FieldEventData' });
@@ -110,6 +116,8 @@ export const EVENT_DATA_SCHEMAS = {
   'field.created': FieldEventDataSchema,
   'field.updated': FieldEventDataSchema,
   'field.deleted': FieldEventDataSchema,
+  'attachment.created': AttachmentEventDataSchema,
+  'attachment.deleted': AttachmentEventDataSchema,
 } as const satisfies Record<EventType, z.ZodType>;
 
 export const EventSchema = z

@@ -64,11 +64,12 @@ and [docs/architecture.md](docs/architecture.md) for how the pieces fit.
 | M0        | Workspace scaffold, tooling, CI, local Postgres, docs skeleton                               | ✅ done |
 | M1        | Database layer: dual-dialect factory, migrations, `withWriteTx`, test harness                | ✅ done |
 | M2        | Domain schemas and core services: issues, comments, links, labels, statuses, events, filters | ✅ done |
-| M3        | HTTP API, auth (actors + tokens), OpenAPI 3.1 contract, Scalar docs                          | planned |
+| M3        | HTTP API, auth (actors + tokens), OpenAPI 3.1 contract, Scalar docs                          | ✅ done |
 | M4        | Generated client and the `tracker` CLI                                                       | ✅ done |
 | M5        | Web UI: shell, list view, issue detail, comments, links                                      | ✅ done |
 | M6        | Kanban board, customizable cards, saved views                                                | ✅ done |
 | M7        | Live updates (event tailer, SSE)                                                             | ✅ done |
 | M8        | Custom fields                                                                                | ✅ done |
-| M9–M10    | Attachments, webhooks                                                                        | planned |
+| M9        | File attachments (local disk or S3), paste/drop upload                                       | ✅ done |
+| M10       | Webhooks                                                                                     | planned |
 | M11       | Production hardening: Docker, Postgres end-to-end, docs                                      | planned |

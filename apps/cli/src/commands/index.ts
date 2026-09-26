@@ -8,7 +8,7 @@ import {
   userCommand,
   viewCommand,
 } from './admin.ts';
-import { commentCommand, eventCommand, linkCommand } from './collab.ts';
+import { attachmentCommand, commentCommand, eventCommand, linkCommand } from './collab.ts';
 import { issueCommand } from './issues.ts';
 import { fieldCommand } from './fields.ts';
 import {
@@ -28,6 +28,7 @@ export function adminCommands(io: CliIO, program: () => Command): Command[] {
     issueCommand(io),
     commentCommand(io),
     linkCommand(io),
+    attachmentCommand(io),
     projectCommand(io),
     statusCommand(io),
     labelCommand(io),

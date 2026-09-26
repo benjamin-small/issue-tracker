@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { serve } from '@hono/node-server';
 import {
+  blobStoreFromEnv,
   createContext,
   ensureBuiltins,
   EventTailer,
@@ -74,6 +75,8 @@ export async function startServer(
     },
     ...(config.TRACKER_WEB_DIR && { webDir: config.TRACKER_WEB_DIR }),
     tailer,
+    blobStore: blobStoreFromEnv(config as unknown as Record<string, string | undefined>),
+    maxUploadBytes: config.TRACKER_MAX_UPLOAD_MB * 1024 * 1024,
     extensions,
   });
 

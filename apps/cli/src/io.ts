@@ -2,6 +2,8 @@
 export interface CliIO {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
+  /** Writes raw bytes to stdout (binary downloads); text-only IO falls back to UTF-8 decoding. */
+  stdoutBytes?: (bytes: Uint8Array) => void;
   env: Record<string, string | undefined>;
   cwd: string;
   /** Reads all of stdin (for `--body-file -`, `--input -`). */
@@ -23,6 +25,7 @@ export function processIO(): CliIO {
   return {
     stdout: (t) => process.stdout.write(t),
     stderr: (t) => process.stderr.write(t),
+    stdoutBytes: (b) => process.stdout.write(b),
     env: process.env,
     cwd: process.cwd(),
     readStdin: () => readAll(process.stdin),

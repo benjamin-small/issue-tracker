@@ -14,7 +14,11 @@
   "dependencies": {
     "@tracker/db": "workspace:*",
     "@tracker/schema": "workspace:*",
+    "aws4fetch": "^1.0.20",
     "fractional-indexing": "^4.0.0",
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "s3rver": "^3.7.1"
   }
 }

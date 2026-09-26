@@ -6,6 +6,7 @@ export type Kind =
   | 'issue'
   | 'comment'
   | 'link'
+  | 'attachment'
   | 'linkType'
   | 'project'
   | 'status'
@@ -48,6 +49,14 @@ const COLUMNS: Record<Exclude<Kind, 'raw'>, Column[]> = {
     ['ISSUE', (r) => (r.issue as { key: string }).key],
     ['STATUS', (r) => (r.issue as { status: { name: string } }).status.name],
     ['TITLE', (r) => (r.issue as { title: string }).title],
+  ],
+  attachment: [
+    ['ID', (r) => r.id],
+    ['FILENAME', (r) => r.filename],
+    ['TYPE', (r) => r.contentType],
+    ['SIZE', (r) => r.size],
+    ['UPLOADER', (r) => handle(r.uploader)],
+    ['CREATED', (r) => date(r.createdAt)],
   ],
   linkType: [
     ['KEY', (r) => r.key],

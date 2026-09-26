@@ -13,6 +13,7 @@ import {
 import { authenticate, requestId, requireActor } from './middleware/auth.ts';
 import { idempotency } from './middleware/idempotency.ts';
 import { problem, problemFromError } from './problem.ts';
+import { registerAttachmentRoutes } from './routes/attachments.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerCollaborationRoutes } from './routes/collaboration.ts';
 import { registerIssueRoutes } from './routes/issues.ts';
@@ -102,6 +103,7 @@ function buildApi(resolved: ResolvedDeps): TrackerApp {
   registerIssueRoutes(api);
   registerCollaborationRoutes(api);
   registerFieldRoutes(api);
+  registerAttachmentRoutes(api, resolved);
   registerStreamRoute(api, resolved);
   for (const extension of resolved.extensions ?? []) extension(api, resolved);
 

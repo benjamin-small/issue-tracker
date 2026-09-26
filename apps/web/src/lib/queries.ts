@@ -18,6 +18,7 @@ export const keys = {
   issue: (key: string) => ['issue', key] as const,
   comments: (key: string) => ['comments', key] as const,
   links: (key: string) => ['links', key] as const,
+  attachments: (key: string) => ['attachments', key] as const,
   children: (key: string) => ['children', key] as const,
   activity: (key: string) => ['activity', key] as const,
 };
@@ -79,6 +80,8 @@ export const fetchers = {
         api.GET('/issues/{issue}/comments', { params: { path: { issue: key }, query: {} } }),
       )
     ).data,
+  attachments: async (key: string) =>
+    (await call(api.GET('/issues/{issue}/attachments', { params: { path: { issue: key } } }))).data,
   links: async (key: string) =>
     (await call(api.GET('/issues/{issue}/links', { params: { path: { issue: key } } }))).data,
   children: async (key: string) =>

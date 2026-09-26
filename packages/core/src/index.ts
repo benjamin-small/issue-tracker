@@ -20,3 +20,6 @@ export * from './services/views.ts';
 export * from './services/schema.ts';
 export * from './events/tailer.ts';
 export * from './services/custom-fields.ts';
+export * from './services/attachments.ts';
+export * from './storage/blob-store.ts';
+export * from './storage/content-type.ts';

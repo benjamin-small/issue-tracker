@@ -65,6 +65,11 @@ function handle(qc: QueryClient, event: TrackerEvent, meId: string | undefined) 
     void qc.invalidateQueries({ queryKey: keys.activity(data.issue.key) });
     return;
   }
+  if (event.type.startsWith('attachment.') && data.issue) {
+    void qc.invalidateQueries({ queryKey: keys.attachments(data.issue.key) });
+    void qc.invalidateQueries({ queryKey: keys.activity(data.issue.key) });
+    return;
+  }
   if (event.type.startsWith('link.') && data.link) {
     for (const ref of [data.link.source, data.link.target]) {
       void qc.invalidateQueries({ queryKey: keys.links(ref.key) });
@@ -131,6 +136,8 @@ export function connectLive(qc: QueryClient, projectKey: string): () => void {
     'comment.deleted',
     'link.created',
     'link.deleted',
+    'attachment.created',
+    'attachment.deleted',
     'project.created',
     'project.updated',
     'status.created',
