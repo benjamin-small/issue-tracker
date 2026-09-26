@@ -7,7 +7,7 @@ import { loadConfig, startServer } from '../../server/src/index.ts';
 const dbFile = fileURLToPath(new URL('../test-results/e2e.db', import.meta.url));
 const blobDir = fileURLToPath(new URL('../test-results/e2e-blobs', import.meta.url));
 rmSync(blobDir, { recursive: true, force: true });
-const url = process.env.E2E_DATABASE_URL ?? `sqlite:${dbFile}`;
+const url = process.env.E2E_DATABASE_URL || `sqlite:${dbFile}`; // empty (as CI sets it) = SQLite
 if (url.startsWith('sqlite:'))
   for (const suffix of ['', '-wal', '-shm']) rmSync(`${dbFile}${suffix}`, { force: true });
 
