@@ -105,6 +105,14 @@ Markdown can embed an attachment by its `url`, e.g. `![shot.png](/api/v1/attachm
 
 Storage keys are random and never derived from the filename. Bytes are written before the database transaction and removed if it fails, so no network I/O happens inside a write transaction.
 
+## Webhooks
+
+Admins register webhooks with `POST /webhooks` (`url`, `eventTypes`, optional `project`). The response contains the signing `secret`, which is shown only once. `POST /webhooks/{id}/rotate-secret` issues a new one.
+
+`POST /webhooks/{id}/test` sends a signed `webhook.ping` right away. `GET /webhooks/{id}/deliveries` is the delivery log, and `POST /webhook-deliveries/{id}/redeliver` retries a delivery.
+
+The payload is documented in the OpenAPI document's `webhooks` section. Signatures, retries and network rules are covered in [events.md](events.md#webhooks).
+
 ## Errors
 
 Every error is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json` body:

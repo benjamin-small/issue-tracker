@@ -29,6 +29,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     TRACKER_S3_ACCESS_KEY_ID: z.string().optional(),
     TRACKER_S3_SECRET_ACCESS_KEY: z.string().optional(),
     TRACKER_S3_FORCE_PATH_STYLE: z.string().optional(),
+    /** Run the background webhook worker in this process (turn off on replicas that should only serve API). */
+    TRACKER_WEBHOOKS: bool(true),
+    /** Let webhooks use http and reach private/loopback addresses. Never enable in production. */
+    TRACKER_WEBHOOK_ALLOW_PRIVATE: bool(!production),
     TRACKER_MAX_UPLOAD_MB: z.coerce.number().positive().max(1024).default(25),
     TRACKER_ALLOWED_ORIGINS: z
       .string()

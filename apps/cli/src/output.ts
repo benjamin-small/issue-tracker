@@ -7,6 +7,8 @@ export type Kind =
   | 'comment'
   | 'link'
   | 'attachment'
+  | 'webhook'
+  | 'webhookDelivery'
   | 'linkType'
   | 'project'
   | 'status'
@@ -57,6 +59,22 @@ const COLUMNS: Record<Exclude<Kind, 'raw'>, Column[]> = {
     ['SIZE', (r) => r.size],
     ['UPLOADER', (r) => handle(r.uploader)],
     ['CREATED', (r) => date(r.createdAt)],
+  ],
+  webhook: [
+    ['ID', (r) => r.id],
+    ['URL', (r) => r.url],
+    ['EVENTS', (r) => (r.eventTypes as string[]).join(',')],
+    ['ACTIVE', (r) => (r.active ? 'yes' : r.disabledAt ? 'disabled (failures)' : 'no')],
+    ['DESCRIPTION', (r) => r.description],
+  ],
+  webhookDelivery: [
+    ['ID', (r) => r.id],
+    ['SEQ', (r) => r.eventSeq],
+    ['EVENT', (r) => r.eventType],
+    ['STATUS', (r) => r.status],
+    ['ATTEMPTS', (r) => r.attempts],
+    ['HTTP', (r) => r.lastStatusCode ?? '—'],
+    ['ERROR', (r) => r.lastError ?? ''],
   ],
   linkType: [
     ['KEY', (r) => r.key],

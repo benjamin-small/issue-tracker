@@ -6,6 +6,7 @@ import type {
   EventTailer,
   IdGenerator,
   ServiceContext,
+  WebhookPolicy,
 } from '@tracker/core';
 import type { Db } from '@tracker/db';
 
@@ -37,6 +38,8 @@ export interface AppDeps {
   blobStore?: BlobStore;
   /** Upload size limit in bytes (default 25 MB). */
   maxUploadBytes?: number;
+  /** How webhooks may reach the network (default: https to public addresses only). */
+  webhooks?: WebhookPolicy;
   /** Follows the event log for live streaming (`GET /events/stream`) and webhooks. */
   tailer?: EventTailer;
   /** Extra hooks for features that attach to the app (attachments, …). */

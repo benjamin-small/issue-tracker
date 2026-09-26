@@ -13,6 +13,8 @@ export type TrackerEvent = Schemas['Event'];
 export type LinkType = Schemas['LinkType'];
 export type CustomField = Schemas['CustomField'];
 export type Attachment = Schemas['Attachment'];
+export type Webhook = Schemas['Webhook'];
+export type WebhookDelivery = Schemas['WebhookDelivery'];
 export type UpdateIssueInput = Schemas['UpdateIssueInput'];
 export type CreateIssueInput = Schemas['CreateIssueInput'];
 export { ApiError };

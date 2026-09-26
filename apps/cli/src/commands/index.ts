@@ -11,6 +11,7 @@ import {
 import { attachmentCommand, commentCommand, eventCommand, linkCommand } from './collab.ts';
 import { issueCommand } from './issues.ts';
 import { fieldCommand } from './fields.ts';
+import { webhookCommand } from './webhooks.ts';
 import {
   apiCommand,
   authCommand,
@@ -35,6 +36,7 @@ export function adminCommands(io: CliIO, program: () => Command): Command[] {
     fieldCommand(io),
     viewCommand(io),
     eventCommand(io),
+    webhookCommand(io),
     userCommand(io),
     tokenCommand(io),
     authCommand(io),

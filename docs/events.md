@@ -83,3 +83,89 @@ So an agent that runs `tracker issue create` against the same database shows up 
 - It writes the snapshot into the issue cache.
 - For every cached issue list, it applies the list's `IssueFilter` with `matchesFilter`, which has the same semantics as the server (proven by a property test), to insert, update or remove the issue, then re-sorts with the list's sort.
 - Comments, links and reference data (statuses, labels, users) trigger targeted refetches.
+
+## Webhooks
+
+Webhooks push events to other services. They are managed by admins: through the web app (**Workspace → Webhooks**), `tracker webhook …`, or the API (`/webhooks`).
+
+```sh
+tracker webhook create https://ci.example.com/hooks/tracker --events 'issue.*,comment.created' --scope ENG
+tracker webhook test whk_…          # sends a signed webhook.ping now
+tracker webhook deliveries whk_…    # the delivery log, newest first
+tracker webhook redeliver whd_…
+```
+
+**Subscriptions.**
+
+- `eventTypes` takes event types, `<noun>.*` (e.g. `issue.*`) or `*`.
+- A webhook can be scoped to one project.
+- A webhook receives only events that happen after it is created. History is never replayed.
+
+**Request.** Each delivery is a `POST` with the event as the JSON body. The body has exactly the shape returned by `GET /events` and documented under `webhooks.event` in the OpenAPI document. Headers:
+
+| Header                | Value                                                                               |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| `webhook-id`          | The delivery id (`whd_…`). It is the same on every retry, so use it to deduplicate. |
+| `webhook-timestamp`   | Unix seconds of this attempt                                                        |
+| `webhook-signature`   | `v1,<base64 HMAC-SHA256>`                                                           |
+| `x-tracker-event`     | The event type, e.g. `issue.updated`                                                |
+| `x-tracker-event-seq` | The event's `seq`. Deliveries can arrive out of order; sort by it if order matters. |
+
+### Verifying signatures
+
+Signatures follow [Standard Webhooks](https://www.standardwebhooks.com), so any of its libraries works: `standardwebhooks` on npm, PyPI, Go, Ruby and others.
+
+- **Signed content:** `{webhook-id}.{webhook-timestamp}.{raw body}`.
+- **Key:** the base64-decoded part of the secret after `whsec_`.
+- **Replays:** reject timestamps more than about 5 minutes from now.
+
+By hand in Node:
+
+```ts
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+function verify(secret: string, headers: Headers, rawBody: string): boolean {
+  const id = headers.get('webhook-id')!;
+  const ts = headers.get('webhook-timestamp')!;
+  if (Math.abs(Date.now() / 1000 - Number(ts)) > 300) return false;
+  const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64');
+  const expected = createHmac('sha256', key).update(`${id}.${ts}.${rawBody}`).digest();
+  return headers
+    .get('webhook-signature')!
+    .split(' ')
+    .some((sig) => {
+      const given = Buffer.from(sig.split(',')[1] ?? '', 'base64');
+      return given.length === expected.length && timingSafeEqual(given, expected);
+    });
+}
+```
+
+`verifyWebhook(secret, headers, body)` from `@tracker/core` does the same. Rotating the secret (`tracker webhook rotate-secret`) takes effect on the next attempt.
+
+### Retries and failure handling
+
+Any 2xx response within 10 seconds counts as delivered. Everything else is retried:
+
+- **Failures:** non-2xx responses, timeouts, connection errors and refused addresses.
+- **Retry schedule:** after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours.
+- **Giving up:** after 6 attempts in total the delivery is marked `dead`.
+- **Auto-disable:** after 5 dead deliveries in a row the webhook is disabled. Re-enabling it (`tracker webhook edit whk_… --enable`) resumes its queued deliveries.
+- **Redelivery:** `redeliver` queues any delivery again with a fresh set of retries.
+
+### How delivery works
+
+- **Scheduling:** every server process with `TRACKER_WEBHOOKS=1` (the default) runs a webhook runner. The event tailer wakes it on new events, and a 5-second timer covers retries.
+- **Fan-out:** the runner turns new events into `webhook_deliveries` rows, advancing a durable cursor (`system_state.webhook_cursor`) under the write lock. Concurrent replicas never skip or duplicate an event.
+- **Sending:** due deliveries are claimed with a 60-second lease and sent outside any transaction. A crashed worker's claims simply expire.
+- **CLI local mode** never sends webhooks itself. A server running against the same database picks up its events.
+
+### Network safety (SSRF)
+
+Webhook URLs are admin-supplied, but the server still refuses to call into its own network:
+
+- **URLs:** `https` only, with no credentials in the URL.
+- **Addresses:** every address a hostname resolves to must be public. Refused: loopback, RFC 1918, link-local (including cloud metadata at `169.254.169.254`), CGNAT, multicast and reserved ranges, and IPv4-mapped or NAT64 forms of those.
+- **DNS pinning:** the connection is pinned to the address that was checked, so DNS rebinding cannot swap it.
+- **Responses:** redirects are not followed. Responses are capped at 64 KB (2 KB is kept in the log).
+
+`TRACKER_WEBHOOK_ALLOW_PRIVATE=1` lifts the address checks and allows `http`, for local receivers during development. It defaults to on outside `NODE_ENV=production` and must stay off in production.

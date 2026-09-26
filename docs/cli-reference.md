@@ -621,6 +621,99 @@ Follow new events as NDJSON (one event per line) until interrupted
 | `--issue <issue>` | only this issue (use the global --project to filter by project) |
 | `--types <types>` | comma-separated event types, e.g. issue.created,issue.updated |
 
+### `tracker webhook list`
+
+List webhooks
+
+Aliases: `ls`
+
+### `tracker webhook create <url>`
+
+Register a webhook; prints its signing secret (shown only now)
+
+| Argument | Description |
+| --- | --- |
+| `url` | receiver URL (https) |
+
+| Option | Description |
+| --- | --- |
+| `-e, --events <types>` | comma-separated event types, `<noun>.*` or `*` (default: `*`) |
+| `--scope <project>` | only events from this project |
+| `--description <text>` | what the webhook is for |
+| `--inactive` | create it disabled |
+
+### `tracker webhook view <id>`
+
+Show a webhook
+
+| Argument | Description |
+| --- | --- |
+| `id` | webhook id |
+
+### `tracker webhook edit <id>`
+
+Change a webhook; --enable re-activates an automatically disabled one
+
+| Argument | Description |
+| --- | --- |
+| `id` | webhook id |
+
+| Option | Description |
+| --- | --- |
+| `--url <url>` | receiver URL |
+| `-e, --events <types>` | comma-separated event types, `<noun>.*` or `*` |
+| `--scope <project>` | only events from this project; `all` removes the scope |
+| `--description <text>` | description |
+| `--enable` | activate |
+| `--disable` | deactivate |
+
+### `tracker webhook delete <id>`
+
+Delete a webhook and its delivery log
+
+Aliases: `rm`
+
+| Argument | Description |
+| --- | --- |
+| `id` | webhook id |
+
+### `tracker webhook rotate-secret <id>`
+
+Replace the signing secret; prints the new one
+
+| Argument | Description |
+| --- | --- |
+| `id` | webhook id |
+
+### `tracker webhook test <id>`
+
+Send a signed webhook.ping now and show the answer (exit 6 unless it was 2xx)
+
+| Argument | Description |
+| --- | --- |
+| `id` | webhook id |
+
+### `tracker webhook deliveries <id>`
+
+Show recent deliveries, newest first
+
+| Argument | Description |
+| --- | --- |
+| `id` | webhook id |
+
+| Option | Description |
+| --- | --- |
+| `--status <status>` | pending \| succeeded \| failed \| dead |
+| `--limit <n>` | page size (1-200) |
+
+### `tracker webhook redeliver <delivery>`
+
+Send a delivery again (with a fresh set of retries)
+
+| Argument | Description |
+| --- | --- |
+| `delivery` | delivery id (whd_…) |
+
 ### `tracker user list`
 
 List users

@@ -44,6 +44,13 @@ beforeAll(async () => {
     db: t.db,
     auth: { mode: 'trusted', actor: 'admin' },
     blobStore: new LocalDiskBlobStore(join(dir, 'blobs')),
+    webhooks: {
+      allowPrivate: false,
+      send: async (req) =>
+        req.url.includes('down')
+          ? { statusCode: null, response: null, error: 'connect ECONNREFUSED', durationMs: 1 }
+          : { statusCode: 204, response: '', error: null, durationMs: 1 },
+    },
   });
   appFetch = (r) => Promise.resolve(app.fetch(r));
 });
@@ -361,6 +368,45 @@ describe(`tracker CLI (${testDialect()})`, () => {
     expect(missing.code).toBe(3);
     expect((await cli(['attachment', 'add', issue.key, 'nope.bin'])).code).toBe(2);
   });
+
+  it('manages webhooks', async () => {
+    const created = await cli([
+      'webhook',
+      'create',
+      'https://example.com/hook',
+      '--events',
+      'issue.*,comment.created',
+      '--scope',
+      'CLI',
+      '--description',
+      'CI bot',
+    ]);
+    expect(created.code).toBe(0);
+    expect(created.stdout).toMatch(/Signing secret .*\nwhsec_/);
+    const id = /Created webhook (whk_\w+)/.exec(created.stdout)![1]!;
+
+    const listed = await cli(['webhook', 'ls']);
+    expect(listed.stdout.split('\n')[0]).toMatch(/^ID\s+URL\s+EVENTS\s+ACTIVE\s+DESCRIPTION$/);
+    expect(listed.stdout).toContain('issue.*,comment.created');
+
+    const edited = await cli(['webhook', 'edit', id, '--scope', 'all', '--disable', '--json']);
+    expect(edited.json()).toMatchObject({ projectId: null, active: false });
+    expect((await cli(['webhook', 'test', id])).stdout).toMatch(/^OK: HTTP 204/);
+    expect((await cli(['webhook', 'deliveries', id, '--json'])).json()).toEqual({
+      data: [],
+      nextCursor: null,
+    });
+    const rotated = await cli(['webhook', 'rotate-secret', id, '--json']);
+    expect(rotated.json().secret).toMatch(/^whsec_/);
+
+    const insecure = await cli(['webhook', 'create', 'http://127.0.0.1:8080/x']);
+    expect(insecure.code).toBe(2);
+    const down = await cli(['webhook', 'create', 'https://down.example.com/', '-q']);
+    const ping = await cli(['webhook', 'test', down.stdout.trim()]);
+    expect(ping.code).toBe(6);
+    expect(ping.stderr).toMatch(/ECONNREFUSED/);
+    expect((await cli(['webhook', 'rm', id])).stdout).toBe(`Deleted webhook ${id}\n`);
+  });
 });
 
 describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transports)', () => {
@@ -371,7 +417,7 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
     expect(unmigrated.code).toBe(6);
     expect(unmigrated.stderr).toMatch(/tracker db migrate/);
     expect((await cli(['db', 'migrate'], { env, fetch: null })).stdout).toMatch(
-      /Applied: 0001_init/,
+      /Applied: 0001_init, 0002_webhook_delivery_details/,
     );
     const seeded = await cli(['db', 'seed', '--json'], { env, fetch: null });
     expect(seeded.json().agentToken).toMatch(/^trk_/);

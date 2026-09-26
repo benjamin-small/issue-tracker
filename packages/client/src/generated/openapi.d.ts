@@ -4279,6 +4279,725 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List webhooks */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Webhooks */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Webhook"][];
+                        };
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Register a webhook
+         * @description Events matching `eventTypes` (and `project`, if set) are POSTed to `url`, signed per Standard Webhooks. The response is the only time the signing `secret` is shown (besides rotation).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateWebhookInput"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WebhookWithSecret"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a webhook */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Webhook id. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Webhook */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Webhook"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a webhook and its delivery log */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Webhook id. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Webhook"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Update a webhook
+         * @description Setting `active: true` on an automatically disabled webhook re-enables it.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Webhook id. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateWebhookInput"];
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Webhook"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/webhooks/{id}/rotate-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace the signing secret */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Webhook id. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Webhook with its new secret */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WebhookWithSecret"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a test ping
+         * @description Sends a signed `webhook.ping` event now and reports the receiver’s answer. Not recorded as a delivery.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Webhook id. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description How the receiver answered */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WebhookTestResult"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/{id}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List a webhook’s deliveries (newest first) */
+        get: {
+            parameters: {
+                query?: {
+                    status?: "pending" | "succeeded" | "failed" | "dead";
+                    /** @description Page size (1–200, default 50). */
+                    limit?: number;
+                    /** @description Opaque cursor from a previous `nextCursor`. */
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Webhook id. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deliveries */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["WebhookDelivery"][];
+                            /** @description Opaque cursor for the next page; null when this is the last page. */
+                            nextCursor: string | null;
+                        };
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhook-deliveries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a delivery */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Delivery id. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Delivery */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WebhookDelivery"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhook-deliveries/{id}/redeliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a delivery again
+         * @description Queues the delivery immediately, with a fresh set of retries.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Delivery id. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Queued */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WebhookDelivery"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events/stream": {
         parameters: {
             query?: never;
@@ -4324,14 +5043,79 @@ export interface paths {
         trace?: never;
     };
 }
-export type webhooks = Record<string, never>;
+export interface webhooks {
+    event: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tracker event
+         * @description Every delivery POSTs one event (the same shape as `GET /events`) as JSON. Verify `webhook-signature` (Standard Webhooks: HMAC-SHA256 over `{webhook-id}.{webhook-timestamp}.{body}` with the base64-decoded part of the `whsec_` secret) and reject timestamps older than a few minutes. `webhook-id` is stable across retries of the same delivery — use it to deduplicate. Answer 2xx within 10 seconds; anything else is retried after 1m, 5m, 30m, 2h and 12h.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    "webhook-id": string;
+                    /** @description Unix seconds. */
+                    "webhook-timestamp": string;
+                    /** @description Space-separated `v1,<base64>` signatures. */
+                    "webhook-signature": string;
+                    "x-tracker-event": string;
+                    "x-tracker-event-seq": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            responses: {
+                /** @description Any 2xx acknowledges the delivery. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
 export interface components {
     schemas: {
-        AuthConfig: {
-            /** @description Whether passwordless dev login is enabled (development only). */
-            devLogin: boolean;
-            /** @description Users to pick from (dev login only). */
-            users?: components["schemas"]["UserSummary"][];
+        Event: {
+            /** @description Strictly increasing in commit order (may skip values). Use as a cursor. */
+            seq: number;
+            id: string;
+            /** @enum {string} */
+            type: "issue.created" | "issue.updated" | "issue.deleted" | "issue.restored" | "comment.created" | "comment.updated" | "comment.deleted" | "link.created" | "link.deleted" | "project.created" | "project.updated" | "status.created" | "status.updated" | "status.deleted" | "label.created" | "label.updated" | "label.deleted" | "user.created" | "user.updated" | "field.created" | "field.updated" | "field.deleted" | "attachment.created" | "attachment.deleted";
+            actorId: string | null;
+            actor: components["schemas"]["UserSummary"] | null;
+            projectId: string | null;
+            issueId: string | null;
+            /** @description Payload; shape depends on `type`. */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            createdAt: string;
         };
         UserSummary: {
             /** @example usr_01h455vb4pex5vsknk084sn02q */
@@ -4346,6 +5130,12 @@ export interface components {
              */
             kind: "human" | "agent" | "system";
             avatarUrl: string | null;
+        };
+        AuthConfig: {
+            /** @description Whether passwordless dev login is enabled (development only). */
+            devLogin: boolean;
+            /** @description Users to pick from (dev login only). */
+            users?: components["schemas"]["UserSummary"][];
         };
         User: {
             /** @example usr_01h455vb4pex5vsknk084sn02q */
@@ -5036,27 +5826,6 @@ export interface components {
             /** @description Opaque cursor for the next page; null when this is the last page. */
             nextCursor: string | null;
         };
-        Event: {
-            /** @description Strictly increasing in commit order (may skip values). Use as a cursor. */
-            seq: number;
-            id: string;
-            /** @enum {string} */
-            type: "issue.created" | "issue.updated" | "issue.deleted" | "issue.restored" | "comment.created" | "comment.updated" | "comment.deleted" | "link.created" | "link.deleted" | "project.created" | "project.updated" | "status.created" | "status.updated" | "status.deleted" | "label.created" | "label.updated" | "label.deleted" | "user.created" | "user.updated" | "field.created" | "field.updated" | "field.deleted" | "attachment.created" | "attachment.deleted";
-            actorId: string | null;
-            actor: components["schemas"]["UserSummary"] | null;
-            projectId: string | null;
-            issueId: string | null;
-            /** @description Payload; shape depends on `type`. */
-            data: {
-                [key: string]: unknown;
-            };
-            /**
-             * Format: date-time
-             * @description ISO-8601 UTC timestamp.
-             * @example 2026-09-26T13:49:00.123Z
-             */
-            createdAt: string;
-        };
         Comment: {
             id: string;
             issueId: string;
@@ -5422,6 +6191,163 @@ export interface components {
              */
             deletedAt: string | null;
         };
+        Webhook: {
+            id: string;
+            url: string;
+            description: string;
+            /** @description Event types, `<noun>.*` or `*`. */
+            eventTypes: string[];
+            /** @description Only events from this project; null for all projects. */
+            projectId: string | null;
+            active: boolean;
+            /** @description Consecutive deliveries that exhausted their retries. The webhook is disabled at 5; re-activating resets it. */
+            failureCount: number;
+            /**
+             * Format: date-time
+             * @description Set when the webhook was disabled automatically after repeated failures.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            disabledAt: string | null;
+            createdBy: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            updatedAt: string;
+        };
+        WebhookWithSecret: {
+            id: string;
+            url: string;
+            description: string;
+            /** @description Event types, `<noun>.*` or `*`. */
+            eventTypes: string[];
+            /** @description Only events from this project; null for all projects. */
+            projectId: string | null;
+            active: boolean;
+            /** @description Consecutive deliveries that exhausted their retries. The webhook is disabled at 5; re-activating resets it. */
+            failureCount: number;
+            /**
+             * Format: date-time
+             * @description Set when the webhook was disabled automatically after repeated failures.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            disabledAt: string | null;
+            createdBy: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            updatedAt: string;
+            /**
+             * @description Signing secret (`whsec_…`). Returned only when the webhook is created or its secret rotated.
+             * @example whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw
+             */
+            secret: string;
+        };
+        CreateWebhookInput: {
+            /**
+             * Format: uri
+             * @example https://example.com/hooks/tracker
+             */
+            url: string;
+            /** @default  */
+            description?: string;
+            /**
+             * @default [
+             *       "*"
+             *     ]
+             */
+            eventTypes?: string[];
+            /**
+             * @description Project key or id to scope the webhook to.
+             * @example ENG
+             */
+            project?: string;
+            /** @default true */
+            active?: boolean;
+        };
+        UpdateWebhookInput: {
+            /**
+             * Format: uri
+             * @example https://example.com/hooks/tracker
+             */
+            url?: string;
+            description?: string;
+            eventTypes?: string[];
+            /** @description null removes the scope. */
+            project?: string | null;
+            active?: boolean;
+        };
+        WebhookTestResult: {
+            ok: boolean;
+            statusCode: number | null;
+            error: string | null;
+            response: string | null;
+            durationMs: number;
+        };
+        WebhookDelivery: {
+            /** @description Also sent as the `webhook-id` header on every attempt. */
+            id: string;
+            webhookId: string;
+            eventSeq: number;
+            eventId: string | null;
+            eventType: string | null;
+            /**
+             * @description `pending` (not yet attempted), `failed` (will retry at `nextAttemptAt`), `succeeded`, or `dead` (retries exhausted).
+             * @enum {string}
+             */
+            status: "pending" | "succeeded" | "failed" | "dead";
+            attempts: number;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            nextAttemptAt: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            lastAttemptAt: string | null;
+            lastStatusCode: number | null;
+            lastError: string | null;
+            /** @description Start of the last response body (up to 2 KB). */
+            lastResponse: string | null;
+            lastDurationMs: number | null;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            updatedAt: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            completedAt: string | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -5429,8 +6355,9 @@ export interface components {
     headers: never;
     pathItems: never;
 }
-export type AuthConfig = components['schemas']['AuthConfig'];
+export type Event = components['schemas']['Event'];
 export type UserSummary = components['schemas']['UserSummary'];
+export type AuthConfig = components['schemas']['AuthConfig'];
 export type User = components['schemas']['User'];
 export type Problem = components['schemas']['Problem'];
 export type TokenLoginInput = components['schemas']['TokenLoginInput'];
@@ -5467,7 +6394,6 @@ export type MoveIssueInput = components['schemas']['MoveIssueInput'];
 export type BulkUpdateInput = components['schemas']['BulkUpdateInput'];
 export type ChangeLabelsInput = components['schemas']['ChangeLabelsInput'];
 export type EventPage = components['schemas']['EventPage'];
-export type Event = components['schemas']['Event'];
 export type Comment = components['schemas']['Comment'];
 export type CreateCommentInput = components['schemas']['CreateCommentInput'];
 export type UpdateCommentInput = components['schemas']['UpdateCommentInput'];
@@ -5485,5 +6411,11 @@ export type CreateFieldOptionInput = components['schemas']['CreateFieldOptionInp
 export type UpdateCustomFieldInput = components['schemas']['UpdateCustomFieldInput'];
 export type UpdateFieldOptionInput = components['schemas']['UpdateFieldOptionInput'];
 export type Attachment = components['schemas']['Attachment'];
+export type Webhook = components['schemas']['Webhook'];
+export type WebhookWithSecret = components['schemas']['WebhookWithSecret'];
+export type CreateWebhookInput = components['schemas']['CreateWebhookInput'];
+export type UpdateWebhookInput = components['schemas']['UpdateWebhookInput'];
+export type WebhookTestResult = components['schemas']['WebhookTestResult'];
+export type WebhookDelivery = components['schemas']['WebhookDelivery'];
 export type $defs = Record<string, never>;
 export type operations = Record<string, never>;

@@ -8,3 +8,4 @@ export * from './fields.ts';
 export * from './filter.ts';
 export * from './ids.ts';
 export * from './view-config.ts';
+export * from './webhooks.ts';

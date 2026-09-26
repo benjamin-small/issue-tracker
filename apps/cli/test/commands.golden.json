@@ -1510,6 +1510,217 @@
       ]
     },
     {
+      "name": "webhook list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List webhooks",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "webhook create",
+      "aliases": [],
+      "description": "Register a webhook; prints its signing secret (shown only now)",
+      "arguments": [
+        {
+          "name": "url",
+          "required": true,
+          "variadic": false,
+          "description": "receiver URL (https)"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-e, --events <types>",
+          "name": "events",
+          "description": "comma-separated event types, `<noun>.*` or `*`",
+          "required": false,
+          "takesValue": true,
+          "default": "*"
+        },
+        {
+          "flags": "--scope <project>",
+          "name": "scope",
+          "description": "only events from this project",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "what the webhook is for",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--inactive",
+          "name": "inactive",
+          "description": "create it disabled",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "webhook view",
+      "aliases": [],
+      "description": "Show a webhook",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "webhook edit",
+      "aliases": [],
+      "description": "Change a webhook; --enable re-activates an automatically disabled one",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--url <url>",
+          "name": "url",
+          "description": "receiver URL",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-e, --events <types>",
+          "name": "events",
+          "description": "comma-separated event types, `<noun>.*` or `*`",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--scope <project>",
+          "name": "scope",
+          "description": "only events from this project; `all` removes the scope",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "description",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--enable",
+          "name": "enable",
+          "description": "activate",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--disable",
+          "name": "disable",
+          "description": "deactivate",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "webhook delete",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Delete a webhook and its delivery log",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "webhook rotate-secret",
+      "aliases": [],
+      "description": "Replace the signing secret; prints the new one",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "webhook test",
+      "aliases": [],
+      "description": "Send a signed webhook.ping now and show the answer (exit 6 unless it was 2xx)",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "webhook deliveries",
+      "aliases": [],
+      "description": "Show recent deliveries, newest first",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--status <status>",
+          "name": "status",
+          "description": "pending | succeeded | failed | dead",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--limit <n>",
+          "name": "limit",
+          "description": "page size (1-200)",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "webhook redeliver",
+      "aliases": [],
+      "description": "Send a delivery again (with a fresh set of retries)",
+      "arguments": [
+        {
+          "name": "delivery",
+          "required": true,
+          "variadic": false,
+          "description": "delivery id (whd_…)"
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "user list",
       "aliases": [
         "ls"

@@ -71,5 +71,5 @@ and [docs/architecture.md](docs/architecture.md) for how the pieces fit.
 | M7        | Live updates (event tailer, SSE)                                                             | ✅ done |
 | M8        | Custom fields                                                                                | ✅ done |
 | M9        | File attachments (local disk or S3), paste/drop upload                                       | ✅ done |
-| M10       | Webhooks                                                                                     | planned |
+| M10       | Webhooks: signed deliveries, retries, SSRF guard, CLI and web management                     | ✅ done |
 | M11       | Production hardening: Docker, Postgres end-to-end, docs                                      | planned |

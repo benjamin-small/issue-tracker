@@ -21,6 +21,7 @@ import { registerFieldRoutes } from './routes/fields.ts';
 import { registerProjectRoutes } from './routes/projects.ts';
 import { registerStreamRoute } from './routes/stream.ts';
 import { registerUserRoutes } from './routes/users.ts';
+import { registerWebhookRoutes } from './routes/webhooks.ts';
 
 export const API_VERSION = '1.0.0';
 
@@ -104,6 +105,7 @@ function buildApi(resolved: ResolvedDeps): TrackerApp {
   registerCollaborationRoutes(api);
   registerFieldRoutes(api);
   registerAttachmentRoutes(api, resolved);
+  registerWebhookRoutes(api, resolved.webhooks ?? { allowPrivate: false });
   registerStreamRoute(api, resolved);
   for (const extension of resolved.extensions ?? []) extension(api, resolved);
 

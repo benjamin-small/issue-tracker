@@ -33,23 +33,95 @@
       }
     },
     "schemas": {
-      "AuthConfig": {
+      "Event": {
         "type": "object",
         "properties": {
-          "devLogin": {
-            "type": "boolean",
-            "description": "Whether passwordless dev login is enabled (development only)."
+          "seq": {
+            "type": "integer",
+            "description": "Strictly increasing in commit order (may skip values). Use as a cursor."
           },
-          "users": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserSummary"
-            },
-            "description": "Users to pick from (dev login only)."
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "issue.created",
+              "issue.updated",
+              "issue.deleted",
+              "issue.restored",
+              "comment.created",
+              "comment.updated",
+              "comment.deleted",
+              "link.created",
+              "link.deleted",
+              "project.created",
+              "project.updated",
+              "status.created",
+              "status.updated",
+              "status.deleted",
+              "label.created",
+              "label.updated",
+              "label.deleted",
+              "user.created",
+              "user.updated",
+              "field.created",
+              "field.updated",
+              "field.deleted",
+              "attachment.created",
+              "attachment.deleted"
+            ]
+          },
+          "actorId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "issueId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Payload; shape depends on `type`."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
           }
         },
         "required": [
-          "devLogin"
+          "seq",
+          "id",
+          "type",
+          "actorId",
+          "actor",
+          "projectId",
+          "issueId",
+          "data",
+          "createdAt"
         ]
       },
       "UserSummary": {
@@ -89,6 +161,25 @@
           "name",
           "kind",
           "avatarUrl"
+        ]
+      },
+      "AuthConfig": {
+        "type": "object",
+        "properties": {
+          "devLogin": {
+            "type": "boolean",
+            "description": "Whether passwordless dev login is enabled (development only)."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSummary"
+            },
+            "description": "Users to pick from (dev login only)."
+          }
+        },
+        "required": [
+          "devLogin"
         ]
       },
       "User": {
@@ -1682,97 +1773,6 @@
           "nextCursor"
         ]
       },
-      "Event": {
-        "type": "object",
-        "properties": {
-          "seq": {
-            "type": "integer",
-            "description": "Strictly increasing in commit order (may skip values). Use as a cursor."
-          },
-          "id": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "issue.created",
-              "issue.updated",
-              "issue.deleted",
-              "issue.restored",
-              "comment.created",
-              "comment.updated",
-              "comment.deleted",
-              "link.created",
-              "link.deleted",
-              "project.created",
-              "project.updated",
-              "status.created",
-              "status.updated",
-              "status.deleted",
-              "label.created",
-              "label.updated",
-              "label.deleted",
-              "user.created",
-              "user.updated",
-              "field.created",
-              "field.updated",
-              "field.deleted",
-              "attachment.created",
-              "attachment.deleted"
-            ]
-          },
-          "actorId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "actor": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserSummary"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "projectId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "issueId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "data": {
-            "type": "object",
-            "additionalProperties": {},
-            "description": "Payload; shape depends on `type`."
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "ISO-8601 UTC timestamp.",
-            "example": "2026-09-26T13:49:00.123Z"
-          }
-        },
-        "required": [
-          "seq",
-          "id",
-          "type",
-          "actorId",
-          "actor",
-          "projectId",
-          "issueId",
-          "data",
-          "createdAt"
-        ]
-      },
       "Comment": {
         "type": "object",
         "properties": {
@@ -2540,6 +2540,383 @@
           "url",
           "createdAt",
           "deletedAt"
+        ]
+      },
+      "Webhook": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "eventTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Event types, `<noun>.*` or `*`."
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Only events from this project; null for all projects."
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "failureCount": {
+            "type": "integer",
+            "description": "Consecutive deliveries that exhausted their retries. The webhook is disabled at 5; re-activating resets it."
+          },
+          "disabledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Set when the webhook was disabled automatically after repeated failures.",
+            "example": "2026-09-26T13:49:00.123Z"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "description",
+          "eventTypes",
+          "projectId",
+          "active",
+          "failureCount",
+          "disabledAt",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "WebhookWithSecret": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "eventTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Event types, `<noun>.*` or `*`."
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Only events from this project; null for all projects."
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "failureCount": {
+            "type": "integer",
+            "description": "Consecutive deliveries that exhausted their retries. The webhook is disabled at 5; re-activating resets it."
+          },
+          "disabledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Set when the webhook was disabled automatically after repeated failures.",
+            "example": "2026-09-26T13:49:00.123Z"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
+          },
+          "secret": {
+            "type": "string",
+            "description": "Signing secret (`whsec_…`). Returned only when the webhook is created or its secret rotated.",
+            "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "description",
+          "eventTypes",
+          "projectId",
+          "active",
+          "failureCount",
+          "disabledAt",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
+          "secret"
+        ]
+      },
+      "CreateWebhookInput": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "format": "uri",
+            "example": "https://example.com/hooks/tracker"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "default": ""
+          },
+          "eventTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "example": "issue.*"
+            },
+            "minItems": 1,
+            "default": [
+              "*"
+            ]
+          },
+          "project": {
+            "type": "string",
+            "description": "Project key or id to scope the webhook to.",
+            "example": "ENG"
+          },
+          "active": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "UpdateWebhookInput": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "format": "uri",
+            "example": "https://example.com/hooks/tracker"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "eventTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "example": "issue.*"
+            },
+            "minItems": 1
+          },
+          "project": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null removes the scope."
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "WebhookTestResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "statusCode": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "response": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "statusCode",
+          "error",
+          "response",
+          "durationMs"
+        ]
+      },
+      "WebhookDelivery": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Also sent as the `webhook-id` header on every attempt."
+          },
+          "webhookId": {
+            "type": "string"
+          },
+          "eventSeq": {
+            "type": "integer"
+          },
+          "eventId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eventType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "succeeded",
+              "failed",
+              "dead"
+            ],
+            "description": "`pending` (not yet attempted), `failed` (will retry at `nextAttemptAt`), `succeeded`, or `dead` (retries exhausted)."
+          },
+          "attempts": {
+            "type": "integer"
+          },
+          "nextAttemptAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
+          },
+          "lastAttemptAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
+          },
+          "lastStatusCode": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "lastError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastResponse": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Start of the last response body (up to 2 KB)."
+          },
+          "lastDurationMs": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
+          }
+        },
+        "required": [
+          "id",
+          "webhookId",
+          "eventSeq",
+          "eventId",
+          "eventType",
+          "status",
+          "attempts",
+          "nextAttemptAt",
+          "lastAttemptAt",
+          "lastStatusCode",
+          "lastError",
+          "lastResponse",
+          "lastDurationMs",
+          "createdAt",
+          "updatedAt",
+          "completedAt"
         ]
       }
     },
@@ -7317,6 +7694,776 @@
         }
       }
     },
+    "/webhooks": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List webhooks",
+        "responses": {
+          "200": {
+            "description": "Webhooks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Webhook"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Register a webhook",
+        "description": "Events matching `eventTypes` (and `project`, if set) are POSTed to `url`, signed per Standard Webhooks. The response is the only time the signing `secret` is shown (besides rotation).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebhookInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookWithSecret"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/{id}": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Get a webhook",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "whk_01h455vb4pex5vsknk084sn02q"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path",
+            "description": "Webhook id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Update a webhook",
+        "description": "Setting `active: true` on an automatically disabled webhook re-enables it.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "whk_01h455vb4pex5vsknk084sn02q"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path",
+            "description": "Webhook id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebhookInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Delete a webhook and its delivery log",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "whk_01h455vb4pex5vsknk084sn02q"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path",
+            "description": "Webhook id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/{id}/rotate-secret": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Replace the signing secret",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "whk_01h455vb4pex5vsknk084sn02q"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path",
+            "description": "Webhook id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook with its new secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookWithSecret"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/{id}/test": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Send a test ping",
+        "description": "Sends a signed `webhook.ping` event now and reports the receiver’s answer. Not recorded as a delivery.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "whk_01h455vb4pex5vsknk084sn02q"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path",
+            "description": "Webhook id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How the receiver answered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookTestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/{id}/deliveries": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List a webhook’s deliveries (newest first)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "whk_01h455vb4pex5vsknk084sn02q"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path",
+            "description": "Webhook id."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "succeeded",
+                "failed",
+                "dead"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "description": "Page size (1–200, default 50)."
+            },
+            "required": false,
+            "description": "Page size (1–200, default 50).",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Opaque cursor from a previous `nextCursor`."
+            },
+            "required": false,
+            "description": "Opaque cursor from a previous `nextCursor`.",
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deliveries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WebhookDelivery"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Opaque cursor for the next page; null when this is the last page."
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "nextCursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhook-deliveries/{id}": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Get a delivery",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "whd_01h455vb4pex5vsknk084sn02q"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path",
+            "description": "Delivery id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookDelivery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhook-deliveries/{id}/redeliver": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Send a delivery again",
+        "description": "Queues the delivery immediately, with a fresh set of retries.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "whd_01h455vb4pex5vsknk084sn02q"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path",
+            "description": "Delivery id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookDelivery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/events/stream": {
       "get": {
         "tags": [
@@ -7365,5 +8512,80 @@
       }
     }
   },
-  "webhooks": {}
+  "webhooks": {
+    "event": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Tracker event",
+        "description": "Every delivery POSTs one event (the same shape as `GET /events`) as JSON. Verify `webhook-signature` (Standard Webhooks: HMAC-SHA256 over `{webhook-id}.{webhook-timestamp}.{body}` with the base64-decoded part of the `whsec_` secret) and reject timestamps older than a few minutes. `webhook-id` is stable across retries of the same delivery — use it to deduplicate. Answer 2xx within 10 seconds; anything else is retried after 1m, 5m, 30m, 2h and 12h.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "whd_01h455vb4pex5vsknk084sn02q"
+            },
+            "required": true,
+            "name": "webhook-id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Unix seconds.",
+              "example": "1790445358"
+            },
+            "required": true,
+            "description": "Unix seconds.",
+            "name": "webhook-timestamp",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Space-separated `v1,<base64>` signatures."
+            },
+            "required": true,
+            "description": "Space-separated `v1,<base64>` signatures.",
+            "name": "webhook-signature",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "issue.updated"
+            },
+            "required": true,
+            "name": "x-tracker-event",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "1042"
+            },
+            "required": true,
+            "name": "x-tracker-event-seq",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Any 2xx acknowledges the delivery."
+          }
+        }
+      }
+    }
+  }
 }

@@ -69,7 +69,12 @@ export async function openTransport(config: ResolvedConfig, io: CliIO): Promise<
     io.env,
     file ? join(dirname(file), 'blobs') : join(io.cwd, 'data', 'blobs'),
   );
-  const app = createApp({ db, auth: { mode: 'trusted', actor }, blobStore });
+  const app = createApp({
+    db,
+    auth: { mode: 'trusted', actor },
+    blobStore,
+    webhooks: { allowPrivate: ['1', 'true'].includes(io.env.TRACKER_WEBHOOK_ALLOW_PRIVATE ?? '') },
+  });
   return {
     client: createClient({
       baseUrl: 'http://tracker.local',

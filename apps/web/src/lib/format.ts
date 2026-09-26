@@ -4,7 +4,7 @@ export const PRIORITY_ORDER = [1, 2, 3, 4, 0] as const;
 
 export function relativeTime(iso: string, now = Date.now()): string {
   const diff = (now - Date.parse(iso)) / 1000;
-  if (diff < 45) return 'just now';
+  if (Math.abs(diff) < 45) return 'just now';
   const units: Array<[number, Intl.RelativeTimeFormatUnit]> = [
     [60, 'minute'],
     [3600, 'hour'],

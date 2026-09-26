@@ -2,6 +2,7 @@ import type { Kysely } from 'kysely';
 import { type Migration, type MigrationResultSet, Migrator } from 'kysely/migration';
 import type { Db, Dialect } from './dialect.ts';
 import { migration0001 } from './migrations/0001_init.ts';
+import { migration0002 } from './migrations/0002_webhook_delivery_details.ts';
 
 /**
  * All migrations, in order. Migrations are registered in code (not discovered from the filesystem)
@@ -10,6 +11,7 @@ import { migration0001 } from './migrations/0001_init.ts';
 function allMigrations(dialect: Dialect): Record<string, Migration> {
   return {
     '0001_init': migration0001(dialect),
+    '0002_webhook_delivery_details': migration0002(dialect),
   };
 }
 

@@ -9,6 +9,7 @@
   import Plus from '@lucide/svelte/icons/plus';
   import Settings from '@lucide/svelte/icons/settings';
   import Sun from '@lucide/svelte/icons/sun';
+  import Webhook from '@lucide/svelte/icons/webhook';
   import { api, type Project, type User } from '../api.ts';
   import { live } from '../live.svelte.ts';
   import { applyTheme } from '../theme.ts';
@@ -91,6 +92,14 @@
         No projects yet. Create one with <code>tracker project create</code>.
       </p>
     {/each}
+    {#if me.role === 'admin'}
+      <p class="px-2 pt-4 pb-1 text-xs font-medium text-fg-subtle">Workspace</p>
+      <a
+        href="/settings/webhooks"
+        class={link(path.startsWith('/settings/webhooks'))}
+        data-testid="nav-webhooks"><Webhook size={14} /> Webhooks</a
+      >
+    {/if}
   </div>
 
   <div class="flex items-center gap-2 border-t border-border px-3 py-2">

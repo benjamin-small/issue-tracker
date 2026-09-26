@@ -21,6 +21,8 @@ export const keys = {
   attachments: (key: string) => ['attachments', key] as const,
   children: (key: string) => ['children', key] as const,
   activity: (key: string) => ['activity', key] as const,
+  webhooks: ['webhooks'] as const,
+  deliveries: (id: string) => ['webhooks', id, 'deliveries'] as const,
 };
 
 export interface IssueListQuery {

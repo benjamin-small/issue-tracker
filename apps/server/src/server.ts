@@ -8,6 +8,7 @@ import {
   EventTailer,
   seedDemoData,
   SYSTEM_ACTOR,
+  WebhookRunner,
 } from '@tracker/core';
 import { createDb, type Db, migrateToLatest, migrationStatus, parseDatabaseUrl } from '@tracker/db';
 import { createApp } from './app.ts';
@@ -64,6 +65,14 @@ export async function startServer(
   await prepareDatabase(db, config);
   const tailer = new EventTailer(db);
   await tailer.start();
+  const webhooks = { allowPrivate: config.TRACKER_WEBHOOK_ALLOW_PRIVATE };
+  const runner = config.TRACKER_WEBHOOKS
+    ? new WebhookRunner(db, {
+        policy: webhooks,
+        onError: (error) => console.error('webhook runner:', error),
+      })
+    : undefined;
+  runner?.start(tailer);
 
   const app = createApp({
     db,
@@ -75,6 +84,7 @@ export async function startServer(
     },
     ...(config.TRACKER_WEB_DIR && { webDir: config.TRACKER_WEB_DIR }),
     tailer,
+    webhooks,
     blobStore: blobStoreFromEnv(config as unknown as Record<string, string | undefined>),
     maxUploadBytes: config.TRACKER_MAX_UPLOAD_MB * 1024 * 1024,
     extensions,
@@ -94,8 +104,8 @@ export async function startServer(
               // Open SSE streams would keep the server alive; drop connections before waiting for close().
               (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
               server.close(() => {
-                void tailer
-                  .stop()
+                void Promise.resolve(runner?.stop())
+                  .then(() => tailer.stop())
                   .then(() => db.destroy())
                   .then(() => done());
               });
