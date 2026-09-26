@@ -5,7 +5,7 @@ import { columnTypes, createTable } from './helpers.ts';
 /**
  * Initial schema: every v1 table. See docs/data-model.md for the entity reference.
  *
- * Frozen once M3 ships — schema changes after that go in new migration files.
+ * FROZEN (since M3): never edit this migration. Schema changes go in new migration files registered in migrate.ts.
  */
 export function migration0001(dialect: Dialect) {
   const t = columnTypes(dialect);

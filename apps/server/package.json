@@ -8,11 +8,23 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "dev": "node --watch src/main.ts",
+    "start": "node src/main.ts",
+    "openapi:gen": "node src/scripts/gen-openapi.ts",
+    "openapi:check": "node src/scripts/gen-openapi.ts --check"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@hono/zod-openapi": "^1.6.3",
+    "@scalar/hono-api-reference": "^0.12.6",
     "@tracker/core": "workspace:*",
     "@tracker/db": "workspace:*",
-    "@tracker/schema": "workspace:*"
+    "@tracker/schema": "workspace:*",
+    "hono": "^4.13.9",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.2"
   }
 }

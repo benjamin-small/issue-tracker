@@ -24,6 +24,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
+      - run: pnpm openapi:check
 
   test:
     name: Test (${{ matrix.db }})

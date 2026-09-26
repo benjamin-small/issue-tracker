@@ -12,3 +12,6 @@ Short records of decisions that constrain future work. Copy `0000-template.md`, 
 | [0007](0007-eav-custom-fields.md)                  | Custom field values as typed EAV rows                              | Accepted |
 | [0008](0008-fractional-ranks.md)                   | Fractional-index ranks with server-computed moves                  | Accepted |
 | [0010](0010-filter-language-and-field-registry.md) | `IssueFilter` + field registry as the extension spine              | Accepted |
+| [0005](0005-api-as-contract.md)                    | The HTTP API is the contract; CLI local mode runs it in-process    | Accepted |
+| [0009](0009-auth-v1.md)                            | Auth v1: actors, API tokens and cookie sessions                    | Accepted |
+| [0011](0011-committed-openapi.md)                  | OpenAPI generated from code and committed                          | Accepted |

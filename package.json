@@ -15,7 +15,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:pg": "TEST_DB=postgres vitest run",
-    "pg": "bash scripts/pg.sh"
+    "pg": "bash scripts/pg.sh",
+    "openapi:gen": "pnpm --filter @tracker/server openapi:gen",
+    "openapi:check": "pnpm --filter @tracker/server openapi:check",
+    "dev:server": "pnpm --filter @tracker/server dev"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

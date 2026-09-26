@@ -26,7 +26,14 @@ pnpm pg start       # throwaway local cluster (no Docker), prints its URL
 pnpm test:pg
 ```
 
-See [docs/development.md](docs/development.md) for details.
+Run the API server (SQLite, auto-migrated, seeded with demo data and tokens on first start):
+
+```sh
+pnpm dev:server     # http://127.0.0.1:3000 — API reference at /api/docs
+```
+
+See [docs/development.md](docs/development.md) for details, [docs/api.md](docs/api.md) for API conventions
+and [docs/architecture.md](docs/architecture.md) for how the pieces fit.
 
 ## Repository layout
 
