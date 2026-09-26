@@ -1,4 +1,5 @@
 import { createQuery } from '@tanstack/svelte-query';
+import type { CustomFieldLike } from '@tracker/schema';
 import type { Label, Status, User, View } from './api.ts';
 import { fetchers, keys } from './queries.ts';
 
@@ -8,6 +9,8 @@ export interface ProjectData {
   readonly labels: Label[];
   readonly users: User[];
   readonly views: View[];
+  /** Active custom field definitions (key, name, type) for the field registry. */
+  readonly customFields: CustomFieldLike[];
   readonly loaded: boolean;
 }
 
@@ -45,6 +48,9 @@ export function useProjectData(key: () => string): ProjectData {
     },
     get views() {
       return views.data ?? [];
+    },
+    get customFields() {
+      return [];
     },
     get loaded() {
       return statuses.isSuccess && labels.isSuccess && users.isSuccess;

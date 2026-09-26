@@ -19,6 +19,7 @@
     "@tracker/schema": "workspace:*",
     "bits-ui": "^2.19.3",
     "dompurify": "^3.4.16",
+    "fractional-indexing": "^4.0.0",
     "marked": "^18.0.14",
     "svelte-dnd-action": "^0.9.79"
   },

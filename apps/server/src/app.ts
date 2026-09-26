@@ -120,13 +120,19 @@ export function createApp(deps: AppDeps = {}): OpenAPIHono<AppEnv> {
 
   if (deps.webDir) {
     const webDir = deps.webDir;
-    let shell: string | undefined;
-    const indexHtml = () => (shell ??= readFileSync(join(webDir, 'index.html'), 'utf8'));
+    // Content-hashed build assets never change; everything else must revalidate.
+    root.use('/_app/immutable/*', async (c, next) => {
+      await next();
+      if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable');
+    });
     root.use('/*', serveStatic({ root: webDir }));
-    // SPA fallback: any other non-API path renders the app shell.
-    root.get('*', (c) =>
-      c.req.path.startsWith('/api/') ? problem(c, 'NOT_FOUND', 'Not found') : c.html(indexHtml()),
-    );
+    // SPA fallback: any other non-API path renders the app shell (read per request so a rebuild never
+    // leaves a stale shell pointing at deleted assets).
+    root.get('*', (c) => {
+      if (c.req.path.startsWith('/api/')) return problem(c, 'NOT_FOUND', 'Not found');
+      c.header('Cache-Control', 'no-cache');
+      return c.html(readFileSync(join(webDir, 'index.html'), 'utf8'));
+    });
   }
   root.notFound((c) => problem(c, 'NOT_FOUND', `No route for ${c.req.method} ${c.req.path}`));
   return root;

@@ -13,9 +13,12 @@
     sameConfig,
     type ViewConfig,
   } from '../views.ts';
+  import Board from './Board.svelte';
   import FilterBar from './FilterBar.svelte';
   import IssueDetail from './IssueDetail.svelte';
   import IssueList from './IssueList.svelte';
+  import ViewConfigPanel from './ViewConfigPanel.svelte';
+  import ViewMenu from './ViewMenu.svelte';
 
   /**
    * A project's issues through a view: the saved view's config, overridden by an unsaved `?v=` config in the URL
@@ -66,12 +69,12 @@
 
 <div class="flex h-full min-h-0 flex-col">
   <header class="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2">
-    <h1 class="text-sm font-semibold">
-      {view?.name ?? (effectiveLayout === 'board' ? 'Board' : 'All issues')}
-      {#if dirty}<span class="ml-1 text-xs font-normal text-fg-subtle" data-testid="view-modified"
+    <div class="flex items-center">
+      <ViewMenu {project} {view} {config} layout={effectiveLayout} {dirty} />
+      {#if dirty}<span class="ml-1 text-xs text-fg-subtle" data-testid="view-modified"
           >· modified</span
         >{/if}
-    </h1>
+    </div>
     <FilterBar
       filter={config.filter}
       {project}
@@ -88,6 +91,7 @@
       <span class="text-xs text-fg-subtle" data-testid="issue-count"
         >{issues.data?.length ?? '…'} issues</span
       >
+      <ViewConfigPanel {config} layout={effectiveLayout} {project} onchange={setConfig} />
     </div>
   </header>
 
@@ -97,7 +101,11 @@
     {:else if !issues.data}
       <p class="p-6 text-sm text-fg-subtle">Loading…</p>
     {:else}
-      <IssueList issues={issues.data} {config} {project} onopen={open} active={peek} />
+      {#if effectiveLayout === 'board'}
+        <Board issues={issues.data} {config} {project} onopen={open} active={peek} />
+      {:else}
+        <IssueList issues={issues.data} {config} {project} onopen={open} active={peek} />
+      {/if}
     {/if}
 
     {#if peek}
