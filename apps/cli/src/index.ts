@@ -1,2 +1,3 @@
-// Implemented in a later milestone; see docs/adr and the roadmap in README.md.
-export {};
+export { buildProgram, CLI_VERSION, run } from './main.ts';
+export { type CliIO, processIO } from './io.ts';
+export { EXIT_CODES } from './errors.ts';

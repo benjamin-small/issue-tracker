@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file is for AI coding agents (and humans) working **on this repository**. For how agents should _use_ the tracker through its CLI, see `docs/agents.md` (added in M4).
+This file is for AI coding agents (and humans) working **on this repository**. For how agents should _use_ the tracker through its CLI, see [docs/agents.md](docs/agents.md).
 
 ## Commands
 
@@ -11,6 +11,9 @@ pnpm test             # Vitest, all packages, SQLite
 pnpm test:pg          # same suites against Postgres (run `pnpm pg start` first)
 pnpm format           # apply Prettier
 pnpm pg start|stop|reset|status|url   # throwaway local Postgres, no Docker
+pnpm openapi:gen      # regenerate docs/openapi.json + client types after API changes
+pnpm vitest run --project cli -u      # refresh CLI golden files + docs/cli-reference.md after CLI changes
+pnpm tracker …        # run the CLI from source
 ```
 
 Run a single package's tests with `pnpm vitest run --project <name>`, for example `--project db`.

@@ -818,14 +818,12 @@
           "color": {
             "type": "string",
             "pattern": "^#[0-9a-fA-F]{6}$",
-            "default": "#8a8f98",
             "description": "Hex color.",
             "example": "#5e6ad2"
           },
           "description": {
             "type": "string",
-            "maxLength": 500,
-            "default": ""
+            "maxLength": 500
           }
         }
       },

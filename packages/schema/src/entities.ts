@@ -215,9 +215,11 @@ export const CreateLabelInputSchema = z
   .meta({ id: 'CreateLabelInput' });
 export type CreateLabelInput = z.input<typeof CreateLabelInputSchema>;
 
-export const UpdateLabelInputSchema = CreateLabelInputSchema.partial().meta({
-  id: 'UpdateLabelInput',
-});
+// Explicit (not CreateLabelInputSchema.partial()): `.partial()` keeps defaults, which would reset omitted fields.
+export const UpdateLabelInputSchema = z
+  .object({ name: z.string().min(1).max(50), color: ColorSchema, description: z.string().max(500) })
+  .partial()
+  .meta({ id: 'UpdateLabelInput' });
 export type UpdateLabelInput = z.input<typeof UpdateLabelInputSchema>;
 
 // ---------------------------------------------------------------------------

@@ -16,9 +16,10 @@
     "test:watch": "vitest",
     "test:pg": "TEST_DB=postgres vitest run",
     "pg": "bash scripts/pg.sh",
-    "openapi:gen": "pnpm --filter @tracker/server openapi:gen",
-    "openapi:check": "pnpm --filter @tracker/server openapi:check",
-    "dev:server": "pnpm --filter @tracker/server dev"
+    "openapi:gen": "pnpm --filter @tracker/server openapi:gen && pnpm --filter @tracker/client gen",
+    "openapi:check": "pnpm --filter @tracker/server openapi:check && pnpm --filter @tracker/client gen && git diff --exit-code -- packages/client/src/generated",
+    "dev:server": "pnpm --filter @tracker/server dev",
+    "tracker": "node apps/cli/src/bin.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

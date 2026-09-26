@@ -32,7 +32,15 @@ Run the API server (SQLite, auto-migrated, seeded with demo data and tokens on f
 pnpm dev:server     # http://127.0.0.1:3000 — API reference at /api/docs
 ```
 
-See [docs/development.md](docs/development.md) for details, [docs/api.md](docs/api.md) for API conventions
+Use the CLI (local mode needs no server — it runs the API in-process on the same SQLite file):
+
+```sh
+pnpm tracker db migrate && pnpm tracker db seed
+pnpm tracker issue list -P ENG
+pnpm tracker commands --json      # the full command surface, for agents
+```
+
+See [docs/cli.md](docs/cli.md) and [docs/agents.md](docs/agents.md) for the CLI, [docs/development.md](docs/development.md) for details, [docs/api.md](docs/api.md) for API conventions
 and [docs/architecture.md](docs/architecture.md) for how the pieces fit.
 
 ## Repository layout
@@ -56,7 +64,7 @@ and [docs/architecture.md](docs/architecture.md) for how the pieces fit.
 | M1        | Database layer: dual-dialect factory, migrations, `withWriteTx`, test harness                | ✅ done |
 | M2        | Domain schemas and core services: issues, comments, links, labels, statuses, events, filters | ✅ done |
 | M3        | HTTP API, auth (actors + tokens), OpenAPI 3.1 contract, Scalar docs                          | planned |
-| M4        | Generated client and the `tracker` CLI                                                       | planned |
+| M4        | Generated client and the `tracker` CLI                                                       | ✅ done |
 | M5        | Web UI: shell, list view, issue detail, comments, links                                      | planned |
 | M6        | Kanban board, customizable cards, saved views                                                | planned |
 | M7        | Live updates (event tailer, SSE)                                                             | planned |
