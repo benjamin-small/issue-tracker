@@ -5,10 +5,19 @@
   "description": "Kysely database layer: dialect factory (SQLite/Postgres), migrations, transactions.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
     "typecheck": "tsc -p ."
   },
-  "dependencies": {}
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "kysely": "^0.29.6",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/pg": "^8.23.1"
+  }
 }
