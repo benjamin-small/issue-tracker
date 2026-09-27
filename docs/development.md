@@ -1,5 +1,7 @@
 # Development
 
+To set up and run the project, start with [Run it locally](../README.md#run-it-locally) in the README. This page covers how the pieces work.
+
 ## Toolchain
 
 - **Node 22.12+** (see `.nvmrc`) and **pnpm 10** (`corepack enable` picks up the version pinned in `package.json`). Use the `.nvmrc` major (`nvm use`): on newer majors `better-sqlite3` may have no prebuilt binary and falls back to compiling with node-gyp.
@@ -50,7 +52,9 @@ pnpm test:pg
 
 `apps/web` is a SvelteKit single-page app (Svelte 5 runes, Tailwind 4, bits-ui, TanStack Query).
 
-- **Development.** `pnpm dev` runs the API (`:3000`) and Vite (`:5173`). Vite proxies `/api` to the API, so the browser sees one origin and the session cookie works. Set `TRACKER_API_URL` to point Vite at another server.
+- **Development.** `pnpm dev` runs the API (`:3000`) and Vite (`127.0.0.1:5173`, or the next free port). Vite proxies `/api` to the API, so the browser sees one origin and the session cookie works. Set `TRACKER_API_URL` to point Vite at another server.
+  - `pnpm dev` loads a repo-root `.env` if there is one.
+  - It resolves a relative SQLite path and the blob directory against the repo root, so the server and the CLI's local mode share `data/dev.db` and `data/blobs`.
 - **Production.** `pnpm build:web` writes `apps/web/build/`. The API server serves it when `TRACKER_WEB_DIR` points there, with an SPA fallback for deep links.
 - **Data layer.**
   - The web app only talks to the API through `@tracker/client`.
@@ -60,7 +64,7 @@ pnpm test:pg
 - **Checks.** `pnpm typecheck` runs `svelte-check --fail-on-warnings` for the web package.
 - **End-to-end tests** (`apps/web/e2e`):
   - They run the built app against the real server on a fresh seeded SQLite database (`pnpm e2e`). Set `E2E_DATABASE_URL` to run against Postgres.
-  - Locally, the preinstalled Chromium at `/opt/pw-browsers/chromium` is used when present. Override it with `PLAYWRIGHT_CHROMIUM_PATH`.
+  - They use the preinstalled Chromium at `/opt/pw-browsers/chromium` when present, and otherwise Playwright's own. Install that once with `pnpm --filter @tracker/web exec playwright install chromium`. Override the browser with `PLAYWRIGHT_CHROMIUM_PATH`.
 
 ## Browser demo
 
