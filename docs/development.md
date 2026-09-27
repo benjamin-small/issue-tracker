@@ -2,7 +2,7 @@
 
 ## Toolchain
 
-- **Node 22.12+** (see `.nvmrc`) and **pnpm 10** (`corepack enable` picks up the version pinned in `package.json`).
+- **Node 22.12+** (see `.nvmrc`) and **pnpm 10** (`corepack enable` picks up the version pinned in `package.json`). Use the `.nvmrc` major (`nvm use`): on newer majors `better-sqlite3` may have no prebuilt binary and falls back to compiling with node-gyp.
 - **TypeScript is pinned to 6.0.x.** TypeScript 7 exists, but SvelteKit and typescript-eslint don't support it yet.
 - pnpm 10 blocks dependency install scripts by default. Native modules that need a build step (`better-sqlite3`, `esbuild`) are allowlisted in `pnpm-workspace.yaml` under `onlyBuiltDependencies`.
 
@@ -21,9 +21,9 @@ CI (`.github/workflows/ci.yml`) runs the same gates and runs the tests twice, wi
 
 Development uses SQLite; production uses Postgres. The `TRACKER_DATABASE_URL` scheme selects the dialect (see `.env.example`).
 
-### Local Postgres without Docker
+### Local Postgres
 
-`scripts/pg.sh` (also available as `pnpm pg …`) manages a throwaway cluster:
+`scripts/pg.sh` (also available as `pnpm pg …`) manages a throwaway cluster, using local server binaries when installed and a Docker container otherwise (for example on macOS):
 
 ```sh
 pnpm pg start    # initdb on first run, start, create database `tracker`, print the URL
@@ -38,11 +38,12 @@ Details:
 - Auth is `trust` for the `tracker` user, and `fsync` is off. It's fast and **not durable**; it's for tests only.
 - When run as root, the script uses `runuser -u postgres`, because `initdb` refuses to run as root.
 - It finds the server binaries on `PATH` or under `/usr/lib/postgresql/*/bin`.
+- Without them, it runs a `postgres:16` container named `tracker-pg` with the same user, database, port and settings. Its data lives in the container, and `reset` recreates it. Set `TRACKER_PG_BACKEND=native` or `docker` to choose explicitly.
 
-To run the suites against it:
+To run the suites against it (the URL is also the default for `TEST_DATABASE_URL`):
 
 ```sh
-TEST_DATABASE_URL=$(pnpm -s pg url) pnpm test:pg
+pnpm test:pg
 ```
 
 ## Web app
