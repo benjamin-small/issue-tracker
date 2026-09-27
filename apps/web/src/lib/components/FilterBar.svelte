@@ -60,7 +60,7 @@
   const chip = 'border border-dashed border-border text-xs text-fg-muted';
 </script>
 
-<div class="flex flex-wrap items-center gap-1.5" data-testid="filter-bar">
+<div class="flex items-center gap-1.5 sm:flex-wrap" data-testid="filter-bar">
   <label
     class="flex items-center gap-1.5 rounded-md border border-border bg-bg px-2 py-1 text-sm focus-within:border-border-strong"
   >

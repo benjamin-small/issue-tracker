@@ -4,16 +4,21 @@
   import Maximize2 from '@lucide/svelte/icons/maximize-2';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import Trash2 from '@lucide/svelte/icons/trash-2';
+  import FileQuestion from '@lucide/svelte/icons/file-question';
   import X from '@lucide/svelte/icons/x';
+  import { MediaQuery } from 'svelte/reactivity';
+  import { ApiError } from '../api.ts';
   import { href, shareUrl } from '../nav.ts';
   import { deleteIssue, projectKeyOf, restoreIssue, updateIssue } from '../issues.ts';
   import { useProjectData } from '../project-data.svelte.ts';
   import { fetchers, keys } from '../queries.ts';
   import { toast } from '../toast.svelte.ts';
   import { markdownUploader } from '../attachments.ts';
+  import { autosize } from '../autosize.ts';
   import ActivityTimeline from './ActivityTimeline.svelte';
   import AttachmentsSection from './AttachmentsSection.svelte';
   import CustomFieldEditor from './CustomFieldEditor.svelte';
+  import EmptyState from './EmptyState.svelte';
   import IssueProperties from './IssueProperties.svelte';
   import LinksSection from './LinksSection.svelte';
   import Markdown from './Markdown.svelte';
@@ -43,6 +48,11 @@
   const issue = $derived(query.data);
   const upload = markdownUploader(qc, () => issueKey);
 
+  // Side-by-side properties only on a wide full page; the panel and narrow screens stack them under the title.
+  const wide = new MediaQuery('min-width: 1024px');
+  const stacked = $derived(panel || !wide.current);
+  const notFound = $derived(query.error instanceof ApiError && query.error.status === 404);
+
   let title = $state('');
   let editingDescription = $state(false);
   let description = $state('');
@@ -71,12 +81,34 @@
 </script>
 
 {#if query.isError}
-  <div class="p-8 text-sm text-fg-muted">
-    Couldn't load {issueKey}: {query.error.message}
-    {#if onclose}<button class="ml-2 text-accent" onclick={onclose}>Close</button>{/if}
-  </div>
+  <EmptyState
+    icon={FileQuestion}
+    title={notFound ? `${issueKey} doesn’t exist` : `Couldn’t load ${issueKey}`}
+    testid="issue-error"
+  >
+    {notFound
+      ? 'It may have been deleted permanently, or the key may be mistyped.'
+      : query.error.message}
+    {#snippet actions()}
+      {#if onclose}
+        <button
+          class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-bg-hover"
+          onclick={onclose}>Close</button
+        >
+      {/if}
+      <a
+        href={href(`/p/${projectKeyOf(issueKey)}`)}
+        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg"
+        >Back to {projectKeyOf(issueKey)} issues</a
+      >
+    {/snippet}
+  </EmptyState>
 {:else if !issue}
-  <div class="p-8 text-sm text-fg-subtle">Loading…</div>
+  <div class="space-y-3 p-6" aria-busy="true" aria-label="Loading issue">
+    <div class="h-6 w-2/3 animate-pulse rounded bg-bg-muted"></div>
+    <div class="h-4 w-full animate-pulse rounded bg-bg-muted"></div>
+    <div class="h-4 w-5/6 animate-pulse rounded bg-bg-muted"></div>
+  </div>
 {:else}
   <article class="flex h-full min-h-0 flex-col" data-testid="issue-detail" data-issue={issue.key}>
     <header class="flex items-center gap-2 border-b border-border px-4 py-2 text-sm">
@@ -142,17 +174,29 @@
       </div>
     {/if}
 
-    <div class="flex min-h-0 flex-1 {panel ? 'flex-col overflow-y-auto' : 'overflow-hidden'}">
-      <div class="min-w-0 flex-1 space-y-6 px-6 py-5 {panel ? '' : 'overflow-y-auto'}">
-        <input
+    <div class="flex min-h-0 flex-1 overflow-hidden">
+      <div class="min-w-0 flex-1 space-y-6 overflow-y-auto px-4 py-5 sm:px-6">
+        <textarea
           bind:value={title}
           onblur={saveTitle}
-          onkeydown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
+          onkeydown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+          }}
           disabled={!!issue.deletedAt}
           aria-label="Title"
           data-testid="issue-title"
-          class="w-full bg-transparent text-xl font-semibold outline-none"
-        />
+          use:autosize={title}
+          rows="1"
+          class="w-full resize-none bg-transparent text-xl leading-snug font-semibold text-balance outline-none [field-sizing:content]"
+        ></textarea>
+        {#if stacked}
+          <div class="rounded-lg border border-border px-3 py-2">
+            {@render properties()}
+          </div>
+        {/if}
 
         <div>
           {#if editingDescription}
@@ -198,27 +242,30 @@
         <ActivityTimeline {issue} me={me.data} />
       </div>
 
-      <aside
-        class="shrink-0 border-border px-4 py-4 {panel
-          ? 'order-first border-b'
-          : 'w-72 overflow-y-auto border-l'}"
-      >
-        <IssueProperties {issue} {project}>
-          {#snippet extra()}
-            {#each project.customFields as field (field.id)}
-              <div class="grid grid-cols-[88px_1fr] items-center gap-2 py-0.5">
-                <span
-                  class="truncate text-xs text-fg-subtle"
-                  title={field.description || field.name}>{field.name}</span
-                >
-                <div class="min-w-0">
-                  <CustomFieldEditor {issue} {field} users={project.users} />
-                </div>
-              </div>
-            {/each}
-          {/snippet}
-        </IssueProperties>
-      </aside>
+      {#if !stacked}
+        <aside class="w-72 shrink-0 overflow-y-auto border-l border-border px-4 py-4">
+          {@render properties()}
+        </aside>
+      {/if}
     </div>
   </article>
 {/if}
+
+{#snippet properties()}
+  {#if issue}
+    <IssueProperties {issue} {project}>
+      {#snippet extra()}
+        {#each project.customFields as field (field.id)}
+          <div class="grid grid-cols-[88px_1fr] items-center gap-2 py-0.5">
+            <span class="truncate text-xs text-fg-subtle" title={field.description || field.name}
+              >{field.name}</span
+            >
+            <div class="min-w-0">
+              <CustomFieldEditor {issue} {field} users={project.users} />
+            </div>
+          </div>
+        {/each}
+      {/snippet}
+    </IssueProperties>
+  {/if}
+{/snippet}

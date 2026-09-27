@@ -170,10 +170,13 @@
   );
 </script>
 
-<div class="flex min-h-0 flex-1 gap-3 overflow-x-auto bg-bg-subtle p-3" data-testid="board">
+<div
+  class="flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto bg-bg-subtle p-3 sm:snap-none"
+  data-testid="board"
+>
   {#each columns as column, index (column.id)}
     <section
-      class="flex w-72 shrink-0 flex-col rounded-lg"
+      class="flex w-[85vw] shrink-0 snap-start flex-col rounded-lg sm:w-72"
       data-testid="board-column"
       data-column={column.label}
     >

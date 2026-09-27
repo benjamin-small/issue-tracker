@@ -5,6 +5,7 @@
   import type { View } from '../api.ts';
   import { useProjectData } from '../project-data.svelte.ts';
   import { fetchers, keys } from '../queries.ts';
+  import { openCreateIssue } from '../ui.svelte.ts';
   import {
     decodeConfig,
     defaultViewConfig,
@@ -16,6 +17,9 @@
   import Board from './Board.svelte';
   import FilterBar from './FilterBar.svelte';
   import IssueDetail from './IssueDetail.svelte';
+  import Inbox from '@lucide/svelte/icons/inbox';
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+  import EmptyState from './EmptyState.svelte';
   import IssueList from './IssueList.svelte';
   import ViewConfigPanel from './ViewConfigPanel.svelte';
   import ViewMenu from './ViewMenu.svelte';
@@ -73,18 +77,25 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col">
-  <header class="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2">
+  <header
+    class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-3 py-2 sm:px-4"
+  >
     <div class="flex items-center">
       <ViewMenu {project} {view} {config} layout={effectiveLayout} {dirty} />
       {#if dirty}<span class="ml-1 text-xs text-fg-subtle" data-testid="view-modified"
           >· modified</span
         >{/if}
     </div>
-    <FilterBar
-      filter={config.filter}
-      {project}
-      onchange={(filter) => setConfig({ ...config, filter })}
-    />
+    <!-- Narrow screens: filters get their own scrolling row under the view name. -->
+    <div
+      class="order-last -mx-3 w-[calc(100%+1.5rem)] overflow-x-auto px-3 sm:order-none sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0"
+    >
+      <FilterBar
+        filter={config.filter}
+        {project}
+        onchange={(filter) => setConfig({ ...config, filter })}
+      />
+    </div>
     <div class="ml-auto flex items-center gap-2">
       {#if dirty}
         <button
@@ -102,12 +113,51 @@
 
   <div class="relative flex min-h-0 flex-1">
     {#if issues.isError}
-      <p class="p-6 text-sm text-danger">Couldn't load issues: {issues.error.message}</p>
+      <EmptyState icon={TriangleAlert} tone="danger" title="Couldn’t load issues">
+        {issues.error.message}
+        {#snippet actions()}
+          <button
+            class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-bg-hover"
+            onclick={() => issues.refetch()}>Try again</button
+          >
+        {/snippet}
+      </EmptyState>
     {:else if !issues.data}
-      <p class="p-6 text-sm text-fg-subtle">Loading…</p>
+      <div class="flex-1 space-y-px" aria-busy="true" aria-label="Loading issues">
+        {#each [70, 55, 80, 45, 65, 50] as width, i (i)}
+          <div class="flex items-center gap-3 border-b border-border px-4 py-2.5">
+            <div class="h-3 w-12 animate-pulse rounded bg-bg-muted"></div>
+            <div class="h-3 animate-pulse rounded bg-bg-muted" style:width="{width}%"></div>
+          </div>
+        {/each}
+      </div>
     {:else}
       {#if effectiveLayout === 'board'}
         <Board issues={issues.data} {config} {project} onopen={open} active={peek} />
+      {:else if issues.data.length === 0}
+        <EmptyState
+          icon={Inbox}
+          title={config.filter.conditions.length
+            ? 'No issues match these filters'
+            : 'No issues yet'}
+          testid="empty-list"
+        >
+          {config.filter.conditions.length
+            ? 'Try removing a filter, or create an issue that fits.'
+            : 'Create the first issue for this project.'}
+          {#snippet actions()}
+            {#if dirty}
+              <button
+                class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-bg-hover"
+                onclick={() => setConfig(saved)}>Reset view</button
+              >
+            {/if}
+            <button
+              class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg"
+              onclick={() => openCreateIssue(projectKey)}>New issue</button
+            >
+          {/snippet}
+        </EmptyState>
       {:else}
         <IssueList issues={issues.data} {config} {project} onopen={open} active={peek} />
       {/if}
@@ -115,7 +165,7 @@
 
     {#if peek}
       <aside
-        class="absolute inset-y-0 right-0 z-20 w-[min(560px,100%)] border-l border-border bg-bg shadow-xl"
+        class="absolute inset-y-0 right-0 z-20 w-full border-border bg-bg shadow-xl sm:w-[min(600px,100%)] sm:border-l"
         data-testid="peek-panel"
       >
         {#key peek}

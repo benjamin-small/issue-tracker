@@ -21,7 +21,15 @@
     field,
     project,
     compact = false,
-  }: { issue: Issue; field: string; project: ProjectData; compact?: boolean } = $props();
+    nowrap = false,
+  }: {
+    issue: Issue;
+    field: string;
+    project: ProjectData;
+    compact?: boolean;
+    /** Keep multi-value fields (labels) on one line, clipping extras (list cells). */
+    nowrap?: boolean;
+  } = $props();
 </script>
 
 {#if field === 'key'}
@@ -39,7 +47,8 @@
     ><Avatar user={issue.creator} size={16} />{#if !compact}{issue.creator.name}{/if}</span
   >
 {:else if field === 'labels'}
-  {#if issue.labels.length}<span class="flex min-w-0 flex-wrap gap-1"
+  {#if issue.labels.length}<span
+      class="flex min-w-0 gap-1 {nowrap ? 'overflow-hidden' : 'flex-wrap'}"
       >{#each issue.labels as l (l.id)}<LabelChip label={l} />{/each}</span
     >{/if}
 {:else if field === 'estimate'}

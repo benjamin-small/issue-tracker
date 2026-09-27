@@ -4,7 +4,10 @@
   import { connectLive } from '$lib/live.svelte.ts';
   import { fetchers, keys } from '$lib/queries.ts';
   import { openCreateIssue, ui } from '$lib/ui.svelte.ts';
+  import Menu from '@lucide/svelte/icons/menu';
+  import Plus from '@lucide/svelte/icons/plus';
   import CreateIssueDialog from '$components/CreateIssueDialog.svelte';
+  import CreateProjectDialog from '$components/CreateProjectDialog.svelte';
   import Sidebar from '$components/Sidebar.svelte';
 
   let { children } = $props();
@@ -21,6 +24,12 @@
       projects.data?.[0]?.key ??
       '',
   );
+
+  // Close the navigation drawer whenever the page changes.
+  $effect(() => {
+    void page.url.href;
+    ui.sidebarOpen = false;
+  });
 
   const qc = useQueryClient();
   // One live event stream for the project in view; reconnects when the project changes.
@@ -44,13 +53,41 @@
 <svelte:window {onkeydown} />
 
 {#if me.data}
-  <div class="flex h-screen overflow-hidden">
+  <div class="flex h-dvh overflow-hidden">
     <Sidebar me={me.data} projects={projects.data ?? []} {currentProject} />
+    {#if ui.sidebarOpen}
+      <button
+        class="fixed inset-0 z-30 bg-black/30 md:hidden"
+        aria-label="Close menu"
+        onclick={() => (ui.sidebarOpen = false)}
+      ></button>
+    {/if}
     <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <!-- Narrow screens: the sidebar becomes a drawer opened from this bar. -->
+      <div class="flex items-center gap-2 border-b border-border px-2 py-1.5 md:hidden">
+        <button
+          class="rounded-md p-1.5 text-fg-muted hover:bg-bg-hover hover:text-fg"
+          aria-label="Open menu"
+          aria-expanded={ui.sidebarOpen}
+          data-testid="open-menu"
+          onclick={() => (ui.sidebarOpen = true)}><Menu size={18} /></button
+        >
+        <span class="truncate text-sm font-medium"
+          >{projects.data?.find((p) => p.key === currentProject)?.name ?? 'Tracker'}</span
+        >
+        {#if currentProject}
+          <button
+            class="ml-auto rounded-md p-1.5 text-fg-muted hover:bg-bg-hover hover:text-fg"
+            aria-label="New issue"
+            onclick={() => openCreateIssue(currentProject)}><Plus size={18} /></button
+          >
+        {/if}
+      </div>
       {@render children()}
     </main>
   </div>
   {#if ui.createIssue.open}<CreateIssueDialog />{/if}
+  {#if ui.createProject}<CreateProjectDialog />{/if}
 {:else if me.isError}
   <div class="p-8 text-sm text-fg-muted">Redirecting to sign in…</div>
 {:else}

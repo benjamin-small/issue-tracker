@@ -9,6 +9,7 @@
   import { keys } from '$lib/queries.ts';
   import { toast } from '$lib/toast.svelte.ts';
   import CustomFieldsSettings from '$components/CustomFieldsSettings.svelte';
+  import ProjectGeneralSettings from '$components/ProjectGeneralSettings.svelte';
   import StatusIcon from '$components/StatusIcon.svelte';
 
   const key = $derived(page.params.key!.toUpperCase());
@@ -118,8 +119,10 @@
 <svelte:head><title>{key} · Settings</title></svelte:head>
 
 <div class="overflow-y-auto">
-  <div class="mx-auto max-w-3xl space-y-10 px-6 py-8">
-    <h1 class="text-lg font-semibold">{key} settings</h1>
+  <div class="mx-auto max-w-3xl space-y-10 px-4 py-6 sm:px-6 sm:py-8">
+    <h1 class="text-lg font-semibold">Project settings</h1>
+
+    <ProjectGeneralSettings projectKey={key} />
 
     <section data-testid="settings-statuses">
       <h2 class="mb-1 font-medium">Workflow</h2>
