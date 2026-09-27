@@ -7,6 +7,7 @@
   import { groupIssues } from '../grouping.ts';
   import type { ProjectData } from '../project-data.svelte.ts';
   import { openCreateIssue } from '../ui.svelte.ts';
+  import { isSelected, selection, setOrder, toggleSelected } from '../selection.svelte.ts';
   import type { ViewConfig } from '../views.ts';
   import FieldValue from './FieldValue.svelte';
   import GroupHeader from './GroupHeader.svelte';
@@ -66,6 +67,7 @@
   const columns = $derived(narrow.current ? allColumns.filter((f) => PHONE.has(f)) : allColumns);
   const template = $derived(
     [
+      narrow.current ? null : '1rem',
       narrow.current ? '1.5rem' : showKey ? WIDTH.key : null,
       'minmax(0, 1fr)',
       ...columns.map((f) => WIDTH[f] ?? '7rem'),
@@ -76,9 +78,23 @@
   let collapsed = $state<Record<string, boolean>>({});
   const dense = $derived(config.density === 'compact');
 
-  /** A click anywhere on a row opens it, unless it landed on one of the row's own controls. */
+  // j/k and shift-click ranges follow the rows on screen (collapsed groups excluded).
+  $effect(() => {
+    setOrder(groups.filter((g) => !collapsed[g.id]).flatMap((g) => g.issues.map((i) => i.key)));
+  });
+  const selecting = $derived(selection.selected.length > 0);
+
+  /**
+   * A click anywhere on a row opens it, unless it landed on one of the row's own controls.
+   * ⌘/Ctrl-click toggles selection, shift-click selects a range.
+   */
   function onrowclick(event: MouseEvent, key: string) {
     if ((event.target as HTMLElement).closest('button, a, input, [role="combobox"]')) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || selecting) {
+      toggleSelected(key, event.shiftKey);
+      return;
+    }
+    selection.focused = key;
     onopen(key);
   }
 </script>
@@ -89,6 +105,7 @@
     style:grid-template-columns={template}
     data-testid="list-header"
   >
+    <span></span>
     {#if showKey}<span>ID</span>{/if}
     <span>Title</span>
     {#each columns as field (field)}
@@ -134,12 +151,31 @@
           <li
             class="group grid cursor-pointer items-center gap-3 border-b border-border px-4 hover:bg-bg-subtle {dense
               ? 'py-1'
-              : 'py-2'} {active === issue.key ? 'bg-accent-subtle hover:bg-accent-subtle' : ''}"
+              : 'py-2'} {active === issue.key || isSelected(issue.key)
+              ? 'bg-accent-subtle hover:bg-accent-subtle'
+              : ''} {selection.focused === issue.key ? 'ring-1 ring-accent/60 ring-inset' : ''}"
             style:grid-template-columns={template}
             data-testid="issue-row"
             data-key={issue.key}
+            data-focused={selection.focused === issue.key}
+            data-selected={isSelected(issue.key)}
             onclick={(e) => onrowclick(e, issue.key)}
           >
+            {#if !narrow.current}
+              <input
+                type="checkbox"
+                class="size-3.5 accent-accent {selecting || isSelected(issue.key)
+                  ? ''
+                  : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}"
+                checked={isSelected(issue.key)}
+                aria-label="Select {issue.key}"
+                data-testid="row-select"
+                onclick={(e) => {
+                  e.preventDefault();
+                  toggleSelected(issue.key, e.shiftKey);
+                }}
+              />
+            {/if}
             {#if narrow.current}
               <span class="flex items-center"
                 ><StatusPicker {issue} statuses={project.statuses} showLabel={false} /></span

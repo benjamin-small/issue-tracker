@@ -3,7 +3,14 @@
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { connectLive } from '$lib/live.svelte.ts';
   import { fetchers, keys } from '$lib/queries.ts';
-  import { openCreateIssue, ui } from '$lib/ui.svelte.ts';
+  import { openCommand, openCreateIssue, ui } from '$lib/ui.svelte.ts';
+  import { PRIORITY_LABELS } from '$lib/format.ts';
+  import { bulkUpdate, cachedIssues, deleteIssues } from '$lib/issues.ts';
+  import { navigate } from '$lib/nav.ts';
+  import { clearSelection, moveFocus, selection, toggleSelected } from '$lib/selection.svelte.ts';
+  import CommandMenu from '$components/CommandMenu.svelte';
+  import ConfirmDialog from '$components/ConfirmDialog.svelte';
+  import ShortcutsDialog from '$components/ShortcutsDialog.svelte';
   import Menu from '@lucide/svelte/icons/menu';
   import Plus from '@lucide/svelte/icons/plus';
   import CreateIssueDialog from '$components/CreateIssueDialog.svelte';
@@ -38,15 +45,135 @@
     return connectLive(qc, currentProject);
   });
 
+  /** What issue shortcuts act on: the selection, else the open issue, else the focused row or card. */
+  function issueTargets(): string[] {
+    if (selection.selected.length) return [...selection.selected];
+    if (ui.openIssue) return [ui.openIssue];
+    if (selection.focused) return [selection.focused];
+    return [];
+  }
+
+  function reveal(key: string | null) {
+    if (!key) return;
+    document
+      .querySelector(
+        `[data-testid="issue-row"][data-key="${key}"], [data-testid="issue-card"][data-key="${key}"]`,
+      )
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+
+  let pendingG: ReturnType<typeof setTimeout> | undefined;
+  const GO: Record<string, string> = { i: '', b: '/board', s: '/settings' };
+
   function onkeydown(event: KeyboardEvent) {
-    const target = event.target as HTMLElement;
-    if (target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]'))
-      return;
-    if (event.metaKey || event.ctrlKey || event.altKey) return;
-    if (event.key === 'c' && currentProject && !ui.createIssue.open) {
+    const mod = event.metaKey || event.ctrlKey;
+    if (mod && event.key.toLowerCase() === 'k') {
       event.preventDefault();
-      openCreateIssue(currentProject);
+      if (ui.command.open) ui.command.open = false;
+      else openCommand('root', issueTargets());
+      return;
     }
+    const target = event.target as HTMLElement;
+    if (target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    if (
+      target.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]') ||
+      ui.command.open ||
+      ui.createIssue.open ||
+      ui.createProject ||
+      ui.shortcutsOpen
+    )
+      return;
+
+    if (mod && (event.key === 'Backspace' || event.key === 'Delete')) {
+      const targets = cachedIssues(qc, issueTargets());
+      if (targets.length) {
+        event.preventDefault();
+        void deleteIssues(qc, targets).then(clearSelection);
+      }
+      return;
+    }
+    if (mod || event.altKey) return;
+
+    if (pendingG) {
+      clearTimeout(pendingG);
+      pendingG = undefined;
+      const suffix = GO[event.key.toLowerCase()];
+      if (suffix !== undefined && currentProject) {
+        event.preventDefault();
+        void navigate(`/p/${currentProject}${suffix}`);
+      }
+      return;
+    }
+
+    const targets = issueTargets();
+    switch (event.key) {
+      case 'c':
+        if (!currentProject) return;
+        openCreateIssue(currentProject);
+        break;
+      case 'g':
+        pendingG = setTimeout(() => (pendingG = undefined), 1000);
+        break;
+      case '?':
+        ui.shortcutsOpen = true;
+        break;
+      case '/': {
+        const search = document.querySelector<HTMLInputElement>('[data-testid="search"]');
+        if (!search) return;
+        search.focus();
+        search.select();
+        break;
+      }
+      case 'j':
+      case 'ArrowDown':
+        if (!selection.order.length) return;
+        reveal(moveFocus(1));
+        break;
+      case 'k':
+      case 'ArrowUp':
+        if (!selection.order.length) return;
+        reveal(moveFocus(-1));
+        break;
+      case 'Enter':
+      case 'o':
+        // Enter on a real control keeps its own meaning.
+        if (!selection.focused || (event.key === 'Enter' && target.closest('button, a'))) return;
+        (ui.opener ?? ((key: string) => navigate(`/i/${key}`)))(selection.focused);
+        break;
+      case 'x':
+        if (!selection.focused) return;
+        toggleSelected(selection.focused);
+        break;
+      case 'Escape':
+        if (selection.selected.length) clearSelection();
+        else if (page.state.peek) history.back();
+        else if (selection.focused) selection.focused = null;
+        else return;
+        break;
+      case 's':
+      case 'a':
+      case 'p':
+      case 'l':
+        if (!targets.length) return;
+        openCommand(
+          ({ s: 'status', a: 'assignee', p: 'priority', l: 'labels' } as const)[event.key],
+          targets,
+        );
+        break;
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4': {
+        if (!targets.length) return;
+        const priority = Number(event.key);
+        void bulkUpdate(qc, targets, { priority }, `Priority → ${PRIORITY_LABELS[priority]}`);
+        break;
+      }
+      default:
+        return;
+    }
+    event.preventDefault();
   }
 </script>
 
@@ -88,6 +215,9 @@
   </div>
   {#if ui.createIssue.open}<CreateIssueDialog />{/if}
   {#if ui.createProject}<CreateProjectDialog />{/if}
+  <CommandMenu {currentProject} />
+  <ShortcutsDialog />
+  <ConfirmDialog />
 {:else if me.isError}
   <div class="p-8 text-sm text-fg-muted">Redirecting to sign in…</div>
 {:else}

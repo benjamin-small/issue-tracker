@@ -10,14 +10,21 @@
     project,
     density,
     active = false,
+    focused = false,
+    selected = false,
     onopen,
+    onselect,
   }: {
     issue: Issue;
     fields: string[];
     project: ProjectData;
     density: 'compact' | 'comfortable';
     active?: boolean;
+    focused?: boolean;
+    selected?: boolean;
     onopen: (key: string) => void;
+    /** ⌘/Ctrl- or shift-click: toggle selection (shift selects a range). */
+    onselect?: (key: string, range: boolean) => void;
   } = $props();
 
   const showKey = $derived(fields.includes('key'));
@@ -29,13 +36,23 @@
 
 <div
   class="group rounded-lg border bg-bg shadow-xs transition-colors hover:border-border-strong
-    {active ? 'border-accent' : 'border-border'} {density === 'compact'
+    {active || selected ? 'border-accent' : 'border-border'} {selected
+    ? 'bg-accent-subtle'
+    : ''} {focused ? 'ring-2 ring-accent/50' : ''} {density === 'compact'
     ? 'px-2.5 py-1.5'
     : 'px-3 py-2.5'}"
   data-testid="issue-card"
   data-key={issue.key}
+  data-focused={focused}
+  data-selected={selected}
 >
-  <button class="block w-full text-left" onclick={() => onopen(issue.key)}>
+  <button
+    class="block w-full text-left"
+    onclick={(e) => {
+      if (onselect && (e.metaKey || e.ctrlKey || e.shiftKey)) onselect(issue.key, e.shiftKey);
+      else onopen(issue.key);
+    }}
+  >
     {#if showKey}<div class="mb-0.5 font-mono text-[11px] text-fg-subtle">{issue.key}</div>{/if}
     <div
       class="line-clamp-3 text-sm leading-snug font-medium {density === 'compact' ? '' : 'mb-1.5'}"

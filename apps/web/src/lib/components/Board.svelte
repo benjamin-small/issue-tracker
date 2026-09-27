@@ -14,6 +14,7 @@
   import { moveIssue, updateIssue } from '../issues.ts';
   import type { ProjectData } from '../project-data.svelte.ts';
   import { openCreateIssue } from '../ui.svelte.ts';
+  import { isSelected, selection, setOrder, toggleSelected } from '../selection.svelte.ts';
   import type { ViewConfig } from '../views.ts';
   import GroupHeader from './GroupHeader.svelte';
   import IssueCard from './IssueCard.svelte';
@@ -169,6 +170,11 @@
     }
   }
 
+  // j/k follow the cards on screen, column by column (collapsed columns excluded).
+  $effect(() => {
+    setOrder(columns.filter((c) => !collapsed[c.id]).flatMap((c) => c.items.map((i) => i.key)));
+  });
+
   // Collapsed columns, remembered per project and grouping in this browser (a viewer convenience).
   const collapseKey = $derived(`tracker.board.collapsed.${project.key}.${groupBy}`);
   let collapsed = $state<Record<string, boolean>>({});
@@ -299,7 +305,13 @@
                     {project}
                     density={config.density}
                     active={active === issue.key}
-                    {onopen}
+                    focused={selection.focused === issue.key}
+                    selected={isSelected(issue.key)}
+                    onopen={(key) => {
+                      selection.focused = key;
+                      onopen(key);
+                    }}
+                    onselect={toggleSelected}
                   />
                 </div>
               {/each}

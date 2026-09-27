@@ -1,12 +1,15 @@
 import { type APIRequestContext, test as base, expect, type Page } from '@playwright/test';
 
-/** Signs the browser in as a seeded user (dev login) before each test. */
+/** Signs the browser in as a seeded user (dev login) before each test, and fails it on uncaught page errors. */
 export const test = base.extend<{ user: string }>({
   user: ['ada', { option: true }],
   page: async ({ page, user }, use) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
     const res = await page.request.post('/api/v1/auth/dev-login', { data: { user } });
     expect(res.ok()).toBe(true);
     await use(page);
+    expect(errors, 'uncaught errors in the page').toEqual([]);
   },
 });
 

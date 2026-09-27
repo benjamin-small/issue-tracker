@@ -153,3 +153,83 @@ export async function restoreIssue(qc: QueryClient, issue: Issue): Promise<Issue
     return undefined;
   }
 }
+
+/** Applies one update to several issues atomically (the bulk endpoint), then refreshes caches. */
+export async function bulkUpdate(
+  qc: QueryClient,
+  issueKeys: string[],
+  patch: Omit<UpdateIssueInput, 'expectedVersion'>,
+  description: string,
+): Promise<Issue[] | undefined> {
+  if (issueKeys.length === 0) return [];
+  try {
+    const { data } = await call(api.POST('/issues/bulk', { body: { issues: issueKeys, patch } }));
+    for (const issue of data) {
+      upsertIssue(qc, issue);
+      afterChange(qc, issue);
+    }
+    toast(
+      issueKeys.length === 1
+        ? `${issueKeys[0]}: ${description}`
+        : `${description} on ${issueKeys.length} issues`,
+      'success',
+    );
+    return data;
+  } catch (error) {
+    toast(`Couldn't update: ${errorMessage(error)}`, 'error');
+    return undefined;
+  }
+}
+
+/** Adds a label to every issue, or removes it from all of them if they all have it already. */
+export async function toggleLabel(
+  qc: QueryClient,
+  issues: Issue[],
+  labelId: string,
+  labelName: string,
+): Promise<void> {
+  const remove = issues.every((i) => i.labelIds.includes(labelId));
+  await bulkUpdate(
+    qc,
+    issues.map((i) => i.key),
+    remove ? { removeLabels: [labelId] } : { addLabels: [labelId] },
+    remove ? `Removed ${labelName}` : `Added ${labelName}`,
+  );
+}
+
+/** Moves several issues to the trash, with one Undo that restores all of them. */
+export async function deleteIssues(qc: QueryClient, issues: Issue[]): Promise<void> {
+  if (issues.length === 1) return void (await deleteIssue(qc, issues[0]!));
+  const deleted: Issue[] = [];
+  for (const issue of issues) {
+    try {
+      const result = await call(
+        api.DELETE('/issues/{issue}', { params: { path: { issue: issue.key }, query: {} } }),
+      );
+      upsertIssue(qc, result);
+      afterChange(qc, result);
+      deleted.push(result);
+    } catch (error) {
+      toast(`Couldn't delete ${issue.key}: ${errorMessage(error)}`, 'error');
+    }
+  }
+  if (deleted.length)
+    toast(`${deleted.length} issues moved to the trash`, 'info', {
+      label: 'Undo',
+      run: () => void Promise.all(deleted.map((issue) => restoreIssue(qc, issue))),
+    });
+}
+
+/** Finds cached issue snapshots for keys (detail cache first, then any cached list). */
+export function cachedIssues(qc: QueryClient, issueKeys: string[]): Issue[] {
+  const found = new Map<string, Issue>();
+  for (const key of issueKeys) {
+    const detail = qc.getQueryData<Issue>(keys.issue(key));
+    if (detail) found.set(key, detail);
+  }
+  if (found.size < issueKeys.length)
+    for (const [, list] of qc.getQueriesData<Issue[]>({ queryKey: ['issues'] }))
+      for (const issue of list ?? [])
+        if (issueKeys.includes(issue.key) && !found.has(issue.key)) found.set(issue.key, issue);
+  return issueKeys.map((k) => found.get(k)).filter((i): i is Issue => !!i);
+}

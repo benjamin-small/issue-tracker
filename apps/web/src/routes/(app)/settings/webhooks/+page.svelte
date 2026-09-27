@@ -10,6 +10,7 @@
   import { relativeTime } from '$lib/format.ts';
   import { fetchers, keys } from '$lib/queries.ts';
   import { toast } from '$lib/toast.svelte.ts';
+  import { confirmAction } from '$lib/confirm.svelte.ts';
 
   /** Admin page: register webhooks, see their delivery log, test, rotate secrets, redeliver. */
   const qc = useQueryClient();
@@ -96,7 +97,13 @@
   }
 
   async function remove(hook: Webhook) {
-    if (!confirm(`Delete the webhook to ${hook.url}? Its delivery log is deleted too.`)) return;
+    const ok = await confirmAction({
+      title: 'Delete this webhook?',
+      body: `Events stop going to ${hook.url}, and its delivery log is deleted.`,
+      confirmLabel: 'Delete webhook',
+      danger: true,
+    });
+    if (!ok) return;
     await run(call(api.DELETE('/webhooks/{id}', { params: { path: { id: hook.id } } })));
     if (expanded === hook.id) expanded = null;
   }

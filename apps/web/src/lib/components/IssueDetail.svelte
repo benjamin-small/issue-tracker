@@ -13,6 +13,7 @@
   import { useProjectData } from '../project-data.svelte.ts';
   import { fetchers, keys } from '../queries.ts';
   import { toast } from '../toast.svelte.ts';
+  import { ui } from '../ui.svelte.ts';
   import { markdownUploader } from '../attachments.ts';
   import { autosize } from '../autosize.ts';
   import ActivityTimeline from './ActivityTimeline.svelte';
@@ -51,6 +52,14 @@
   // Side-by-side properties only on a wide full page; the panel and narrow screens stack them under the title.
   const wide = new MediaQuery('min-width: 1024px');
   const stacked = $derived(panel || !wide.current);
+  // While shown, this issue is what issue shortcuts (s, a, p, l, ⌘⌫) act on.
+  $effect(() => {
+    const key = issueKey;
+    ui.openIssue = key;
+    return () => {
+      if (ui.openIssue === key) ui.openIssue = null;
+    };
+  });
   const notFound = $derived(query.error instanceof ApiError && query.error.status === 404);
 
   let title = $state('');
@@ -128,6 +137,7 @@
         <button
           class="rounded p-1 hover:bg-bg-hover hover:text-fg"
           onclick={copyLink}
+          title="Copy link"
           aria-label="Copy link"><Link size={15} /></button
         >
         {#if issue.deletedAt}
@@ -142,6 +152,9 @@
           <button
             class="rounded p-1 hover:bg-bg-hover hover:text-danger"
             onclick={() => deleteIssue(qc, issue)}
+            title="Move to trash ({/Mac|iPhone|iPad/.test(navigator.platform)
+              ? '⌘'
+              : 'Ctrl'}⌫). You can undo."
             aria-label="Delete issue"
             data-testid="delete-issue"
           >

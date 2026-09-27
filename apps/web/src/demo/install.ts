@@ -69,8 +69,6 @@ export async function installDemo(): Promise<void> {
     return isApi(new URL(request.url)) ? handle(request) : nativeFetch(input, init);
   };
 
-  // The artifact viewer answers every confirm() with false; demo data is disposable, so accept.
-  window.confirm = () => true;
   installEventSource(handle);
   installAssetLoader(handle);
   installBadge(backend);

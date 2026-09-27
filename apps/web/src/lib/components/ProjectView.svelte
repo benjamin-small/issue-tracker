@@ -5,7 +5,9 @@
   import type { View } from '../api.ts';
   import { useProjectData } from '../project-data.svelte.ts';
   import { fetchers, keys } from '../queries.ts';
-  import { openCreateIssue } from '../ui.svelte.ts';
+  import { openCreateIssue, ui } from '../ui.svelte.ts';
+  import { clearSelection } from '../selection.svelte.ts';
+  import SelectionBar from './SelectionBar.svelte';
   import {
     decodeConfig,
     defaultViewConfig,
@@ -68,6 +70,19 @@
   }));
 
   const peek = $derived(page.state.peek);
+  // Shortcuts and the command menu open issues the way this view does: in the peek panel.
+  $effect(() => {
+    ui.opener = open;
+    return () => {
+      if (ui.opener === open) ui.opener = null;
+    };
+  });
+  // A new project or layout starts with nothing selected.
+  $effect(() => {
+    void projectKey;
+    void effectiveLayout;
+    clearSelection();
+  });
   function open(key: string) {
     pushPageState({ peek: key });
   }
@@ -162,6 +177,8 @@
         <IssueList issues={issues.data} {config} {project} onopen={open} active={peek} />
       {/if}
     {/if}
+
+    <SelectionBar />
 
     {#if peek}
       <aside

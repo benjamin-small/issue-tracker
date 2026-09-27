@@ -8,6 +8,7 @@
   import { useProjectData } from '$lib/project-data.svelte.ts';
   import { keys } from '$lib/queries.ts';
   import { toast } from '$lib/toast.svelte.ts';
+  import { confirmAction } from '$lib/confirm.svelte.ts';
   import CustomFieldsSettings from '$components/CustomFieldsSettings.svelte';
   import ProjectGeneralSettings from '$components/ProjectGeneralSettings.svelte';
   import StatusIcon from '$components/StatusIcon.svelte';
@@ -95,7 +96,13 @@
     );
   }
   async function removeLabel(l: Label) {
-    if (confirm(`Delete label "${l.name}"? It is removed from all issues.`))
+    const ok = await confirmAction({
+      title: `Delete the label “${l.name}”?`,
+      body: 'It is removed from every issue that has it. This can’t be undone.',
+      confirmLabel: 'Delete label',
+      danger: true,
+    });
+    if (ok)
       await run(call(api.DELETE('/labels/{id}', { params: { path: { id: l.id } } })), labelKeys);
   }
   async function addLabel(event: SubmitEvent) {
@@ -197,7 +204,7 @@
       <h2 class="mb-3 font-medium">Labels</h2>
       <ul class="divide-y divide-border rounded-lg border border-border">
         {#each project.labels as l (l.id)}
-          <li class="flex items-center gap-2 px-3 py-2">
+          <li class="flex items-center gap-2 px-3 py-2" data-label={l.name}>
             <input
               type="color"
               value={l.color}
