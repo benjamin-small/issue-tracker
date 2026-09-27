@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { navigate } from '$lib/nav.ts';
   import { useQueryClient } from '@tanstack/svelte-query';
   import { Dialog } from 'bits-ui';
   import X from '@lucide/svelte/icons/x';
@@ -63,7 +63,7 @@
     if (!issue) return;
     toast(`Created ${issue.key}`, 'success', {
       label: 'Open',
-      run: () => void goto(`/i/${issue.key}`),
+      run: () => void navigate(`/i/${issue.key}`),
     });
     if (createMore) {
       title = '';

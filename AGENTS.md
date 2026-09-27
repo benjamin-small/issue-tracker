@@ -13,6 +13,7 @@ pnpm format           # apply Prettier
 pnpm pg start|stop|reset|status|url   # throwaway local Postgres, no Docker
 pnpm e2e              # build the web app, run Playwright (E2E_DATABASE_URL=postgres://… for Postgres)
 pnpm build            # web app + dist/server.mjs + dist/tracker.mjs (tsdown bundles)
+pnpm build:demo       # self-contained browser demo in apps/web/build-demo/ (pnpm e2e:demo tests it)
 docker compose up -d --build --wait tracker   # production shape: Postgres + S3 storage
 pnpm openapi:gen      # regenerate docs/openapi.json + client types after API changes
 pnpm vitest run --project cli -u      # refresh CLI golden files + docs/cli-reference.md after CLI changes
@@ -25,6 +26,7 @@ Run a single package's tests with `pnpm vitest run --project <name>`, for exampl
 
 - **Business logic lives in `packages/core`.** It does not live in HTTP route handlers, the CLI or the web app. The server, the CLI's local mode and future integrations all call the same services.
 - **`packages/schema` is isomorphic.** It must not import Node-only modules, Hono or database code, because the web app bundles it.
+- **Internal links go through `$lib/nav.ts`** (`href`, `navigate`, `current`) in the web app, so they work with both the path router and the demo's hash router.
 - **Portable SQL only.** All code must work on both SQLite and Postgres:
   - Use the column-type helpers and row mappers in `packages/db`.
   - Write through `withWriteTx`.

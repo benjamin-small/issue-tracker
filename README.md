@@ -43,6 +43,12 @@ pnpm tracker issue list -P ENG
 pnpm tracker commands --json      # the full command surface, for agents
 ```
 
+Or build the self-contained browser demo, where the web app, API and SQLite all run in the page and any static host can serve it:
+
+```sh
+pnpm build:demo     # apps/web/build-demo/
+```
+
 Run it in production shape (Postgres + S3-compatible storage) with Docker:
 
 ```sh

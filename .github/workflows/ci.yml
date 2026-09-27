@@ -109,6 +109,11 @@ jobs:
       - run: pnpm e2e
         env:
           CI: 'true'
+      - name: Browser demo (static build, API and SQLite in the page)
+        if: matrix.db == 'sqlite'
+        run: pnpm e2e:demo
+        env:
+          CI: 'true'
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

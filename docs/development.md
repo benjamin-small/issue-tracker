@@ -61,6 +61,21 @@ TEST_DATABASE_URL=$(pnpm -s pg url) pnpm test:pg
   - They run the built app against the real server on a fresh seeded SQLite database (`pnpm e2e`). Set `E2E_DATABASE_URL` to run against Postgres.
   - Locally, the preinstalled Chromium at `/opt/pw-browsers/chromium` is used when present. Override it with `PLAYWRIGHT_CHROMIUM_PATH`.
 
+## Browser demo
+
+`pnpm build:demo` builds a self-contained demo into `apps/web/build-demo/`: the web app, the real API server code and SQLite (sql.js, compiled to JavaScript) all run in the page. Any static host can serve it, including a claude.ai artifact, and no server is involved.
+
+How it differs from the normal build ([ADR 0015](adr/0015-browser-demo.md)):
+
+- **Routing.** It uses SvelteKit's hash router (`index.html#/p/ENG`), because a static host may serve the page from any path. Internal links therefore go through `$lib/nav.ts` everywhere.
+- **Startup.** `src/hooks.client.ts` boots `src/demo/` before the app starts.
+- **Requests.** The demo layer answers `fetch` and `EventSource` calls to `/api` with `createApp(…)`. Each signed-in user gets the app's trusted mode, because pages can't set cookies on in-page requests.
+- **Node-only modules.** `node:crypto`, `better-sqlite3`, `pg`, `pino` and the rest are aliased to small browser stand-ins in `src/demo/shims/` (see `vite.config.ts`).
+- **Storage.** Data is saved to the viewer's `localStorage` after writes and when the page is hidden. The badge's **Reset data** button starts over.
+- **What's missing.** Webhooks are delivered to a pretend receiver that always answers 200. Attachments live in memory and in the saved snapshot.
+
+`pnpm e2e:demo` builds it and runs `apps/web/e2e-demo/` against the static files served from a sub-path.
+
 ## Claude Code on the web
 
 `.claude/hooks/session-start.sh` runs when a cloud session starts. It installs dependencies and starts the local Postgres cluster, so agents can run `pnpm check` and `pnpm test:pg` immediately.

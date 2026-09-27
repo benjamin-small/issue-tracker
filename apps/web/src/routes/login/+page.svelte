@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import { page } from '$app/state';
+  import { asset } from '$app/paths';
+  import { current, navigate } from '$lib/nav.ts';
+
+  const DEMO = import.meta.env.TRACKER_DEMO;
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { api, call, errorMessage } from '$lib/api.ts';
   import { fetchers, keys } from '$lib/queries.ts';
@@ -12,11 +14,11 @@
   let error = $state('');
   let busy = $state(false);
 
-  const next = $derived(page.url.searchParams.get('next') ?? '/');
+  const next = $derived(current().params.get('next') ?? '/');
 
   async function finish() {
     await qc.invalidateQueries();
-    await goto(next.startsWith('/') && !next.startsWith('//') ? next : '/');
+    await navigate(next.startsWith('/') && !next.startsWith('//') ? next : '/');
   }
 
   async function tokenLogin(event: SubmitEvent) {
@@ -51,13 +53,13 @@
 <main class="flex min-h-screen items-center justify-center bg-bg-subtle p-6">
   <div class="w-full max-w-sm rounded-xl border border-border bg-bg p-6 shadow-sm">
     <div class="mb-6 flex items-center gap-2">
-      <img src="/favicon.svg" alt="" class="size-7" />
+      <img src={asset('/favicon.svg')} alt="" class="size-7" />
       <h1 class="text-lg font-semibold">Sign in to Tracker</h1>
     </div>
 
     {#if config.data?.devLogin && config.data.users?.length}
       <p class="mb-2 text-xs font-medium tracking-wide text-fg-subtle uppercase">
-        Development — pick a user
+        {DEMO ? 'Explore as' : 'Development — pick a user'}
       </p>
       <ul class="mb-6 space-y-1" data-testid="dev-users">
         {#each config.data.users as u (u.id)}
@@ -79,27 +81,34 @@
       </ul>
     {/if}
 
-    <form onsubmit={tokenLogin} class="space-y-3">
-      <label class="block">
-        <span class="mb-1 block text-xs font-medium text-fg-muted">API token</span>
-        <input
-          bind:value={token}
-          type="password"
-          autocomplete="off"
-          placeholder="trk_…"
-          class="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-accent"
-        />
-      </label>
-      <button
-        type="submit"
-        disabled={busy || !token.trim()}
-        class="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-fg disabled:opacity-50"
-        >Sign in</button
-      >
+    {#if DEMO}
       <p class="text-xs text-fg-subtle">
-        Create a token with <code class="font-mono">tracker token create --name web</code>.
+        This demo runs entirely in your browser, including the API and its SQLite database. Changes
+        stay on this device. To start over, use Reset data at the bottom right.
       </p>
-      {#if error}<p class="text-sm text-danger" role="alert">{error}</p>{/if}
-    </form>
+    {:else}
+      <form onsubmit={tokenLogin} class="space-y-3">
+        <label class="block">
+          <span class="mb-1 block text-xs font-medium text-fg-muted">API token</span>
+          <input
+            bind:value={token}
+            type="password"
+            autocomplete="off"
+            placeholder="trk_…"
+            class="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-accent"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={busy || !token.trim()}
+          class="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-fg disabled:opacity-50"
+          >Sign in</button
+        >
+        <p class="text-xs text-fg-subtle">
+          Create a token with <code class="font-mono">tracker token create --name web</code>.
+        </p>
+      </form>
+    {/if}
+    {#if error}<p class="mt-3 text-sm text-danger" role="alert">{error}</p>{/if}
   </div>
 </main>

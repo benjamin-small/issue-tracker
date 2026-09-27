@@ -5,6 +5,7 @@
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import X from '@lucide/svelte/icons/x';
+  import { href, shareUrl } from '../nav.ts';
   import { deleteIssue, projectKeyOf, restoreIssue, updateIssue } from '../issues.ts';
   import { useProjectData } from '../project-data.svelte.ts';
   import { fetchers, keys } from '../queries.ts';
@@ -64,7 +65,7 @@
   }
 
   async function copyLink() {
-    await navigator.clipboard?.writeText(`${location.origin}/i/${issueKey}`).catch(() => {});
+    await navigator.clipboard?.writeText(shareUrl(`/i/${issueKey}`)).catch(() => {});
     toast(`Copied link to ${issueKey}`, 'success');
   }
 </script>
@@ -79,7 +80,7 @@
 {:else}
   <article class="flex h-full min-h-0 flex-col" data-testid="issue-detail" data-issue={issue.key}>
     <header class="flex items-center gap-2 border-b border-border px-4 py-2 text-sm">
-      <a href="/p/{projectKeyOf(issue.key)}" class="text-fg-subtle hover:text-fg"
+      <a href={href(`/p/${projectKeyOf(issue.key)}`)} class="text-fg-subtle hover:text-fg"
         >{projectKeyOf(issue.key)}</a
       >
       <span class="text-fg-subtle">›</span>
@@ -117,7 +118,7 @@
         {/if}
         {#if panel}
           <a
-            href="/i/{issue.key}"
+            href={href(`/i/${issue.key}`)}
             class="rounded p-1 hover:bg-bg-hover hover:text-fg"
             aria-label="Open full page"><Maximize2 size={15} /></a
           >

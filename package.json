@@ -24,7 +24,9 @@
     "build:web": "pnpm --filter @tracker/web build",
     "build": "pnpm build:web && tsdown",
     "start": "node dist/server.mjs",
-    "e2e": "pnpm build:web && pnpm --filter @tracker/web e2e"
+    "e2e": "pnpm build:web && pnpm --filter @tracker/web e2e",
+    "build:demo": "pnpm --filter @tracker/web build:demo",
+    "e2e:demo": "pnpm build:demo && pnpm --filter @tracker/web e2e:demo"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

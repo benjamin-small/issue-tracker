@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
-  import { page } from '$app/state';
+  import { asset } from '$app/paths';
   import { useQueryClient } from '@tanstack/svelte-query';
   import KanbanSquare from '@lucide/svelte/icons/square-kanban';
   import List from '@lucide/svelte/icons/list';
@@ -12,6 +11,7 @@
   import Webhook from '@lucide/svelte/icons/webhook';
   import { api, type Project, type User } from '../api.ts';
   import { live } from '../live.svelte.ts';
+  import { current, href, navigate } from '../nav.ts';
   import { applyTheme } from '../theme.ts';
   import { openCreateIssue } from '../ui.svelte.ts';
   import Avatar from './Avatar.svelte';
@@ -29,17 +29,17 @@
   async function logout() {
     await api.POST('/auth/logout');
     qc.clear();
-    await goto('/login');
+    await navigate('/login');
   }
 
-  const path = $derived(page.url.pathname);
+  const path = $derived(current().path);
   const link = (active: boolean) =>
     `flex items-center gap-2 rounded-md px-2 py-1 text-sm ${active ? 'bg-bg-hover text-fg font-medium' : 'text-fg-muted hover:bg-bg-hover hover:text-fg'}`;
 </script>
 
 <nav class="flex w-56 shrink-0 flex-col border-r border-border bg-bg-subtle" aria-label="Main">
   <div class="flex items-center gap-2 px-3 py-3">
-    <img src="/favicon.svg" alt="" class="size-5" />
+    <img src={asset('/favicon.svg')} alt="" class="size-5" />
     <span class="font-semibold">Tracker</span>
     <span
       class="ml-auto size-2 rounded-full {live.connected ? 'bg-success' : 'bg-border-strong'}"
@@ -66,7 +66,7 @@
     <p class="px-2 pt-2 pb-1 text-xs font-medium text-fg-subtle">Projects</p>
     {#each projects as p (p.id)}
       <div class="mb-1">
-        <a href="/p/{p.key}" class={link(false)} class:!text-fg={p.key === currentProject}>
+        <a href={href(`/p/${p.key}`)} class={link(false)} class:!text-fg={p.key === currentProject}>
           <span
             class="inline-flex size-5 items-center justify-center rounded bg-bg-muted font-mono text-[10px] font-semibold"
             >{p.key.slice(0, 3)}</span
@@ -75,13 +75,17 @@
         </a>
         {#if p.key === currentProject}
           <div class="ml-4 border-l border-border pl-2">
-            <a href="/p/{p.key}" class={link(path === `/p/${p.key}`)}><List size={14} /> Issues</a>
+            <a href={href(`/p/${p.key}`)} class={link(path === `/p/${p.key}`)}
+              ><List size={14} /> Issues</a
+            >
             <a
-              href="/p/{p.key}/board"
+              href={href(`/p/${p.key}/board`)}
               class={link(path === `/p/${p.key}/board`)}
               data-testid="nav-board"><KanbanSquare size={14} /> Board</a
             >
-            <a href="/p/{p.key}/settings" class={link(path.startsWith(`/p/${p.key}/settings`))}
+            <a
+              href={href(`/p/${p.key}/settings`)}
+              class={link(path.startsWith(`/p/${p.key}/settings`))}
               ><Settings size={14} /> Settings</a
             >
           </div>
@@ -95,7 +99,7 @@
     {#if me.role === 'admin'}
       <p class="px-2 pt-4 pb-1 text-xs font-medium text-fg-subtle">Workspace</p>
       <a
-        href="/settings/webhooks"
+        href={href('/settings/webhooks')}
         class={link(path.startsWith('/settings/webhooks'))}
         data-testid="nav-webhooks"><Webhook size={14} /> Webhooks</a
       >

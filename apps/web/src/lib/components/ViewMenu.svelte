@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { current, href, navigate } from '$lib/nav.ts';
   import { useQueryClient } from '@tanstack/svelte-query';
   import { Popover } from 'bits-ui';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
@@ -42,7 +42,7 @@
       await refresh();
       open = false;
       toast(`Saved “${view.name}”`, 'success');
-      await goto(location.pathname, { replaceState: true, keepFocus: true, noScroll: true });
+      await navigate(current().path, { replaceState: true, keepFocus: true, noScroll: true });
     } catch (e) {
       toast(errorMessage(e), 'error');
     }
@@ -61,7 +61,7 @@
       open = false;
       saving = false;
       newName = '';
-      await goto(`/p/${project.key}/v/${created.id}`);
+      await navigate(`/p/${project.key}/v/${created.id}`);
     } catch (e) {
       toast(errorMessage(e), 'error');
     }
@@ -73,7 +73,7 @@
       await call(api.DELETE('/views/{id}', { params: { path: { id: view.id } } }));
       await refresh();
       open = false;
-      await goto(`/p/${project.key}${view.layout === 'board' ? '/board' : ''}`);
+      await navigate(`/p/${project.key}${view.layout === 'board' ? '/board' : ''}`);
     } catch (e) {
       toast(errorMessage(e), 'error');
     }
@@ -97,7 +97,7 @@
       <p class="px-2 pt-1 pb-1 text-xs font-medium text-fg-subtle">Views</p>
       {#each project.views as v (v.id)}
         <a
-          href="/p/{project.key}/v/{v.id}"
+          href={href(`/p/${project.key}/v/${v.id}`)}
           onclick={() => (open = false)}
           class="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-bg-hover {v.id === view?.id
             ? 'font-medium'

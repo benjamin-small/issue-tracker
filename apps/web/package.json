@@ -9,18 +9,26 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "build:demo": "node scripts/build-demo.ts",
+    "e2e:demo": "playwright test -c playwright.demo.config.ts"
   },
   "dependencies": {
     "@internationalized/date": "^3.12.4",
     "@lucide/svelte": "^1.48.0",
+    "@noble/hashes": "^2.4.0",
     "@tanstack/svelte-query": "^6.3.0",
     "@tracker/client": "workspace:*",
+    "@tracker/core": "workspace:*",
+    "@tracker/db": "workspace:*",
     "@tracker/schema": "workspace:*",
+    "@tracker/server": "workspace:*",
     "bits-ui": "^2.19.3",
+    "buffer": "^6.0.3",
     "dompurify": "^3.4.16",
     "fractional-indexing": "^4.0.0",
     "marked": "^18.0.14",
+    "sql.js": "^1.14.2",
     "svelte-dnd-action": "^0.9.79"
   },
   "devDependencies": {
@@ -29,6 +37,7 @@
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/sql.js": "^1.4.11",
     "eslint-plugin-svelte": "^3.23.0",
     "svelte": "^5.57.1",
     "svelte-check": "^4.7.6",

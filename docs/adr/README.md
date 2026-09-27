@@ -18,3 +18,4 @@ Short records of decisions that constrain future work. Copy `0000-template.md`, 
 | [0012](0012-blob-storage.md)                       | Attachment bytes in a pluggable blob store (local disk or S3)          | Accepted |
 | [0013](0013-webhook-delivery.md)                   | Webhooks delivered from the event log with durable, leased deliveries  | Accepted |
 | [0014](0014-packaging.md)                          | One bundled process per deployment, structured logs, graceful shutdown | Accepted |
+| [0015](0015-browser-demo.md)                       | A self-contained browser demo built from the real code                 | Accepted |

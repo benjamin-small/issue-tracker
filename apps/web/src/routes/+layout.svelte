@@ -1,7 +1,6 @@
 <script lang="ts">
   import '../app.css';
-  import { goto } from '$app/navigation';
-  import { page } from '$app/state';
+  import { current, navigate } from '$lib/nav.ts';
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
   import { ApiError, setUnauthenticatedHandler } from '$lib/api.ts';
   import Toaster from '$components/Toaster.svelte';
@@ -19,9 +18,11 @@
   });
 
   setUnauthenticatedHandler(() => {
-    if (page.url.pathname !== '/login') {
+    const { path, params } = current();
+    if (path !== '/login') {
       queryClient.clear();
-      void goto(`/login?next=${encodeURIComponent(page.url.pathname + page.url.search)}`);
+      const query = params.toString();
+      void navigate(`/login?next=${encodeURIComponent(query ? `${path}?${query}` : path)}`);
     }
   });
 </script>

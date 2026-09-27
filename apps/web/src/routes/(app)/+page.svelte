@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { navigate } from '$lib/nav.ts';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchers, keys } from '$lib/queries.ts';
 
   const projects = createQuery(() => ({ queryKey: keys.projects, queryFn: fetchers.projects }));
   $effect(() => {
     const first = projects.data?.[0];
-    if (first) void goto(`/p/${first.key}`, { replaceState: true });
+    if (first) void navigate(`/p/${first.key}`, { replaceState: true });
   });
 </script>
 

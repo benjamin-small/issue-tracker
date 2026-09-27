@@ -16,6 +16,8 @@ export default tseslint.config(
       'packages/client/src/generated/',
       'apps/web/test-results/',
       'apps/web/playwright-report/',
+      'apps/web/build-demo/',
+      '**/.demo-routes/',
     ],
   },
   js.configs.recommended,
@@ -32,9 +34,10 @@ export default tseslint.config(
   },
   ...svelte.configs.recommended,
   {
-    files: ['**/*.svelte', '**/*.svelte.ts'],
+    files: ['**/*.svelte', '**/*.svelte.ts', 'apps/web/src/lib/nav.ts'],
     rules: {
-      // The SPA is always served at the site root (no SvelteKit `base` path), so resolve() adds nothing.
+      // Internal links and navigation go through $lib/nav.ts, which resolves paths for both the path router
+      // (the served app) and the hash router (the demo build) — resolve() alone can't produce hash links.
       'svelte/no-navigation-without-resolve': 'off',
     },
     languageOptions: {

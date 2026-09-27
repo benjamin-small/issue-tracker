@@ -127,7 +127,7 @@ export class S3BlobStore implements BlobStore {
   async put(key: string, data: Uint8Array, contentType: string): Promise<void> {
     const res = await this.#client.fetch(this.#url(key), {
       method: 'PUT',
-      body: data,
+      body: data as Uint8Array<ArrayBuffer>, // DOM typings (web build) reject ArrayBufferLike views
       headers: { 'content-type': contentType, 'content-length': String(data.byteLength) },
     });
     await this.#check(res, 'PUT');

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { goto, pushState } from '$app/navigation';
   import { page } from '$app/state';
+  import { current, navigate, pushPageState } from '$lib/nav.ts';
   import { createQuery } from '@tanstack/svelte-query';
   import type { View } from '../api.ts';
   import { useProjectData } from '../project-data.svelte.ts';
@@ -40,15 +40,20 @@
   const saved = $derived<ViewConfig>(
     view ? migrateViewConfig(view.config) : defaultViewConfig(layout),
   );
-  const config = $derived<ViewConfig>(decodeConfig(page.url.searchParams.get('v')) ?? saved);
+  const config = $derived<ViewConfig>(decodeConfig(current().params.get('v')) ?? saved);
   const effectiveLayout = $derived(view?.layout ?? layout);
   const dirty = $derived(!sameConfig(config, saved));
 
   function setConfig(next: ViewConfig) {
-    const url = new URL(page.url);
-    if (sameConfig(next, saved)) url.searchParams.delete('v');
-    else url.searchParams.set('v', encodeConfig(next));
-    void goto(url, { replaceState: true, keepFocus: true, noScroll: true });
+    const { path, params } = current();
+    if (sameConfig(next, saved)) params.delete('v');
+    else params.set('v', encodeConfig(next));
+    const query = params.toString();
+    void navigate(query ? `${path}?${query}` : path, {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    });
   }
 
   const listQuery = $derived({ filter: config.filter, sort: config.sort });
@@ -60,7 +65,7 @@
 
   const peek = $derived(page.state.peek);
   function open(key: string) {
-    pushState('', { peek: key });
+    pushPageState({ peek: key });
   }
   function closePeek() {
     history.back();
