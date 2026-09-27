@@ -75,7 +75,3 @@ How it differs from the normal build ([ADR 0015](adr/0015-browser-demo.md)):
 - **What's missing.** Webhooks are delivered to a pretend receiver that always answers 200. Attachments live in memory and in the saved snapshot.
 
 `pnpm e2e:demo` builds it and runs `apps/web/e2e-demo/` against the static files served from a sub-path.
-
-## Claude Code on the web
-
-`.claude/hooks/session-start.sh` runs when a cloud session starts. It installs dependencies and starts the local Postgres cluster, so agents can run `pnpm check` and `pnpm test:pg` immediately.
