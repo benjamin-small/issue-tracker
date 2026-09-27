@@ -57,7 +57,8 @@ export function defaultViewConfig(layout: 'list' | 'board'): ViewConfig {
   return ViewConfigSchema.parse({
     sort:
       layout === 'board' ? [{ field: 'rank', dir: 'asc' }] : [{ field: 'updatedAt', dir: 'desc' }],
-    list: {},
+    // Lists read best grouped by workflow stage, like the board.
+    list: layout === 'list' ? { groupBy: 'status' } : {},
     board: {},
   });
 }

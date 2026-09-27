@@ -1,6 +1,10 @@
 <script lang="ts">
   import { useQueryClient } from '@tanstack/svelte-query';
   import { compareIssues } from '@tracker/schema';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import ChevronsLeftRight from '@lucide/svelte/icons/chevrons-left-right';
+  import Minimize2 from '@lucide/svelte/icons/minimize-2';
   import Plus from '@lucide/svelte/icons/plus';
   import { generateKeyBetween } from 'fractional-indexing';
   import { flip } from 'svelte/animate';
@@ -10,6 +14,7 @@
   import { moveIssue, updateIssue } from '../issues.ts';
   import type { ProjectData } from '../project-data.svelte.ts';
   import { openCreateIssue } from '../ui.svelte.ts';
+  import { isSelected, selection, setOrder, toggleSelected } from '../selection.svelte.ts';
   import type { ViewConfig } from '../views.ts';
   import GroupHeader from './GroupHeader.svelte';
   import IssueCard from './IssueCard.svelte';
@@ -64,7 +69,8 @@
   }
 
   function onconsider(index: number, event: CustomEvent<DndEvent<Issue>>) {
-    dragging = true;
+    // Keyboard drags send one last `consider` (dragStopped) after `finalize`.
+    dragging = event.detail.info.trigger !== TRIGGERS.DRAG_STOPPED;
     replaceItems(index, event.detail.items);
   }
 
@@ -165,58 +171,173 @@
     }
   }
 
+  // j/k follow the cards on screen, column by column (collapsed columns excluded).
+  $effect(() => {
+    setOrder(columns.filter((c) => !collapsed[c.id]).flatMap((c) => c.items.map((i) => i.key)));
+  });
+
+  // Collapsed columns, remembered per project and grouping in this browser (a viewer convenience).
+  const collapseKey = $derived(`tracker.board.collapsed.${project.key}.${groupBy}`);
+  let collapsed = $state<Record<string, boolean>>({});
+  $effect(() => {
+    try {
+      collapsed = JSON.parse(localStorage.getItem(collapseKey) ?? '{}') as Record<string, boolean>;
+    } catch {
+      collapsed = {};
+    }
+  });
+  function toggleCollapsed(id: string) {
+    collapsed = { ...collapsed, [id]: !collapsed[id] };
+    try {
+      localStorage.setItem(collapseKey, JSON.stringify(collapsed));
+    } catch {
+      // not persisted; still works for this visit
+    }
+  }
+
+  // Scroll affordances: arrows appear when columns are hidden off either edge.
+  let scroller = $state<HTMLElement>();
+  let canLeft = $state(false);
+  let canRight = $state(false);
+  function measure() {
+    if (!scroller) return;
+    canLeft = scroller.scrollLeft > 4;
+    canRight = scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 4;
+  }
+  $effect(() => {
+    void columns;
+    void collapsed;
+    if (!scroller) return;
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  });
+  function scrollBy(direction: 1 | -1) {
+    if (!scroller) return;
+    // Most of a screen at a time, keeping a sliver of the previous columns for context.
+    scroller.scrollBy({ left: direction * scroller.clientWidth * 0.8, behavior: 'smooth' });
+  }
+
   const draggable = $derived(
     ['status', 'priority', 'assignee'].includes(groupBy) || groupBy.startsWith('cf:'),
   );
 </script>
 
-<div class="flex min-h-0 flex-1 gap-3 overflow-x-auto bg-bg-subtle p-3" data-testid="board">
-  {#each columns as column, index (column.id)}
-    <section
-      class="flex w-72 shrink-0 flex-col rounded-lg"
-      data-testid="board-column"
-      data-column={column.label}
-    >
-      <header class="flex items-center gap-2 px-1.5 pb-2 text-sm">
-        <GroupHeader spec={column.header} />
-        <span class="text-xs text-fg-subtle" data-testid="column-count">{column.items.length}</span>
-        {#if groupBy === 'status'}
-          <button
-            class="ml-auto rounded p-0.5 text-fg-subtle hover:bg-bg-hover hover:text-fg"
-            aria-label="New issue in {column.label}"
-            onclick={() => openCreateIssue(project.key, { status: column.id })}
-            ><Plus size={14} /></button
+<div class="relative flex min-h-0 min-w-0 flex-1">
+  <div
+    bind:this={scroller}
+    onscroll={measure}
+    class="flex min-h-0 min-w-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto bg-bg-subtle p-3 sm:snap-none"
+    data-testid="board"
+  >
+    {#each columns as column, index (column.id)}
+      {#if collapsed[column.id]}
+        <button
+          class="flex w-10 shrink-0 flex-col items-center gap-2 rounded-xl bg-bg-muted/70 py-3 text-sm hover:bg-bg-muted"
+          onclick={() => toggleCollapsed(column.id)}
+          aria-label="Expand {column.label}"
+          title="Expand {column.label}"
+          data-testid="board-column-collapsed"
+          data-column={column.label}
+        >
+          <ChevronsLeftRight size={14} class="text-fg-subtle" />
+          <span class="text-xs text-fg-subtle">{column.items.length}</span>
+          <span class="font-medium [writing-mode:vertical-rl]"
+            ><GroupHeader spec={column.header} /></span
           >
-        {/if}
-      </header>
-      <div
-        class="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto rounded-lg p-0.5 pb-8"
-        use:dndzone={{
-          items: column.items,
-          type: 'issues',
-          flipDurationMs: FLIP_MS,
-          dragDisabled: !draggable,
-          dropTargetStyle: {
-            outline: '2px dashed var(--color-border-strong)',
-            'outline-offset': '2px',
-          },
-        }}
-        onconsider={(e) => onconsider(index, e)}
-        onfinalize={(e) => onfinalize(index, e)}
-      >
-        {#each column.items as issue (issue.id)}
-          <div animate:flip={{ duration: FLIP_MS }}>
-            <IssueCard
-              {issue}
-              fields={config.board.cardFields}
-              {project}
-              density={config.density}
-              active={active === issue.key}
-              {onopen}
-            />
+        </button>
+      {:else}
+        <section
+          class="flex w-[85vw] shrink-0 snap-start flex-col rounded-xl bg-bg-muted/60 sm:w-72"
+          data-testid="board-column"
+          data-column={column.label}
+        >
+          <header class="group/col flex items-center gap-2 px-3 pt-2.5 pb-2 text-sm">
+            <GroupHeader spec={column.header} />
+            <span class="text-xs text-fg-subtle" data-testid="column-count"
+              >{column.items.length}</span
+            >
+            <span class="ml-auto flex items-center gap-0.5">
+              <button
+                class="rounded p-0.5 text-fg-subtle opacity-0 group-hover/col:opacity-100 hover:bg-bg-hover hover:text-fg focus:opacity-100"
+                aria-label="Collapse {column.label}"
+                title="Collapse column"
+                onclick={() => toggleCollapsed(column.id)}><Minimize2 size={13} /></button
+              >
+              {#if groupBy === 'status'}
+                <button
+                  class="rounded p-0.5 text-fg-subtle hover:bg-bg-hover hover:text-fg"
+                  aria-label="New issue in {column.label}"
+                  onclick={() => openCreateIssue(project.key, { status: column.id })}
+                  ><Plus size={14} /></button
+                >
+              {/if}
+            </span>
+          </header>
+          <div class="relative flex min-h-0 flex-1 flex-col">
+            {#if column.items.length === 0}
+              <p
+                class="pointer-events-none absolute inset-x-2 top-0 rounded-lg border border-dashed border-border py-6 text-center text-xs text-fg-subtle"
+              >
+                No issues
+              </p>
+            {/if}
+            <div
+              class="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto rounded-lg px-2 pb-8"
+              use:dndzone={{
+                items: column.items,
+                type: 'issues',
+                flipDurationMs: FLIP_MS,
+                dragDisabled: !draggable,
+                dropTargetStyle: {
+                  outline: '2px dashed var(--color-border-strong)',
+                  'outline-offset': '-2px',
+                },
+              }}
+              onconsider={(e) => onconsider(index, e)}
+              onfinalize={(e) => onfinalize(index, e)}
+            >
+              {#each column.items as issue (issue.id)}
+                <div animate:flip={{ duration: FLIP_MS }}>
+                  <IssueCard
+                    {issue}
+                    fields={config.board.cardFields}
+                    {project}
+                    density={config.density}
+                    active={active === issue.key}
+                    focused={selection.focused === issue.key}
+                    selected={isSelected(issue.key)}
+                    onopen={(key) => {
+                      selection.focused = key;
+                      onopen(key);
+                    }}
+                    onselect={toggleSelected}
+                  />
+                </div>
+              {/each}
+            </div>
           </div>
-        {/each}
-      </div>
-    </section>
-  {/each}
+        </section>
+      {/if}
+    {/each}
+  </div>
+  {#if canLeft}
+    <button
+      class="absolute top-1/2 left-2 z-10 hidden -translate-y-1/2 rounded-full border border-border bg-bg p-1.5 text-fg-muted shadow-md hover:text-fg sm:block"
+      aria-label="Scroll columns left"
+      onclick={() => scrollBy(-1)}><ChevronLeft size={16} /></button
+    >
+  {/if}
+  {#if canRight}
+    <div
+      class="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-bg-subtle to-transparent"
+    ></div>
+    <button
+      class="absolute top-1/2 right-2 z-10 hidden -translate-y-1/2 rounded-full border border-border bg-bg p-1.5 text-fg-muted shadow-md hover:text-fg sm:block"
+      aria-label="Scroll columns right"
+      data-testid="board-scroll-right"
+      onclick={() => scrollBy(1)}><ChevronRight size={16} /></button
+    >
+  {/if}
 </div>

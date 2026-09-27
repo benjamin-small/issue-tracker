@@ -1,12 +1,14 @@
 <script lang="ts">
+  import { btn, input } from '../styles.ts';
   import { useQueryClient } from '@tanstack/svelte-query';
   import Archive from '@lucide/svelte/icons/archive';
   import ArchiveRestore from '@lucide/svelte/icons/archive-restore';
-  import X from '@lucide/svelte/icons/x';
   import { createQuery } from '@tanstack/svelte-query';
   import { api, call, type CustomField, errorMessage } from '../api.ts';
   import { keys } from '../queries.ts';
   import { toast } from '../toast.svelte.ts';
+  import ColorInput from './ColorInput.svelte';
+  import Select from './Select.svelte';
 
   /** Manage a project's custom fields: create (with options), rename, add/archive options, archive fields. */
   let { projectKey }: { projectKey: string } = $props();
@@ -22,6 +24,16 @@
     'user',
     'url',
   ] as const;
+  const TYPE_LABELS: Record<(typeof TYPES)[number], string> = {
+    text: 'Text',
+    number: 'Number',
+    date: 'Date',
+    boolean: 'Checkbox',
+    select: 'Single select',
+    multi_select: 'Multi select',
+    user: 'Person',
+    url: 'Link',
+  };
   const all = createQuery(() => ({
     queryKey: [...keys.fields(projectKey), 'all'],
     queryFn: async () =>
@@ -37,9 +49,10 @@
   let draft = $state({ key: '', name: '', type: 'select' as (typeof TYPES)[number], options: '' });
   const newOption = $state<Record<string, string>>({});
 
-  async function run<T>(action: Promise<T>): Promise<T | undefined> {
+  async function run<T>(action: Promise<T>, saved?: string): Promise<T | undefined> {
     try {
       const result = await action;
+      if (saved) toast(saved, 'success');
       void qc.invalidateQueries({ queryKey: ['fields', projectKey] });
       void qc.invalidateQueries({ queryKey: keys.issueLists(projectKey) });
       return result;
@@ -76,7 +89,12 @@
   }
 
   function update(field: CustomField, body: { name?: string; archived?: boolean }) {
-    return run(call(api.PATCH('/fields/{id}', { params: { path: { id: field.id } }, body })));
+    return run(
+      call(api.PATCH('/fields/{id}', { params: { path: { id: field.id } }, body })),
+      body.archived === undefined
+        ? `Saved “${body.name ?? field.name}”`
+        : `${body.archived ? 'Archived' : 'Restored'} “${field.name}”`,
+    );
   }
 
   async function addOption(field: CustomField) {
@@ -98,9 +116,6 @@
       call(api.PATCH('/field-options/{id}', { params: { path: { id: optionId } }, body })),
     );
   }
-
-  const input =
-    'rounded border border-border bg-bg px-2 py-1 text-sm outline-none focus:border-accent';
 </script>
 
 <section data-testid="settings-fields">
@@ -125,7 +140,7 @@
           />
           <code class="rounded bg-bg-muted px-1.5 py-0.5 text-xs text-fg-muted">cf:{field.key}</code
           >
-          <span class="text-xs text-fg-subtle">{field.type}</span>
+          <span class="text-xs text-fg-subtle">{TYPE_LABELS[field.type]}</span>
           <button
             class="ml-auto inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-fg-muted hover:bg-bg-hover"
             onclick={() => update(field, { archived: !field.archivedAt })}
@@ -141,19 +156,25 @@
                   ? 'line-through opacity-60'
                   : ''}"
               >
-                <input
-                  type="color"
-                  class="size-3.5 cursor-pointer rounded-full border-0 bg-transparent p-0"
+                <ColorInput
+                  compact
                   value={option.color}
-                  aria-label="Option color"
-                  onchange={(e) => setOption(option.id, { color: e.currentTarget.value })}
+                  label="Colour of {option.label}"
+                  onchange={(color) => setOption(option.id, { color })}
                 />
                 {option.label}
                 <button
-                  class="rounded-full p-0.5 text-fg-subtle hover:text-fg"
-                  aria-label={option.archivedAt ? 'Restore option' : 'Archive option'}
+                  class="rounded-full p-0.5 text-fg-subtle hover:bg-bg-hover hover:text-fg"
+                  aria-label={option.archivedAt
+                    ? `Restore ${option.label}`
+                    : `Archive ${option.label}`}
+                  title={option.archivedAt
+                    ? 'Restore option'
+                    : 'Archive option (issues keep their value; it can’t be picked any more)'}
                   onclick={() => setOption(option.id, { archived: !option.archivedAt })}
-                  ><X size={11} /></button
+                  >{#if option.archivedAt}<ArchiveRestore size={11} />{:else}<Archive
+                      size={11}
+                    />{/if}</button
                 >
               </span>
             {/each}
@@ -183,9 +204,13 @@
       aria-label="Field name"
       bind:value={draft.name}
     />
-    <select class={input} aria-label="Field type" bind:value={draft.type}>
-      {#each TYPES as type (type)}<option value={type}>{type}</option>{/each}
-    </select>
+    <Select
+      class="w-36"
+      label="Field type"
+      value={draft.type}
+      items={TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
+      onchange={(v) => (draft.type = v as (typeof TYPES)[number])}
+    />
     {#if draft.type === 'select' || draft.type === 'multi_select'}
       <input
         class="{input} flex-1"
@@ -194,9 +219,6 @@
         bind:value={draft.options}
       />
     {/if}
-    <button
-      class="rounded-md bg-accent px-3 text-sm text-accent-fg disabled:opacity-50"
-      disabled={!draft.key.trim()}>Add field</button
-    >
+    <button class={btn.primary} disabled={!draft.key.trim()}>Add field</button>
   </form>
 </section>

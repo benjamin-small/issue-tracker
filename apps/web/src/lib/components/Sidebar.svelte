@@ -8,12 +8,13 @@
   import Plus from '@lucide/svelte/icons/plus';
   import Settings from '@lucide/svelte/icons/settings';
   import Sun from '@lucide/svelte/icons/sun';
+  import { MediaQuery } from 'svelte/reactivity';
   import Webhook from '@lucide/svelte/icons/webhook';
   import { api, type Project, type User } from '../api.ts';
   import { live } from '../live.svelte.ts';
   import { current, href, navigate } from '../nav.ts';
   import { applyTheme } from '../theme.ts';
-  import { openCreateIssue } from '../ui.svelte.ts';
+  import { openCreateIssue, ui } from '../ui.svelte.ts';
   import Avatar from './Avatar.svelte';
 
   let { me, projects, currentProject }: { me: User; projects: Project[]; currentProject: string } =
@@ -33,20 +34,40 @@
   }
 
   const path = $derived(current().path);
+  const wide = new MediaQuery('min-width: 768px');
+  const isAdmin = $derived(me.role === 'admin');
   const link = (active: boolean) =>
     `flex items-center gap-2 rounded-md px-2 py-1 text-sm ${active ? 'bg-bg-hover text-fg font-medium' : 'text-fg-muted hover:bg-bg-hover hover:text-fg'}`;
 </script>
 
-<nav class="flex w-56 shrink-0 flex-col border-r border-border bg-bg-subtle" aria-label="Main">
+<nav
+  class="flex w-64 shrink-0 flex-col border-r border-border bg-bg-subtle max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-xl max-md:transition-transform md:w-56 {ui.sidebarOpen
+    ? ''
+    : 'max-md:-translate-x-full'}"
+  aria-label="Main"
+  inert={!wide.current && !ui.sidebarOpen}
+>
   <div class="flex items-center gap-2 px-3 py-3">
     <img src={asset('/favicon.svg')} alt="" class="size-5" />
     <span class="font-semibold">Tracker</span>
     <span
-      class="ml-auto size-2 rounded-full {live.connected ? 'bg-success' : 'bg-border-strong'}"
-      title={live.connected ? 'Live updates connected' : 'Live updates disconnected'}
+      class="ml-auto inline-flex items-center gap-1.5 rounded-full px-1.5 py-0.5 text-[11px] {live.connected
+        ? 'text-fg-subtle'
+        : 'bg-bg-muted text-fg-muted'}"
+      title={live.connected
+        ? 'Changes by others appear as they happen'
+        : 'Reconnecting… changes by others appear when you reload'}
+      role="status"
       data-testid="live-indicator"
       data-connected={live.connected}
-    ></span>
+    >
+      <span
+        class="size-1.5 rounded-full {live.connected
+          ? 'bg-success'
+          : 'animate-pulse bg-border-strong'}"
+      ></span>
+      {live.connected ? 'Live' : 'Offline'}
+    </span>
   </div>
   <div class="px-2 pb-2">
     <button
@@ -63,7 +84,18 @@
   </div>
 
   <div class="flex-1 overflow-y-auto px-2">
-    <p class="px-2 pt-2 pb-1 text-xs font-medium text-fg-subtle">Projects</p>
+    <div class="flex items-center px-2 pt-2 pb-1">
+      <p class="text-xs font-medium text-fg-subtle">Projects</p>
+      {#if isAdmin}
+        <button
+          class="ml-auto rounded p-0.5 text-fg-subtle hover:bg-bg-hover hover:text-fg"
+          aria-label="New project"
+          title="New project"
+          data-testid="new-project"
+          onclick={() => (ui.createProject = true)}><Plus size={14} /></button
+        >
+      {/if}
+    </div>
     {#each projects as p (p.id)}
       <div class="mb-1">
         <a href={href(`/p/${p.key}`)} class={link(false)} class:!text-fg={p.key === currentProject}>
@@ -92,11 +124,9 @@
         {/if}
       </div>
     {:else}
-      <p class="px-2 text-xs text-fg-subtle">
-        No projects yet. Create one with <code>tracker project create</code>.
-      </p>
+      <p class="px-2 text-xs text-fg-subtle">No projects yet.</p>
     {/each}
-    {#if me.role === 'admin'}
+    {#if isAdmin}
       <p class="px-2 pt-4 pb-1 text-xs font-medium text-fg-subtle">Workspace</p>
       <a
         href={href('/settings/webhooks')}

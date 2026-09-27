@@ -19,3 +19,5 @@ Short records of decisions that constrain future work. Copy `0000-template.md`, 
 | [0013](0013-webhook-delivery.md)                   | Webhooks delivered from the event log with durable, leased deliveries  | Accepted |
 | [0014](0014-packaging.md)                          | One bundled process per deployment, structured logs, graceful shutdown | Accepted |
 | [0015](0015-browser-demo.md)                       | A self-contained browser demo built from the real code                 | Accepted |
+| [0016](0016-keyboard-and-command-layer.md)         | One keyboard, selection and command layer for the web app              | Accepted |
+| [0017](0017-shared-controls.md)                    | Shared controls instead of native form widgets                         | Accepted |

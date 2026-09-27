@@ -51,7 +51,9 @@
 >
   {#snippet trigger()}
     <Avatar user={issue.assignee} />
-    {#if showLabel}<span class="truncate">{issue.assignee?.name ?? 'Unassigned'}</span>{/if}
+    {#if showLabel}<span class="truncate {issue.assignee ? '' : 'text-fg-subtle'}"
+        >{issue.assignee?.name ?? 'Unassigned'}</span
+      >{/if}
   {/snippet}
   {#snippet item(it)}
     <Avatar user={it.user} />

@@ -6,6 +6,7 @@
   import type { ProjectData } from '../project-data.svelte.ts';
   import AssigneePicker from './AssigneePicker.svelte';
   import Avatar from './Avatar.svelte';
+  import DateInput from './DateInput.svelte';
   import LabelPicker from './LabelPicker.svelte';
   import PriorityPicker from './PriorityPicker.svelte';
   import StatusPicker from './StatusPicker.svelte';
@@ -21,8 +22,7 @@
     if (estimate !== issue.estimate) void updateIssue(qc, issue, { estimate }, { estimate });
   }
 
-  function setDue(event: Event) {
-    const dueDate = (event.target as HTMLInputElement).value || null;
+  function setDue(dueDate: string | null) {
     if (dueDate !== issue.dueDate) void updateIssue(qc, issue, { dueDate }, { dueDate });
   }
 </script>
@@ -45,19 +45,21 @@
       min="0"
       step="0.5"
       value={issue.estimate ?? ''}
-      placeholder="—"
+      placeholder="Set estimate"
       aria-label="Estimate"
       onchange={setEstimate}
-      class="w-20 rounded bg-transparent px-1.5 py-1 hover:bg-bg-hover focus:bg-bg-hover focus:outline-none"
+      class="w-full rounded bg-transparent px-1.5 py-1 placeholder:text-fg-subtle hover:bg-bg-hover focus:bg-bg-hover focus:outline-none"
     />
   {/snippet}
   {#snippet due()}
-    <input
-      type="date"
-      value={issue.dueDate ?? ''}
-      aria-label="Due date"
+    <DateInput
+      value={issue.dueDate}
+      label="Due date"
+      placeholder="Set due date"
+      testid="due-date"
+      overdue={!['completed', 'canceled'].includes(issue.status.category)}
+      disabled={!!issue.deletedAt}
       onchange={setDue}
-      class="rounded bg-transparent px-1.5 py-1 text-sm hover:bg-bg-hover focus:outline-none"
     />
   {/snippet}
   {#snippet creator()}

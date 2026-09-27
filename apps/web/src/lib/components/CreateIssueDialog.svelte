@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { btn } from '../styles.ts';
   import { navigate } from '$lib/nav.ts';
   import { useQueryClient } from '@tanstack/svelte-query';
   import { Dialog } from 'bits-ui';
@@ -187,8 +188,7 @@
             type="submit"
             disabled={!title.trim() || busy}
             data-testid="create-submit"
-            class="ml-auto rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg disabled:opacity-50"
-            >Create issue</button
+            class="{btn.primary} ml-auto">Create issue</button
           >
         </div>
       </form>

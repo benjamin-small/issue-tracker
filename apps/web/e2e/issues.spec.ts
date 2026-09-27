@@ -1,4 +1,4 @@
-import { apiCreateIssue, expect, openList, row, test } from './fixtures.ts';
+import { apiCreateIssue, choose, expect, openList, row, test } from './fixtures.ts';
 
 test('signs in with the dev user picker', async ({ browser }) => {
   const page = await (await browser.newContext()).newPage();
@@ -86,7 +86,7 @@ test('links issues and shows both perspectives', async ({ page }) => {
   await page.goto(`/i/${blocker}`);
   const links = page.getByTestId('links');
   await links.getByTestId('add-link').click();
-  await links.getByLabel('Relation').selectOption('blocks');
+  await choose(links, 'Relation', 'blocks');
   await links.getByTestId('link-target').fill(blocked);
   await links.getByRole('button', { name: 'Link', exact: true }).click();
   await expect(links).toContainText('blocks');

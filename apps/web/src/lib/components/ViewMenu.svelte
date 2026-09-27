@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { btn } from '../styles.ts';
   import { current, href, navigate } from '$lib/nav.ts';
+  import { confirmAction } from '$lib/confirm.svelte.ts';
   import { useQueryClient } from '@tanstack/svelte-query';
   import { Popover } from 'bits-ui';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
@@ -68,7 +70,16 @@
   }
 
   async function remove() {
-    if (!view || !confirm(`Delete the view “${view.name}”?`)) return;
+    if (!view) return;
+    const ok = await confirmAction({
+      title: `Delete the view “${view.name}”?`,
+      body: view.ownerId
+        ? 'This personal view will be gone. Issues are not affected.'
+        : 'Everyone in the project loses this shared view. Issues are not affected.',
+      confirmLabel: 'Delete view',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await call(api.DELETE('/views/{id}', { params: { path: { id: view.id } } }));
       await refresh();
@@ -133,7 +144,7 @@
             ><input type="checkbox" bind:checked={shared} /> Share with the project</label
           >
           <button
-            class="w-full rounded bg-accent px-2 py-1 text-accent-fg disabled:opacity-50"
+            class="{btn.primarySm} w-full"
             disabled={!newName.trim()}
             data-testid="view-create">Create view</button
           >

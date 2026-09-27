@@ -19,8 +19,8 @@
 </script>
 
 <section data-testid="sub-issues">
-  <div class="mb-1 flex items-center gap-2">
-    <h3 class="text-xs font-medium text-fg-subtle">Sub-issues</h3>
+  <div class="mb-2 flex items-center gap-2">
+    <h3 class="text-sm font-semibold">Sub-issues</h3>
     {#if children.data?.length}<span class="text-xs text-fg-subtle"
         >{done}/{children.data.length}</span
       >{/if}
@@ -31,6 +31,19 @@
     >
   </div>
   {#if children.data?.length}
+    <div
+      class="mb-2 h-1 overflow-hidden rounded-full bg-bg-muted"
+      role="progressbar"
+      aria-label="Sub-issues done"
+      aria-valuemin={0}
+      aria-valuemax={children.data.length}
+      aria-valuenow={done}
+    >
+      <div
+        class="h-full rounded-full bg-success transition-[width]"
+        style:width="{(done / children.data.length) * 100}%"
+      ></div>
+    </div>
     <ul class="divide-y divide-border rounded-md border border-border">
       {#each children.data as child (child.id)}
         <li>
@@ -45,5 +58,7 @@
         </li>
       {/each}
     </ul>
+  {:else if children.data}
+    <p class="text-sm text-fg-subtle">No sub-issues. Break the work down with Add.</p>
   {/if}
 </section>

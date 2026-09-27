@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { apiCreateIssue, expect, test } from './fixtures.ts';
+import { apiCreateIssue, choose, expect, test } from './fixtures.ts';
 
 function column(page: Page, name: string) {
   return page.locator(`[data-testid="board-column"][data-column="${name}"]`);
@@ -81,7 +81,7 @@ test('groups the board by priority and drag changes priority', async ({ page }) 
   const key = await apiCreateIssue(page.request, { title: 'Reprioritize me', priority: 4 });
   await page.goto('/p/ENG/board');
   await page.getByTestId('display-options').click();
-  await page.getByLabel('Group by').selectOption('priority');
+  await choose(page, 'Group by', 'Priority');
   await page.keyboard.press('Escape');
   await expect(column(page, 'Urgent')).toBeVisible();
   await drag(

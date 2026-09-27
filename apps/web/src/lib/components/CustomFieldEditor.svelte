@@ -3,6 +3,7 @@
   import type { CustomField, Issue, User } from '../api.ts';
   import { updateIssue } from '../issues.ts';
   import Avatar from './Avatar.svelte';
+  import DateInput from './DateInput.svelte';
   import Picker from './Picker.svelte';
 
   /** Inline editor for one custom field on an issue (optimistic, like the core properties). */
@@ -21,8 +22,9 @@
     void updateIssue(qc, issue, { customFields: { [field.key]: next } }, { customFields });
   }
 
-  const input =
-    'w-full rounded bg-transparent px-1.5 py-1 text-sm hover:bg-bg-hover focus:bg-bg-hover focus:outline-none';
+  const setLabel = $derived(`Set ${field.name.toLowerCase()}`);
+  const inline =
+    'w-full rounded bg-transparent px-1.5 py-1 text-sm placeholder:text-fg-subtle hover:bg-bg-hover focus:bg-bg-hover focus:outline-none';
   const optionOf = (v: unknown) => field.options.find((o) => o.value === v);
 </script>
 
@@ -41,7 +43,7 @@
       {#if typeof value === 'string'}
         <span class="size-2.5 rounded-full" style:background={optionOf(value)?.color}
         ></span>{optionOf(value)?.label ?? value}
-      {:else}<span class="text-fg-subtle">—</span>{/if}
+      {:else}<span class="text-fg-subtle">{setLabel}</span>{/if}
     {/snippet}
     {#snippet item(it)}<span
         class="size-2.5 rounded-full border border-border"
@@ -60,7 +62,7 @@
   >
     {#snippet trigger()}
       {#if current.length}{current.map((v) => optionOf(v)?.label ?? v).join(', ')}{:else}<span
-          class="text-fg-subtle">—</span
+          class="text-fg-subtle">{setLabel}</span
         >{/if}
     {/snippet}
     {#snippet item(it)}<span class="size-2.5 rounded-full" style:background={it.color}
@@ -78,7 +80,9 @@
     triggerLabel={field.name}
     testid="cf-{field.key}"
   >
-    {#snippet trigger()}<Avatar user={u} size={16} />{u?.name ?? '—'}{/snippet}
+    {#snippet trigger()}<Avatar user={u} size={16} />{#if u}{u.name}{:else}<span
+          class="text-fg-subtle">{setLabel}</span
+        >{/if}{/snippet}
     {#snippet item(it)}<Avatar user={it.u} size={16} />{it.label}{/snippet}
   </Picker>
 {:else if field.type === 'boolean'}
@@ -93,28 +97,27 @@
 {:else if field.type === 'number'}
   <input
     type="number"
-    class={input}
+    class={inline}
     value={typeof value === 'number' ? value : ''}
-    placeholder="—"
+    placeholder={setLabel}
     aria-label={field.name}
     data-testid="cf-{field.key}"
     onchange={(e) => set(e.currentTarget.value === '' ? null : Number(e.currentTarget.value))}
   />
 {:else if field.type === 'date'}
-  <input
-    type="date"
-    class={input}
-    value={typeof value === 'string' ? value : ''}
-    aria-label={field.name}
-    data-testid="cf-{field.key}"
-    onchange={(e) => set(e.currentTarget.value || null)}
+  <DateInput
+    value={typeof value === 'string' ? value : null}
+    label={field.name}
+    placeholder={setLabel}
+    testid="cf-{field.key}"
+    onchange={set}
   />
 {:else}
   <input
     type={field.type === 'url' ? 'url' : 'text'}
-    class={input}
+    class={inline}
     value={typeof value === 'string' ? value : ''}
-    placeholder={field.type === 'url' ? 'https://…' : '—'}
+    placeholder={field.type === 'url' ? 'https://…' : setLabel}
     aria-label={field.name}
     data-testid="cf-{field.key}"
     onchange={(e) => set(e.currentTarget.value.trim() || null)}

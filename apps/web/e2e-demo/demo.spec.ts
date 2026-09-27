@@ -27,9 +27,11 @@ test('creates, comments and keeps data across reloads', async ({ page }) => {
   await page.reload();
   await expect(rows(page).filter({ hasText: 'Made in the demo' })).toBeVisible();
   const key = await rows(page).filter({ hasText: 'Made in the demo' }).getAttribute('data-key');
-  await page.goto(`index.html#/i/${key}`);
-  await page.reload();
-  await expect(page.getByText('from the browser')).toBeVisible();
+  // A deep link opened fresh, as a shared URL would be (changing only the hash of a loaded page makes
+  // SvelteKit's hash router reload by itself, which would race an explicit reload here).
+  const shared = await page.context().newPage();
+  await shared.goto(`index.html#/i/${key}`);
+  await expect(shared.getByText('from the browser')).toBeVisible();
 });
 
 test('filters live in the hash and survive a reload', async ({ page }) => {
