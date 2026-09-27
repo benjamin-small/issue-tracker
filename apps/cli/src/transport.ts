@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
 import { type ApiClient, createClient } from '@tracker/client';
 import { blobStoreFromEnv, ensureBuiltins } from '@tracker/core';
 import { dirname, join } from 'node:path';
-import { createDb, type Db, migrationStatus } from '@tracker/db';
+import { createDb, type Db, migrationStatus, parseDatabaseUrl } from '@tracker/db';
 import { createApp } from '@tracker/server';
 import type { ResolvedConfig } from './config.ts';
 import { CliError } from './errors.ts';
@@ -89,7 +90,10 @@ export async function openTransport(config: ResolvedConfig, io: CliIO): Promise<
 export async function openLocalDatabase(url: string, requireMigrated: boolean): Promise<Db> {
   let db: Db;
   try {
-    db = createDb(url);
+    const config = parseDatabaseUrl(url);
+    if (config.dialect === 'sqlite' && config.filename !== ':memory:')
+      mkdirSync(dirname(config.filename), { recursive: true });
+    db = createDb(config);
   } catch (error) {
     throw new CliError('UNAVAILABLE', `Cannot open database ${url}: ${(error as Error).message}`);
   }

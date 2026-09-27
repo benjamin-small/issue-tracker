@@ -446,6 +446,13 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
     expect(me.json()).toMatchObject({ handle: 'claude', kind: 'agent' });
   });
 
+  it('creates the SQLite file’s directory, like the server does', async () => {
+    const env = { TRACKER_DATABASE_URL: `sqlite:${join(dir, 'missing', 'nested', 'dev.db')}` };
+    const migrated = await cli(['db', 'migrate'], { env, fetch: null });
+    expect(migrated.stderr).toBe('');
+    expect(migrated.code).toBe(0);
+  });
+
   it('talks to a real server with a token, and logs in', async () => {
     const { loadConfig, startServer } = await import('@tracker/server');
     const server = await startServer(

@@ -12,48 +12,78 @@ It also has live updates (SSE), webhooks, file attachments (local disk or S3), a
 
 > **Status:** v1 feature-complete. See the [roadmap](#roadmap).
 
-## Quickstart
+## Run it locally
 
-Requirements: Node 22.12+ and pnpm 10 (`corepack enable`).
+Tested on macOS and Linux.
+
+### 1. Prerequisites
+
+- **Node 22**, the version in `.nvmrc`. With nvm, run `nvm install && nvm use`. Newer Node majors may have no prebuilt `better-sqlite3` binary, and the install then fails unless it can compile one.
+- **pnpm 10**. `corepack enable` picks up the version pinned in `package.json`.
+- **Docker** (optional). You need it for the Postgres test run when Postgres isn't installed locally, and for the production-shaped stack.
 
 ```sh
 pnpm install
-pnpm check          # typecheck + lint + format check + tests (SQLite)
 ```
 
-To run the test suites against Postgres as well:
+### 2. Develop: API + web UI on SQLite
 
 ```sh
-pnpm pg start       # throwaway local Postgres (local binaries, else Docker), prints its URL
-pnpm test:pg
+pnpm dev
 ```
 
-Run the app (API server + web UI; SQLite, auto-migrated and seeded with demo users on first start):
+- The web UI is at http://127.0.0.1:5943. Vite moves to the next free port if 5943 is taken and prints the URL it chose.
+- The API is on `:3000`, with its reference at http://127.0.0.1:3000/api/docs.
+- On first start the database (`data/dev.db`) is created, migrated and seeded with demo users (`ada` is an admin, `grace` a member, `claude` an agent) and an `ENG` project.
+- Dev auth mode lets you sign in as any demo user with one click.
+- To start over, stop the server and delete `data/`.
+- Settings come from the environment, or from a `.env` file at the repo root (copy `.env.example`), which `pnpm dev` loads.
+
+To develop against Postgres instead:
 
 ```sh
-pnpm dev            # web UI at http://127.0.0.1:5173 (sign in as a demo user), API docs at :3000/api/docs
-pnpm e2e            # build the web app and run the Playwright suite against the real server
+pnpm pg start                                        # throwaway local Postgres (local binaries, else Docker)
+TRACKER_DATABASE_URL=$(pnpm -s pg url) pnpm dev
 ```
 
-Use the CLI (local mode needs no server — it runs the API in-process on the same SQLite file):
+### 3. Use the CLI
+
+Local mode needs no server. It runs the API in-process on the same `data/dev.db` that `pnpm dev` uses:
 
 ```sh
-pnpm tracker db migrate && pnpm tracker db seed
+pnpm tracker db migrate && pnpm tracker db seed      # not needed if `pnpm dev` has already run
 pnpm tracker issue list -P ENG
-pnpm tracker commands --json      # the full command surface, for agents
+pnpm tracker commands --json                         # the full command surface, for agents
 ```
 
-Or build the self-contained browser demo, where the web app, API and SQLite all run in the page and any static host can serve it:
+### 4. Test
 
 ```sh
-pnpm build:demo     # apps/web/build-demo/
+pnpm check           # typecheck + lint + format check + tests on SQLite (run before every commit)
+pnpm pg start && pnpm test:pg                        # the same tests on Postgres
+pnpm --filter @tracker/web exec playwright install chromium   # once, for the browser tests
+pnpm e2e             # build the web app, run Playwright against the real server (SQLite)
+E2E_DATABASE_URL=$(pnpm -s pg url) pnpm e2e          # ...and on Postgres
+pnpm pg stop
 ```
 
-Run it in production shape (Postgres + S3-compatible storage) with Docker:
+CI runs all of this on every pull request, plus the S3 attachment tests and a Docker smoke test.
+
+### 5. Run the production-shaped stack
+
+This runs Postgres, S3-compatible storage (SeaweedFS) and the tracker image, built from this checkout, on http://localhost:3000:
 
 ```sh
 docker compose up -d --build --wait tracker
 docker compose exec tracker tracker db bootstrap --handle you --name "Your Name"   # prints an API token
+```
+
+Sign in at http://localhost:3000 with the printed token. Production auth has no demo users. Stop the stack with `docker compose down`, or add `-v` to delete its data too. See [deployment.md](docs/deployment.md) for configuration.
+
+### Browser demo
+
+```sh
+pnpm build:demo      # apps/web/build-demo/: web app, API and SQLite all run in the page; any static host serves it
 ```
 
 ## Documentation
