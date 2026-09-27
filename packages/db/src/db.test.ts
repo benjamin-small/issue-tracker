@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { sql } from 'kysely';
+import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { pgTimestampToIso } from './dialect.ts';
 import { latestMigrationName, migrateDown, migrateToLatest, migrationStatus } from './migrate.ts';
@@ -307,6 +308,31 @@ describe.runIf(dialect === 'sqlite')('multi-process SQLite writes', () => {
       await db.destroy();
     }
   }, 30_000);
+});
+
+describe.runIf(dialect === 'postgres')('Postgres connection loss', () => {
+  it('survives the server terminating idle pool connections', async () => {
+    const db = await createTestDb();
+    try {
+      // Warm the pool so it holds an idle connection, then have another session kill it.
+      await sql`select 1`.execute(db.kysely);
+      const killer = new pg.Client({ connectionString: db.url });
+      await killer.connect();
+      try {
+        const killed = await killer.query(
+          'select pg_terminate_backend(pid) from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid()',
+        );
+        expect(killed.rowCount).toBeGreaterThan(0);
+      } finally {
+        await killer.end();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const { rows } = await sql<{ one: number }>`select 1 as one`.execute(db.kysely);
+      expect(rows[0]?.one).toBe(1);
+    } finally {
+      await db.destroy();
+    }
+  });
 });
 
 describe('pgTimestampToIso', () => {

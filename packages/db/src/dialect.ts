@@ -52,7 +52,7 @@ export function createDb(url: string | DatabaseConfig, options: CreateDbOptions 
         })
       : new Kysely<Database>({
           dialect: new PostgresDialect({
-            pool: new pg.Pool({
+            pool: createPgPool({
               connectionString: config.connectionString,
               max: options.poolSize ?? 10,
               types: { getTypeParser: getPgTypeParser as typeof pg.types.getTypeParser },
@@ -162,3 +162,14 @@ function getPgTypeParser(oid: number, format?: string): (value: string) => unkno
 }
 
 export type { DatabaseConnection };
+
+/**
+ * A pool that survives the server dropping idle connections (restart, failover, admin kill).
+ * Without an `error` listener, pg re-throws such errors as uncaught exceptions and the process dies;
+ * with one, the pool discards the dead client and the next query opens a new connection.
+ */
+function createPgPool(config: pg.PoolConfig): pg.Pool {
+  const pool = new pg.Pool(config);
+  pool.on('error', () => {});
+  return pool;
+}
