@@ -24,7 +24,7 @@ pnpm check          # typecheck + lint + format check + tests (SQLite)
 To run the test suites against Postgres as well:
 
 ```sh
-pnpm pg start       # throwaway local cluster (no Docker), prints its URL
+pnpm pg start       # throwaway local Postgres (local binaries, else Docker), prints its URL
 pnpm test:pg
 ```
 

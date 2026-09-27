@@ -10,7 +10,7 @@ pnpm check            # typecheck + lint + format:check + test — must pass bef
 pnpm test             # Vitest, all packages, SQLite
 pnpm test:pg          # same suites against Postgres (run `pnpm pg start` first)
 pnpm format           # apply Prettier
-pnpm pg start|stop|reset|status|url   # throwaway local Postgres, no Docker
+pnpm pg start|stop|reset|status|url   # throwaway local Postgres (local binaries, else Docker)
 pnpm e2e              # build the web app, run Playwright (E2E_DATABASE_URL=postgres://… for Postgres)
 pnpm build            # web app + dist/server.mjs + dist/tracker.mjs (tsdown bundles)
 pnpm build:demo       # self-contained browser demo in apps/web/build-demo/ (pnpm e2e:demo tests it)
