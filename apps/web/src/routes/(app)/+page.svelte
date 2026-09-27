@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { btn } from '$lib/styles.ts';
   import { navigate } from '$lib/nav.ts';
   import { createQuery } from '@tanstack/svelte-query';
   import FolderPlus from '@lucide/svelte/icons/folder-plus';
@@ -25,10 +26,7 @@
       Projects hold issues, a workflow and a board. Most teams start with one per product or team.
     </p>
     {#if me.data?.role === 'admin'}
-      <button
-        class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg"
-        onclick={() => (ui.createProject = true)}>New project</button
-      >
+      <button class={btn.primary} onclick={() => (ui.createProject = true)}>New project</button>
     {:else}
       <p class="text-sm text-fg-subtle">
         Ask an admin to create a project and it will appear here.

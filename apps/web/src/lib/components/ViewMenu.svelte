@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { btn } from '../styles.ts';
   import { current, href, navigate } from '$lib/nav.ts';
   import { confirmAction } from '$lib/confirm.svelte.ts';
   import { useQueryClient } from '@tanstack/svelte-query';
@@ -143,7 +144,7 @@
             ><input type="checkbox" bind:checked={shared} /> Share with the project</label
           >
           <button
-            class="w-full rounded bg-accent px-2 py-1 text-accent-fg disabled:opacity-50"
+            class="{btn.primarySm} w-full"
             disabled={!newName.trim()}
             data-testid="view-create">Create view</button
           >

@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { btn } from '../styles.ts';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import Link from '@lucide/svelte/icons/link';
+  import Pencil from '@lucide/svelte/icons/pencil';
   import Maximize2 from '@lucide/svelte/icons/maximize-2';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -16,6 +18,7 @@
   import { ui } from '../ui.svelte.ts';
   import { markdownUploader } from '../attachments.ts';
   import { autosize } from '../autosize.ts';
+  import { setTaskChecked } from '../tasklist.ts';
   import ActivityTimeline from './ActivityTimeline.svelte';
   import AttachmentsSection from './AttachmentsSection.svelte';
   import CustomFieldEditor from './CustomFieldEditor.svelte';
@@ -83,6 +86,19 @@
       await updateIssue(qc, issue, { description }, { description });
   }
 
+  function startEditing() {
+    if (!issue || issue.deletedAt) return;
+    description = issue.description;
+    editingDescription = true;
+  }
+
+  function toggleTask(index: number, checked: boolean) {
+    if (!issue) return;
+    const next = setTaskChecked(issue.description, index, checked);
+    if (next !== issue.description)
+      void updateIssue(qc, issue, { description: next }, { description: next });
+  }
+
   async function copyLink() {
     await navigator.clipboard?.writeText(shareUrl(`/i/${issueKey}`)).catch(() => {});
     toast(`Copied link to ${issueKey}`, 'success');
@@ -100,14 +116,9 @@
       : query.error.message}
     {#snippet actions()}
       {#if onclose}
-        <button
-          class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-bg-hover"
-          onclick={onclose}>Close</button
-        >
+        <button class={btn.secondary} onclick={onclose}>Close</button>
       {/if}
-      <a
-        href={href(`/p/${projectKeyOf(issueKey)}`)}
-        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg"
+      <a href={href(`/p/${projectKeyOf(issueKey)}`)} class={btn.primary}
         >Back to {projectKeyOf(issueKey)} issues</a
       >
     {/snippet}
@@ -227,25 +238,45 @@
                 class="rounded px-2 py-1 hover:bg-bg-hover"
                 onclick={() => (editingDescription = false)}>Cancel</button
               >
-              <button
-                class="rounded bg-accent px-3 py-1 text-accent-fg"
-                onclick={saveDescription}
-                data-testid="description-save">Save</button
+              <button class={btn.primarySm} onclick={saveDescription} data-testid="description-save"
+                >Save</button
               >
             </div>
           {:else}
-            <button
-              class="block w-full rounded-md text-left hover:bg-bg-subtle disabled:hover:bg-transparent"
-              disabled={!!issue.deletedAt}
-              onclick={() => ((description = issue.description), (editingDescription = true))}
-              data-testid="description"
-            >
-              {#if issue.description.trim()}<Markdown source={issue.description} />{:else}<p
-                  class="py-1 text-sm text-fg-subtle"
+            <div class="group/desc relative">
+              {#if issue.description.trim()}
+                <!-- Clicking the text edits it (links and task boxes keep their own clicks); the Edit button is the keyboard path. -->
+                <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+                <div
+                  class="-mx-2 rounded-md px-2 py-1 {issue.deletedAt
+                    ? ''
+                    : 'cursor-text hover:bg-bg-subtle'}"
+                  onclick={(e) => {
+                    if (!(e.target as HTMLElement).closest('a, input, button')) startEditing();
+                  }}
+                  data-testid="description"
                 >
-                  Add a description…
-                </p>{/if}
-            </button>
+                  <Markdown
+                    source={issue.description}
+                    ontask={issue.deletedAt ? undefined : toggleTask}
+                  />
+                </div>
+                {#if !issue.deletedAt}
+                  <button
+                    class="absolute top-1 right-0 inline-flex items-center gap-1 rounded-md border border-border bg-bg px-2 py-0.5 text-xs text-fg-muted opacity-0 group-hover/desc:opacity-100 hover:text-fg focus-visible:opacity-100"
+                    onclick={startEditing}
+                    data-testid="edit-description"><Pencil size={12} /> Edit</button
+                  >
+                {/if}
+              {:else}
+                <button
+                  class="-mx-2 block w-[calc(100%+1rem)] rounded-md px-2 py-1 text-left text-sm text-fg-subtle hover:bg-bg-subtle disabled:hover:bg-transparent"
+                  disabled={!!issue.deletedAt}
+                  onclick={startEditing}
+                  data-testid="description">Add a description…</button
+                >
+              {/if}
+            </div>
           {/if}
         </div>
 

@@ -1,4 +1,10 @@
-import { type APIRequestContext, test as base, expect, type Page } from '@playwright/test';
+import {
+  type APIRequestContext,
+  test as base,
+  expect,
+  type Locator,
+  type Page,
+} from '@playwright/test';
 
 /** Signs the browser in as a seeded user (dev login) before each test, and fails it on uncaught page errors. */
 export const test = base.extend<{ user: string }>({
@@ -36,4 +42,11 @@ export async function openList(page: Page) {
 
 export function row(page: Page, key: string) {
   return page.locator(`[data-testid="issue-row"][data-key="${key}"]`);
+}
+
+/** Picks an option in one of the app's Select dropdowns (they replace native selects). */
+export async function choose(scope: Page | Locator, label: string, option: string | RegExp) {
+  await scope.getByLabel(label, { exact: true }).click();
+  const page = 'page' in scope ? scope.page() : scope;
+  await page.getByRole('option', { name: option }).click();
 }

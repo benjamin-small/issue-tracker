@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Select from '$components/Select.svelte';
+  import { btn, input } from '$lib/styles.ts';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Copy from '@lucide/svelte/icons/copy';
@@ -118,8 +120,6 @@
 
   const projectKey = (id: string | null) =>
     id ? (projects.data?.find((p) => p.id === id)?.key ?? id) : 'All projects';
-  const input =
-    'rounded border border-border bg-bg px-2 py-1 text-sm outline-none focus:border-accent';
   const STATUS_CLASS: Record<string, string> = {
     succeeded: 'text-success',
     failed: 'text-warning',
@@ -185,21 +185,22 @@
         aria-label="Event types"
         bind:value={draft.events}
       />
-      <select class={input} aria-label="Project" bind:value={draft.project}>
-        <option value="">All projects</option>
-        {#each projects.data ?? [] as p (p.id)}<option value={p.key}>{p.key} · {p.name}</option
-          >{/each}
-      </select>
+      <Select
+        label="Project"
+        value={draft.project}
+        items={[
+          { value: '', label: 'All projects' },
+          ...(projects.data ?? []).map((p) => ({ value: p.key, label: p.name, hint: p.key })),
+        ]}
+        onchange={(v) => (draft.project = v)}
+      />
       <input
         class="{input} sm:col-span-2"
         placeholder="Description (optional)"
         aria-label="Description"
         bind:value={draft.description}
       />
-      <button
-        class="rounded-md bg-accent px-3 py-1 text-sm text-accent-fg disabled:opacity-50"
-        disabled={!draft.url.trim()}>Add webhook</button
-      >
+      <button class={btn.primary} disabled={!draft.url.trim()}>Add webhook</button>
     </form>
 
     <ul class="space-y-2">

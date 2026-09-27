@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { btn, input } from '$lib/styles.ts';
   import { asset } from '$app/paths';
   import { current, navigate } from '$lib/nav.ts';
 
@@ -58,9 +59,13 @@
     </div>
 
     {#if config.data?.devLogin && config.data.users?.length}
-      <p class="mb-2 text-xs font-medium tracking-wide text-fg-subtle uppercase">
-        {DEMO ? 'Explore as' : 'Development — pick a user'}
-      </p>
+      <p class="mb-1 text-sm font-medium">{DEMO ? 'Explore as…' : 'Continue as…'}</p>
+      {#if !DEMO}
+        <p class="mb-2 text-xs text-fg-subtle">
+          This server runs with <code class="font-mono">TRACKER_AUTH_MODE=dev</code>, so anyone can
+          pick a user. Use <code class="font-mono">standard</code> in production.
+        </p>
+      {/if}
       <ul class="mb-6 space-y-1" data-testid="dev-users">
         {#each config.data.users as u (u.id)}
           <li>
@@ -88,6 +93,13 @@
       </p>
     {:else}
       <form onsubmit={tokenLogin} class="space-y-3">
+        {#if config.data?.devLogin && config.data.users?.length}
+          <div class="flex items-center gap-2 text-xs text-fg-subtle" aria-hidden="true">
+            <span class="h-px flex-1 bg-border"></span>or use a token<span
+              class="h-px flex-1 bg-border"
+            ></span>
+          </div>
+        {/if}
         <label class="block">
           <span class="mb-1 block text-xs font-medium text-fg-muted">API token</span>
           <input
@@ -95,17 +107,15 @@
             type="password"
             autocomplete="off"
             placeholder="trk_…"
-            class="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-accent"
+            class="{input} w-full font-mono"
           />
         </label>
-        <button
-          type="submit"
-          disabled={busy || !token.trim()}
-          class="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-fg disabled:opacity-50"
+        <button type="submit" disabled={busy || !token.trim()} class="{btn.primary} w-full"
           >Sign in</button
         >
         <p class="text-xs text-fg-subtle">
-          Create a token with <code class="font-mono">tracker token create --name web</code>.
+          Ask an admin for a token, or create one with
+          <code class="font-mono">tracker token create --name web</code>.
         </p>
       </form>
     {/if}

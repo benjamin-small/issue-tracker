@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { btn } from '../styles.ts';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import type { Comment, Issue, TrackerEvent, User } from '../api.ts';
   import { api, call, errorMessage } from '../api.ts';
@@ -210,10 +211,7 @@
                 <button class="rounded px-2 py-1 hover:bg-bg-hover" onclick={() => (editing = null)}
                   >Cancel</button
                 >
-                <button
-                  class="rounded bg-accent px-2 py-1 text-accent-fg"
-                  onclick={() => saveEdit(c.id)}>Save</button
-                >
+                <button class={btn.primarySm} onclick={() => saveEdit(c.id)}>Save</button>
               </div>
             {:else}
               <Markdown source={c.body} />
@@ -234,7 +232,7 @@
     />
     <div class="mt-2 flex justify-end">
       <button
-        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg disabled:opacity-50"
+        class={btn.primary}
         disabled={!draft.trim() || posting}
         onclick={post}
         data-testid="comment-submit">Comment</button

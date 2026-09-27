@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { btn } from '../styles.ts';
   import { page } from '$app/state';
   import { current, navigate, pushPageState } from '$lib/nav.ts';
   import { createQuery } from '@tanstack/svelte-query';
@@ -131,10 +132,7 @@
       <EmptyState icon={TriangleAlert} tone="danger" title="Couldn’t load issues">
         {issues.error.message}
         {#snippet actions()}
-          <button
-            class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-bg-hover"
-            onclick={() => issues.refetch()}>Try again</button
-          >
+          <button class={btn.secondary} onclick={() => issues.refetch()}>Try again</button>
         {/snippet}
       </EmptyState>
     {:else if !issues.data}
@@ -162,14 +160,10 @@
             : 'Create the first issue for this project.'}
           {#snippet actions()}
             {#if dirty}
-              <button
-                class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-bg-hover"
-                onclick={() => setConfig(saved)}>Reset view</button
-              >
+              <button class={btn.secondary} onclick={() => setConfig(saved)}>Reset view</button>
             {/if}
-            <button
-              class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg"
-              onclick={() => openCreateIssue(projectKey)}>New issue</button
+            <button class={btn.primary} onclick={() => openCreateIssue(projectKey)}
+              >New issue</button
             >
           {/snippet}
         </EmptyState>

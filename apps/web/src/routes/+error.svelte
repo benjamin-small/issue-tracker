@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { btn } from '$lib/styles.ts';
   import { page } from '$app/state';
   import Compass from '@lucide/svelte/icons/compass';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
@@ -23,9 +24,7 @@
       {page.error?.message ?? 'An unexpected error occurred.'} Reload the page to try again.
     {/if}
     {#snippet actions()}
-      <a href={href('/')} class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg"
-        >Go to your issues</a
-      >
+      <a href={href('/')} class={btn.primary}>Go to your issues</a>
     {/snippet}
   </EmptyState>
 </main>

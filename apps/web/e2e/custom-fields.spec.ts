@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { apiCreateIssue, expect, test } from './fixtures.ts';
+import { apiCreateIssue, choose, expect, test } from './fixtures.ts';
 
 async function drag(
   page: Page,
@@ -26,7 +26,7 @@ test('defines a select field, sets it, groups the board by it and drags between 
   const form = page.getByTestId('new-field');
   await form.getByLabel('Field key').fill('team');
   await form.getByLabel('Field name').fill('Team');
-  await form.getByLabel('Field type').selectOption('select');
+  await choose(form, 'Field type', 'Single select');
   await form.getByLabel('Field options').fill('frontend, backend, infra');
   await form.getByRole('button', { name: 'Add field' }).click();
   await expect(page.locator('[data-field-key="team"]')).toContainText('frontend');
@@ -46,7 +46,7 @@ test('defines a select field, sets it, groups the board by it and drags between 
   // Group the board by the field; the card sits in the "backend" column.
   await page.goto('/p/ENG/board');
   await page.getByTestId('display-options').click();
-  await page.getByLabel('Group by').selectOption('cf:team');
+  await choose(page, 'Group by', 'Team');
   await page.getByTestId('display-fields').locator('input[data-field="cf:team"]').check();
   await page.keyboard.press('Escape');
   const column = (name: string) =>

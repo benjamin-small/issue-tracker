@@ -1,5 +1,6 @@
 <script lang="ts">
   import { AlertDialog } from 'bits-ui';
+  import { btn } from '../styles.ts';
   import { confirmState, settleConfirm } from '../confirm.svelte.ts';
 </script>
 
@@ -21,15 +22,11 @@
           >
         {/if}
         <div class="mt-5 flex justify-end gap-2">
-          <AlertDialog.Cancel
-            class="rounded-md px-3 py-1.5 text-sm hover:bg-bg-hover"
-            onclick={() => settleConfirm(false)}>Cancel</AlertDialog.Cancel
+          <AlertDialog.Cancel class={btn.secondary} onclick={() => settleConfirm(false)}
+            >Cancel</AlertDialog.Cancel
           >
           <AlertDialog.Action
-            class="rounded-md px-3 py-1.5 text-sm font-medium text-white {confirmState.request
-              .danger
-              ? 'bg-danger'
-              : 'bg-accent'}"
+            class={confirmState.request.danger ? btn.danger : btn.primary}
             onclick={() => settleConfirm(true)}
             data-testid="confirm-ok"
             >{confirmState.request.confirmLabel ?? 'Confirm'}</AlertDialog.Action

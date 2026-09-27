@@ -69,7 +69,8 @@
   }
 
   function onconsider(index: number, event: CustomEvent<DndEvent<Issue>>) {
-    dragging = true;
+    // Keyboard drags send one last `consider` (dragStopped) after `finalize`.
+    dragging = event.detail.info.trigger !== TRIGGERS.DRAG_STOPPED;
     replaceItems(index, event.detail.items);
   }
 

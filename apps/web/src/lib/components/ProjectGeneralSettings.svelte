@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { input } from '../styles.ts';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { api, call, errorMessage } from '../api.ts';
   import { fetchers, keys } from '../queries.ts';
@@ -30,9 +31,6 @@
       toast(errorMessage(e), 'error');
     }
   }
-
-  const input =
-    'w-full rounded-md border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-accent';
 </script>
 
 <section data-testid="settings-general">
@@ -42,7 +40,7 @@
       <label class="block">
         <span class="mb-1 block text-xs font-medium text-fg-muted">Name</span>
         <input
-          class={input}
+          class="{input} w-full"
           value={project.data.name}
           aria-label="Project name"
           onchange={(e) => save({ name: e.currentTarget.value.trim() })}
@@ -60,7 +58,7 @@
       <label class="block sm:col-span-2">
         <span class="mb-1 block text-xs font-medium text-fg-muted">Description</span>
         <textarea
-          class="{input} resize-y"
+          class="{input} w-full resize-y"
           rows="2"
           value={project.data.description}
           placeholder="What this project covers"

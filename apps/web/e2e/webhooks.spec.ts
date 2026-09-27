@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { apiCreateIssue, expect, test } from './fixtures.ts';
+import { apiCreateIssue, choose, expect, test } from './fixtures.ts';
 
 let receiver: Server;
 let url: string;
@@ -30,7 +30,7 @@ test('an admin registers a webhook, tests it and watches deliveries arrive', asy
   const form = page.getByTestId('new-webhook');
   await form.getByLabel('Webhook URL').fill(url);
   await form.getByLabel('Event types').fill('issue.created');
-  await form.getByLabel('Project').selectOption('ENG');
+  await choose(form, 'Project', /Engineering/);
   await form.getByRole('button', { name: 'Add webhook' }).click();
   await expect(page.getByTestId('webhook-secret')).toContainText('whsec_');
 

@@ -51,11 +51,23 @@
     <img src={asset('/favicon.svg')} alt="" class="size-5" />
     <span class="font-semibold">Tracker</span>
     <span
-      class="ml-auto size-2 rounded-full {live.connected ? 'bg-success' : 'bg-border-strong'}"
-      title={live.connected ? 'Live updates connected' : 'Live updates disconnected'}
+      class="ml-auto inline-flex items-center gap-1.5 rounded-full px-1.5 py-0.5 text-[11px] {live.connected
+        ? 'text-fg-subtle'
+        : 'bg-bg-muted text-fg-muted'}"
+      title={live.connected
+        ? 'Changes by others appear as they happen'
+        : 'Reconnecting… changes by others appear when you reload'}
+      role="status"
       data-testid="live-indicator"
       data-connected={live.connected}
-    ></span>
+    >
+      <span
+        class="size-1.5 rounded-full {live.connected
+          ? 'bg-success'
+          : 'animate-pulse bg-border-strong'}"
+      ></span>
+      {live.connected ? 'Live' : 'Offline'}
+    </span>
   </div>
   <div class="px-2 pb-2">
     <button

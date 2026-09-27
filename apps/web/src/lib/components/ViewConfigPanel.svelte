@@ -1,11 +1,11 @@
 <script lang="ts">
   import { FieldRegistry, SORTABLE_FIELDS } from '@tracker/schema';
   import { Popover } from 'bits-ui';
-  import ArrowDown from '@lucide/svelte/icons/arrow-down';
-  import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import type { ProjectData } from '../project-data.svelte.ts';
   import type { ViewConfig } from '../views.ts';
+  import Select from './Select.svelte';
+  import SortableList from './SortableList.svelte';
 
   /**
    * "Display" options for a view: grouping, ordering, density and — driven by the field registry — which
@@ -43,13 +43,13 @@
   const selected = $derived(
     layout === 'list' ? config.list.columns.map((c) => c.field) : config.board.cardFields,
   );
-  const ordered = $derived([
-    ...selected
+  const shown = $derived(
+    selected
       .filter((k) => k !== 'title')
       .map((k) => registry.get(k))
       .filter((f) => f !== undefined),
-    ...displayable.filter((f) => !selected.includes(f.key)),
-  ]);
+  );
+  const hidden = $derived(displayable.filter((f) => !selected.includes(f.key)));
 
   function setFields(fields: string[]) {
     if (layout === 'list') {
@@ -62,20 +62,15 @@
       onchange({ ...config, board: { ...config.board, cardFields: fields } });
     }
   }
+  /** Applies a dragged order; the title column (never listed) keeps its slot. */
+  function reorder(ids: string[]) {
+    const at = selected.indexOf('title');
+    setFields(at < 0 ? ids : [...ids.slice(0, at), 'title', ...ids.slice(at)]);
+  }
   function toggle(key: string) {
     setFields(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]);
   }
-  function move(key: string, delta: number) {
-    const fields = [...selected];
-    const i = fields.indexOf(key);
-    const j = i + delta;
-    if (i < 0 || j < 0 || j >= fields.length) return;
-    [fields[i], fields[j]] = [fields[j]!, fields[i]!];
-    setFields(fields);
-  }
-
   const primarySort = $derived(config.sort[0] ?? { field: 'updatedAt', dir: 'desc' as const });
-  const select = 'rounded border border-border bg-bg px-1.5 py-1 text-sm';
 </script>
 
 <Popover.Root>
@@ -94,42 +89,38 @@
     >
       <div class="grid grid-cols-[90px_1fr] items-center gap-2">
         <span class="text-fg-muted">{layout === 'board' ? 'Columns' : 'Grouping'}</span>
-        <select
-          class={select}
-          aria-label="Group by"
+        <Select
+          label="Group by"
+          testid="group-by"
           value={layout === 'board' ? config.board.groupBy : (config.list.groupBy ?? '')}
-          onchange={(e) => {
-            const v = e.currentTarget.value;
+          items={[
+            ...(layout === 'list' ? [{ value: '', label: 'No grouping' }] : []),
+            ...groupable.map((f) => ({ value: f.key, label: f.label })),
+          ]}
+          onchange={(v) => {
             if (layout === 'board') onchange({ ...config, board: { ...config.board, groupBy: v } });
             else onchange({ ...config, list: { ...config.list, groupBy: v || null } });
           }}
-        >
-          {#if layout === 'list'}<option value="">No grouping</option>{/if}
-          {#each groupable as f (f.key)}<option value={f.key}>{f.label}</option>{/each}
-        </select>
+        />
 
         <span class="text-fg-muted">Ordering</span>
         <div class="flex gap-1">
-          <select
-            class="{select} flex-1"
-            aria-label="Order by"
+          <Select
+            class="flex-1"
+            label="Order by"
+            testid="order-by"
             value={primarySort.field}
-            onchange={(e) =>
+            items={sortable.map((f) => ({ value: f.key, label: f.label }))}
+            onchange={(v) =>
               onchange({
                 ...config,
-                sort: [
-                  {
-                    field: e.currentTarget.value,
-                    dir: e.currentTarget.value === 'rank' ? 'asc' : primarySort.dir,
-                  },
-                ],
+                sort: [{ field: v, dir: v === 'rank' ? 'asc' : primarySort.dir }],
               })}
-          >
-            {#each sortable as s (s.key)}<option value={s.key}>{s.label}</option>{/each}
-          </select>
+          />
           <button
-            class="rounded border border-border px-2 hover:bg-bg-hover"
+            class="rounded-md border border-border px-2 text-fg-muted hover:bg-bg-hover hover:text-fg"
             aria-label="Toggle direction"
+            title={primarySort.dir === 'asc' ? 'Ascending' : 'Descending'}
             onclick={() =>
               onchange({
                 ...config,
@@ -171,36 +162,39 @@
       <div>
         <p class="mb-1.5 text-xs font-medium text-fg-subtle">
           {layout === 'board' ? 'Card properties' : 'List columns'}
+          <span class="font-normal">· drag to reorder</span>
         </p>
-        <ul class="space-y-0.5" data-testid="display-fields">
-          {#each ordered as f (f.key)}
-            {@const on = selected.includes(f.key)}
-            <li class="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-bg-hover">
-              <label class="flex flex-1 items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={on}
-                  onchange={() => toggle(f.key)}
-                  data-field={f.key}
-                />
-                <span class={on ? '' : 'text-fg-muted'}>{f.label}</span>
-              </label>
-              {#if on}
-                <button
-                  class="rounded p-0.5 text-fg-subtle hover:text-fg"
-                  aria-label="Move {f.label} up"
-                  onclick={() => move(f.key, -1)}><ArrowUp size={12} /></button
-                >
-                <button
-                  class="rounded p-0.5 text-fg-subtle hover:text-fg"
-                  aria-label="Move {f.label} down"
-                  onclick={() => move(f.key, 1)}><ArrowDown size={12} /></button
-                >
-              {/if}
-            </li>
-          {/each}
-        </ul>
+        <div data-testid="display-fields">
+          <SortableList
+            items={shown.map((f) => ({ id: f.key, f }))}
+            onreorder={reorder}
+            label={(it) => `Reorder ${it.f.label}`}
+            class="space-y-0.5"
+            itemClass="rounded px-1 py-0.5 hover:bg-bg-hover"
+          >
+            {#snippet row(it)}
+              {@render fieldToggle(it.f.key, it.f.label, true)}
+            {/snippet}
+          </SortableList>
+          {#if hidden.length}
+            <p class="mt-2 mb-1 text-xs text-fg-subtle">Hidden</p>
+            <ul class="space-y-0.5">
+              {#each hidden as f (f.key)}
+                <li class="flex items-center gap-1.5 rounded px-1 py-0.5 pl-6 hover:bg-bg-hover">
+                  {@render fieldToggle(f.key, f.label, false)}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
       </div>
     </Popover.Content>
   </Popover.Portal>
 </Popover.Root>
+
+{#snippet fieldToggle(key: string, label: string, on: boolean)}
+  <label class="flex flex-1 items-center gap-2">
+    <input type="checkbox" checked={on} onchange={() => toggle(key)} data-field={key} />
+    <span class={on ? '' : 'text-fg-muted'}>{label}</span>
+  </label>
+{/snippet}

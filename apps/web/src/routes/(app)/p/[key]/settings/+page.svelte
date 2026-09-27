@@ -1,8 +1,7 @@
 <script lang="ts">
+  import { btn, input } from '$lib/styles.ts';
   import { page } from '$app/state';
   import { useQueryClient } from '@tanstack/svelte-query';
-  import ArrowDown from '@lucide/svelte/icons/arrow-down';
-  import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import { api, call, errorMessage, type Label, type Status } from '$lib/api.ts';
   import { useProjectData } from '$lib/project-data.svelte.ts';
@@ -11,20 +10,32 @@
   import { confirmAction } from '$lib/confirm.svelte.ts';
   import CustomFieldsSettings from '$components/CustomFieldsSettings.svelte';
   import ProjectGeneralSettings from '$components/ProjectGeneralSettings.svelte';
+  import ColorInput from '$components/ColorInput.svelte';
+  import Select from '$components/Select.svelte';
+  import SortableList from '$components/SortableList.svelte';
   import StatusIcon from '$components/StatusIcon.svelte';
+  import { AlertDialog } from 'bits-ui';
 
   const key = $derived(page.params.key!.toUpperCase());
   const project = useProjectData(() => key);
   const qc = useQueryClient();
-  const CATEGORIES = ['backlog', 'unstarted', 'started', 'completed', 'canceled'] as const;
+  const CATEGORY_ITEMS = [
+    { value: 'backlog', label: 'Backlog', hint: 'not planned yet' },
+    { value: 'unstarted', label: 'Unstarted', hint: 'planned' },
+    { value: 'started', label: 'Started', hint: 'in progress' },
+    { value: 'completed', label: 'Completed', hint: 'done' },
+    { value: 'canceled', label: 'Canceled', hint: 'won’t do' },
+  ];
 
   async function run<T>(
     action: Promise<T>,
     refresh: ReadonlyArray<readonly unknown[]>,
+    saved?: string,
   ): Promise<T | undefined> {
     try {
       const result = await action;
       for (const k of refresh) void qc.invalidateQueries({ queryKey: k });
+      if (saved) toast(saved, 'success');
       return result;
     } catch (e) {
       toast(errorMessage(e), 'error');
@@ -34,7 +45,7 @@
   const statusKeys = $derived([keys.statuses(key), keys.issueLists(key)]);
   const labelKeys = $derived([keys.labels(key), keys.issueLists(key)]);
 
-  let newStatus = $state({ name: '', category: 'unstarted' as (typeof CATEGORIES)[number] });
+  let newStatus = $state({ name: '', category: 'unstarted' as Status['category'] });
   let newLabel = $state({ name: '', color: '#5e6ad2' });
 
   function updateStatus(
@@ -44,12 +55,10 @@
     return run(
       call(api.PATCH('/statuses/{id}', { params: { path: { id: s.id } }, body })),
       statusKeys,
+      `Saved “${body.name ?? s.name}”`,
     );
   }
-  function move(index: number, delta: number) {
-    const ids = project.statuses.map((s) => s.id);
-    const [id] = ids.splice(index, 1);
-    ids.splice(index + delta, 0, id!);
+  function reorderStatuses(ids: string[]) {
     return run(
       call(
         api.POST('/projects/{project}/statuses/reorder', {
@@ -58,22 +67,29 @@
         }),
       ),
       statusKeys,
+      'Workflow order saved',
     );
   }
-  async function removeStatus(s: Status) {
-    const others = project.statuses.filter((x) => x.id !== s.id);
-    const target = prompt(
-      `Delete "${s.name}"? Issues in it move to (status name):`,
-      others[0]?.name ?? '',
-    );
-    if (target === null) return;
+
+  /** Status being deleted, and where its issues go. */
+  let deleting = $state<Status | null>(null);
+  let moveTo = $state('');
+  function askRemoveStatus(s: Status) {
+    moveTo = project.statuses.find((x) => x.id !== s.id)?.id ?? '';
+    deleting = s;
+  }
+  async function removeStatus() {
+    const s = deleting;
+    if (!s) return;
+    deleting = null;
     await run(
       call(
         api.DELETE('/statuses/{id}', {
-          params: { path: { id: s.id }, query: target ? { moveIssuesTo: target } : {} },
+          params: { path: { id: s.id }, query: moveTo ? { moveIssuesTo: moveTo } : {} },
         }),
       ),
       statusKeys,
+      `Deleted “${s.name}”`,
     );
   }
   async function addStatus(event: SubmitEvent) {
@@ -93,6 +109,7 @@
     return run(
       call(api.PATCH('/labels/{id}', { params: { path: { id: l.id } }, body })),
       labelKeys,
+      `Saved “${body.name ?? l.name}”`,
     );
   }
   async function removeLabel(l: Label) {
@@ -118,9 +135,6 @@
     );
     if (created) newLabel = { name: '', color: newLabel.color };
   }
-
-  const input =
-    'rounded border border-border bg-bg px-2 py-1 text-sm outline-none focus:border-accent';
 </script>
 
 <svelte:head><title>{key} · Settings</title></svelte:head>
@@ -134,55 +148,45 @@
     <section data-testid="settings-statuses">
       <h2 class="mb-1 font-medium">Workflow</h2>
       <p class="mb-3 text-sm text-fg-muted">
-        Statuses are the board columns. The category drives started/completed dates and default
-        views.
+        Statuses are the board columns, in this order (drag to reorder). The category drives
+        started/completed dates and default views.
       </p>
-      <ul class="divide-y divide-border rounded-lg border border-border">
-        {#each project.statuses as s, i (s.id)}
-          <li class="flex items-center gap-2 px-3 py-2">
-            <StatusIcon category={s.category} color={s.color} />
-            <input
-              class="{input} flex-1"
-              value={s.name}
-              aria-label="Status name"
-              onchange={(e) => updateStatus(s, { name: e.currentTarget.value })}
-            />
-            <select
-              class={input}
-              value={s.category}
-              aria-label="Category"
-              onchange={(e) =>
-                updateStatus(s, { category: e.currentTarget.value as Status['category'] })}
-            >
-              {#each CATEGORIES as c (c)}<option value={c}>{c}</option>{/each}
-            </select>
-            <input
-              type="color"
-              value={s.color}
-              aria-label="Color"
-              class="h-7 w-9 rounded border border-border bg-bg"
-              onchange={(e) => updateStatus(s, { color: e.currentTarget.value })}
-            />
-            <button
-              class="rounded p-1 text-fg-subtle hover:bg-bg-hover disabled:opacity-30"
-              disabled={i === 0}
-              aria-label="Move up"
-              onclick={() => move(i, -1)}><ArrowUp size={14} /></button
-            >
-            <button
-              class="rounded p-1 text-fg-subtle hover:bg-bg-hover disabled:opacity-30"
-              disabled={i === project.statuses.length - 1}
-              aria-label="Move down"
-              onclick={() => move(i, 1)}><ArrowDown size={14} /></button
-            >
-            <button
-              class="rounded p-1 text-fg-subtle hover:bg-bg-hover hover:text-danger"
-              aria-label="Delete status"
-              onclick={() => removeStatus(s)}><Trash2 size={14} /></button
-            >
-          </li>
-        {/each}
-      </ul>
+      <SortableList
+        items={project.statuses}
+        onreorder={reorderStatuses}
+        label={(s) => `Reorder ${s.name}`}
+        class="divide-y divide-border rounded-lg border border-border"
+        itemClass="gap-2 bg-bg px-2 py-2 first:rounded-t-lg last:rounded-b-lg"
+      >
+        {#snippet row(s)}
+          <ColorInput
+            value={s.color}
+            label="Colour of {s.name}"
+            onchange={(color) => updateStatus(s, { color })}
+          />
+          <StatusIcon category={s.category} color={s.color} />
+          <input
+            class="{input} min-w-0 flex-1"
+            value={s.name}
+            aria-label="Status name"
+            onchange={(e) => updateStatus(s, { name: e.currentTarget.value })}
+          />
+          <Select
+            class="w-32"
+            label="Category of {s.name}"
+            value={s.category}
+            items={CATEGORY_ITEMS}
+            onchange={(v) => updateStatus(s, { category: v as Status['category'] })}
+          />
+          <button
+            class="rounded p-1.5 text-fg-subtle hover:bg-bg-hover hover:text-danger disabled:opacity-30"
+            aria-label="Delete status {s.name}"
+            title="Delete status"
+            disabled={project.statuses.length <= 1}
+            onclick={() => askRemoveStatus(s)}><Trash2 size={14} /></button
+          >
+        {/snippet}
+      </SortableList>
       <form class="mt-3 flex gap-2" onsubmit={addStatus}>
         <input
           class="{input} flex-1"
@@ -190,13 +194,14 @@
           bind:value={newStatus.name}
           aria-label="New status name"
         />
-        <select class={input} bind:value={newStatus.category} aria-label="New status category">
-          {#each CATEGORIES as c (c)}<option value={c}>{c}</option>{/each}
-        </select>
-        <button
-          class="rounded-md bg-accent px-3 text-sm text-accent-fg disabled:opacity-50"
-          disabled={!newStatus.name.trim()}>Add status</button
-        >
+        <Select
+          class="w-32"
+          label="New status category"
+          value={newStatus.category}
+          items={CATEGORY_ITEMS}
+          onchange={(v) => (newStatus.category = v as Status['category'])}
+        />
+        <button class={btn.primary} disabled={!newStatus.name.trim()}>Add status</button>
       </form>
     </section>
 
@@ -205,12 +210,10 @@
       <ul class="divide-y divide-border rounded-lg border border-border">
         {#each project.labels as l (l.id)}
           <li class="flex items-center gap-2 px-3 py-2" data-label={l.name}>
-            <input
-              type="color"
+            <ColorInput
               value={l.color}
-              aria-label="Color"
-              class="h-7 w-9 rounded border border-border bg-bg"
-              onchange={(e) => updateLabel(l, { color: e.currentTarget.value })}
+              label="Colour of {l.name}"
+              onchange={(color) => updateLabel(l, { color })}
             />
             <input
               class="{input} w-40"
@@ -236,11 +239,10 @@
         {/each}
       </ul>
       <form class="mt-3 flex gap-2" onsubmit={addLabel}>
-        <input
-          type="color"
-          bind:value={newLabel.color}
-          aria-label="New label color"
-          class="h-8 w-10 rounded border border-border bg-bg"
+        <ColorInput
+          value={newLabel.color}
+          label="New label colour"
+          onchange={(color) => (newLabel.color = color)}
         />
         <input
           class="{input} flex-1"
@@ -248,13 +250,47 @@
           bind:value={newLabel.name}
           aria-label="New label name"
         />
-        <button
-          class="rounded-md bg-accent px-3 text-sm text-accent-fg disabled:opacity-50"
-          disabled={!newLabel.name.trim()}>Add label</button
-        >
+        <button class={btn.primary} disabled={!newLabel.name.trim()}>Add label</button>
       </form>
     </section>
 
     <CustomFieldsSettings projectKey={key} />
   </div>
 </div>
+
+<AlertDialog.Root open={!!deleting} onOpenChange={(open) => !open && (deleting = null)}>
+  <AlertDialog.Portal>
+    <AlertDialog.Overlay class="fixed inset-0 z-50 bg-black/30" />
+    <AlertDialog.Content
+      class="fixed top-[20vh] left-1/2 z-50 w-[min(420px,92vw)] -translate-x-1/2 rounded-xl border border-border bg-bg p-5 shadow-2xl"
+      data-testid="delete-status-dialog"
+    >
+      {#if deleting}
+        <AlertDialog.Title class="text-base font-semibold"
+          >Delete the status “{deleting.name}”?</AlertDialog.Title
+        >
+        <AlertDialog.Description class="mt-1.5 text-sm text-fg-muted">
+          Issues in it move to another status first.
+        </AlertDialog.Description>
+        <div class="mt-4 flex items-center gap-3 text-sm">
+          <span class="text-fg-muted">Move issues to</span>
+          <Select
+            class="flex-1"
+            label="Move issues to"
+            value={moveTo}
+            items={project.statuses
+              .filter((x) => x.id !== deleting?.id)
+              .map((x) => ({ value: x.id, label: x.name }))}
+            onchange={(v) => (moveTo = v)}
+          />
+        </div>
+        <div class="mt-5 flex justify-end gap-2">
+          <AlertDialog.Cancel class={btn.secondary}>Cancel</AlertDialog.Cancel>
+          <AlertDialog.Action class={btn.danger} onclick={removeStatus} data-testid="confirm-ok"
+            >Delete status</AlertDialog.Action
+          >
+        </div>
+      {/if}
+    </AlertDialog.Content>
+  </AlertDialog.Portal>
+</AlertDialog.Root>

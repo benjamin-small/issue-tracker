@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { btn, input } from '../styles.ts';
   import { useQueryClient } from '@tanstack/svelte-query';
   import { Dialog } from 'bits-ui';
   import X from '@lucide/svelte/icons/x';
@@ -62,9 +63,6 @@
       busy = false;
     }
   }
-
-  const input =
-    'w-full rounded-md border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-accent';
 </script>
 
 <Dialog.Root open={ui.createProject} onOpenChange={(open) => !open && close()}>
@@ -86,7 +84,7 @@
             <span class="mb-1 block text-xs font-medium text-fg-muted">Name</span>
             <!-- svelte-ignore a11y_autofocus -->
             <input
-              class={input}
+              class="{input} w-full"
               bind:value={name}
               placeholder="Engineering"
               autofocus
@@ -96,7 +94,7 @@
           <label class="block">
             <span class="mb-1 block text-xs font-medium text-fg-muted">Key</span>
             <input
-              class="{input} font-mono uppercase"
+              class="{input} w-full font-mono uppercase"
               value={key}
               oninput={(e) => {
                 keyEdited = true;
@@ -119,19 +117,15 @@
             <span class="mb-1 block text-xs font-medium text-fg-muted"
               >Description <span class="font-normal text-fg-subtle">(optional)</span></span
             >
-            <textarea class="{input} resize-y" rows="2" bind:value={description}></textarea>
+            <textarea class="{input} w-full resize-y" rows="2" bind:value={description}></textarea>
           </label>
           {#if error}<p class="text-sm text-danger" role="alert">{error}</p>{/if}
         </div>
         <div class="flex justify-end gap-2 border-t border-border px-4 py-3">
-          <button
-            type="button"
-            class="rounded-md px-3 py-1.5 text-sm hover:bg-bg-hover"
-            onclick={close}>Cancel</button
-          >
+          <button type="button" class={btn.ghost} onclick={close}>Cancel</button>
           <button
             type="submit"
-            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg disabled:opacity-50"
+            class={btn.primary}
             disabled={!name.trim() || !keyValid || busy}
             data-testid="create-project-submit">Create project</button
           >

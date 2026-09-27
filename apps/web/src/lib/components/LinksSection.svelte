@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Select from './Select.svelte';
+  import { btn } from '../styles.ts';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import Link2 from '@lucide/svelte/icons/link-2';
   import X from '@lucide/svelte/icons/x';
@@ -85,25 +87,21 @@
   {#if adding}
     <form onsubmit={add} class="mb-2 flex items-center gap-2 text-sm">
       <span class="font-mono text-xs text-fg-subtle">{issue.key}</span>
-      <select
-        bind:value={relation}
-        class="rounded border border-border bg-bg px-1.5 py-1"
-        aria-label="Relation"
-      >
-        {#each RELATIONS as r (r.value)}<option value={r.value}>{r.label}</option>{/each}
-      </select>
+      <Select
+        size="sm"
+        label="Relation"
+        value={relation}
+        items={RELATIONS.map((r) => ({ value: r.value, label: r.label }))}
+        onchange={(v) => (relation = v as typeof relation)}
+      />
       <input
         bind:value={target}
         placeholder="ENG-7"
         aria-label="Target issue"
         data-testid="link-target"
-        class="w-28 rounded border border-border bg-bg px-2 py-1 font-mono text-xs uppercase"
+        class="w-28 rounded-md border border-border bg-bg px-2 py-1 font-mono text-xs uppercase outline-none focus:border-accent"
       />
-      <button
-        type="submit"
-        disabled={!target.trim() || busy}
-        class="rounded bg-accent px-2 py-1 text-xs text-accent-fg disabled:opacity-50">Link</button
-      >
+      <button type="submit" disabled={!target.trim() || busy} class={btn.primarySm}>Link</button>
     </form>
   {/if}
   {#each grouped as [label, items] (label)}

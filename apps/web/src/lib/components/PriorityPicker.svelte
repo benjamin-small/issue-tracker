@@ -29,7 +29,9 @@
 >
   {#snippet trigger()}
     <PriorityIcon priority={issue.priority} />
-    {#if showLabel}<span class="truncate">{PRIORITY_LABELS[issue.priority]}</span>{/if}
+    {#if showLabel}<span class="truncate {issue.priority ? '' : 'text-fg-subtle'}"
+        >{PRIORITY_LABELS[issue.priority]}</span
+      >{/if}
   {/snippet}
   {#snippet item(it)}
     <PriorityIcon priority={it.priority} />
