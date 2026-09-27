@@ -1,6 +1,18 @@
 // `pnpm dev`: runs the API server (watch mode, SQLite, dev auth, seeded) and the Vite dev server together.
 // Open http://127.0.0.1:5173 — Vite proxies /api to the server on :3000.
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const root = resolve(import.meta.dirname, '..');
+const envFile = resolve(root, '.env');
+if (existsSync(envFile)) process.loadEnvFile(envFile);
+// pnpm runs the server from apps/server, so resolve relative paths against the repo root, where the CLI's
+// local mode looks: both then share data/dev.db and data/blobs.
+const dbUrl = process.env.TRACKER_DATABASE_URL ?? 'sqlite:./data/dev.db';
+const sqliteFile = /^sqlite:(?!:memory:)(.+)$/.exec(dbUrl)?.[1];
+process.env.TRACKER_DATABASE_URL = sqliteFile ? `sqlite:${resolve(root, sqliteFile)}` : dbUrl;
+process.env.TRACKER_BLOB_DIR = resolve(root, process.env.TRACKER_BLOB_DIR ?? 'data/blobs');
 
 const procs = [
   { name: 'api', color: 36, cmd: 'pnpm', args: ['--filter', '@tracker/server', 'dev'] },
