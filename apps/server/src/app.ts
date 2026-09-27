@@ -12,12 +12,18 @@ import {
 } from './env.ts';
 import { authenticate, requestId, requireActor } from './middleware/auth.ts';
 import { idempotency } from './middleware/idempotency.ts';
+import { silentLogger } from './logger.ts';
+import { sql } from '@tracker/db';
 import { problem, problemFromError } from './problem.ts';
+import { registerAttachmentRoutes } from './routes/attachments.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerCollaborationRoutes } from './routes/collaboration.ts';
 import { registerIssueRoutes } from './routes/issues.ts';
+import { registerFieldRoutes } from './routes/fields.ts';
 import { registerProjectRoutes } from './routes/projects.ts';
+import { registerStreamRoute } from './routes/stream.ts';
 import { registerUserRoutes } from './routes/users.ts';
+import { registerWebhookRoutes } from './routes/webhooks.ts';
 
 export const API_VERSION = '1.0.0';
 
@@ -99,6 +105,10 @@ function buildApi(resolved: ResolvedDeps): TrackerApp {
   registerProjectRoutes(api);
   registerIssueRoutes(api);
   registerCollaborationRoutes(api);
+  registerFieldRoutes(api);
+  registerAttachmentRoutes(api, resolved);
+  registerWebhookRoutes(api, resolved.webhooks ?? { allowPrivate: false });
+  registerStreamRoute(api, resolved);
   for (const extension of resolved.extensions ?? []) extension(api, resolved);
 
   api.notFound((c) => problem(c, 'NOT_FOUND', `No route for ${c.req.method} ${c.req.path}`));
@@ -113,20 +123,57 @@ export function createApp(deps: AppDeps = {}): OpenAPIHono<AppEnv> {
   const resolved = resolveDeps(deps);
   const root = new OpenAPIHono<AppEnv>();
   root.onError((error, c) => problemFromError(c, error));
+  const logger = deps.logger ?? silentLogger;
   root.use('*', requestId);
+  // Access log (health probes and static assets only at debug level).
+  root.use('*', async (c, next) => {
+    const started = performance.now();
+    const log = logger.child({ reqId: c.get('requestId') });
+    c.set('logger', log);
+    await next();
+    const path = c.req.path;
+    const quiet = path === '/healthz' || path === '/readyz' || !path.startsWith('/api/');
+    log[quiet ? 'debug' : 'info'](
+      {
+        method: c.req.method,
+        path,
+        status: c.res.status,
+        ms: Math.round(performance.now() - started),
+        actor: c.var.actor?.handle,
+      },
+      'request',
+    );
+  });
+  // Liveness: the process is serving. Readiness: it can reach the database and is not shutting down.
   root.get('/healthz', (c) => c.json({ ok: true }));
+  root.get('/readyz', async (c) => {
+    if (deps.shutdownSignal?.aborted) return c.json({ ok: false, reason: 'shutting down' }, 503);
+    try {
+      await sql`select 1`.execute(resolved.getDb().kysely);
+      return c.json({ ok: true });
+    } catch (error) {
+      c.get('logger').warn({ err: error }, 'readiness check failed');
+      return c.json({ ok: false, reason: 'database unavailable' }, 503);
+    }
+  });
   root.route(API_PREFIX, buildApi(resolved));
   root.get('/api/docs', Scalar({ url: `${API_PREFIX}/openapi.json`, pageTitle: 'Tracker API' }));
 
   if (deps.webDir) {
     const webDir = deps.webDir;
-    let shell: string | undefined;
-    const indexHtml = () => (shell ??= readFileSync(join(webDir, 'index.html'), 'utf8'));
+    // Content-hashed build assets never change; everything else must revalidate.
+    root.use('/_app/immutable/*', async (c, next) => {
+      await next();
+      if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable');
+    });
     root.use('/*', serveStatic({ root: webDir }));
-    // SPA fallback: any other non-API path renders the app shell.
-    root.get('*', (c) =>
-      c.req.path.startsWith('/api/') ? problem(c, 'NOT_FOUND', 'Not found') : c.html(indexHtml()),
-    );
+    // SPA fallback: any other non-API path renders the app shell (read per request so a rebuild never
+    // leaves a stale shell pointing at deleted assets).
+    root.get('*', (c) => {
+      if (c.req.path.startsWith('/api/')) return problem(c, 'NOT_FOUND', 'Not found');
+      c.header('Cache-Control', 'no-cache');
+      return c.html(readFileSync(join(webDir, 'index.html'), 'utf8'));
+    });
   }
   root.notFound((c) => problem(c, 'NOT_FOUND', `No route for ${c.req.method} ${c.req.path}`));
   return root;

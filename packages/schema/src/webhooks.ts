@@ -1,0 +1,130 @@
+import { z } from 'zod';
+import { TimestampSchema } from './common.ts';
+import { EVENT_TYPES, type EventType } from './events.ts';
+
+const EVENT_NOUNS = [...new Set(EVENT_TYPES.map((t) => t.split('.')[0]!))];
+
+/** An event type, `<noun>.*` (e.g. `issue.*`) or `*` for everything. */
+export const WebhookEventPatternSchema = z
+  .string()
+  .refine(
+    (p) =>
+      p === '*' ||
+      (EVENT_TYPES as readonly string[]).includes(p) ||
+      (p.endsWith('.*') && EVENT_NOUNS.includes(p.slice(0, -2))),
+    { message: `Use an event type, "<noun>.*" (${EVENT_NOUNS.join(', ')}) or "*"` },
+  )
+  .meta({ example: 'issue.*' });
+
+/** Whether an event type is selected by a webhook's patterns. */
+export function webhookMatchesType(patterns: readonly string[], type: EventType | string): boolean {
+  return patterns.some(
+    (p) => p === '*' || p === type || (p.endsWith('.*') && type.startsWith(p.slice(0, -1))),
+  );
+}
+
+const WEBHOOK_URL = z
+  .url({ protocol: /^https?$/ })
+  .max(2000)
+  .meta({ example: 'https://example.com/hooks/tracker' });
+
+export const WebhookSchema = z
+  .object({
+    id: z.string(),
+    url: z.string(),
+    description: z.string(),
+    eventTypes: z.array(z.string()).meta({ description: 'Event types, `<noun>.*` or `*`.' }),
+    projectId: z
+      .string()
+      .nullable()
+      .meta({ description: 'Only events from this project; null for all projects.' }),
+    active: z.boolean(),
+    failureCount: z.number().int().meta({
+      description:
+        'Consecutive deliveries that exhausted their retries. The webhook is disabled at 5; re-activating resets it.',
+    }),
+    disabledAt: TimestampSchema.nullable().meta({
+      description: 'Set when the webhook was disabled automatically after repeated failures.',
+    }),
+    createdBy: z.string(),
+    createdAt: TimestampSchema,
+    updatedAt: TimestampSchema,
+  })
+  .meta({ id: 'Webhook' });
+export type Webhook = z.infer<typeof WebhookSchema>;
+
+export const WebhookWithSecretSchema = WebhookSchema.extend({
+  secret: z.string().meta({
+    description:
+      'Signing secret (`whsec_…`). Returned only when the webhook is created or its secret rotated.',
+    example: 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw',
+  }),
+}).meta({ id: 'WebhookWithSecret' });
+export type WebhookWithSecret = z.infer<typeof WebhookWithSecretSchema>;
+
+export const CreateWebhookInputSchema = z
+  .object({
+    url: WEBHOOK_URL,
+    description: z.string().max(500).default(''),
+    eventTypes: z.array(WebhookEventPatternSchema).min(1).default(['*']),
+    project: z
+      .string()
+      .optional()
+      .meta({ description: 'Project key or id to scope the webhook to.', example: 'ENG' }),
+    active: z.boolean().default(true),
+  })
+  .meta({ id: 'CreateWebhookInput' });
+export type CreateWebhookInput = z.input<typeof CreateWebhookInputSchema>;
+
+export const UpdateWebhookInputSchema = z
+  .object({
+    url: WEBHOOK_URL.optional(),
+    description: z.string().max(500).optional(),
+    eventTypes: z.array(WebhookEventPatternSchema).min(1).optional(),
+    project: z.string().nullable().optional().meta({ description: 'null removes the scope.' }),
+    active: z.boolean().optional(),
+  })
+  .meta({ id: 'UpdateWebhookInput' });
+export type UpdateWebhookInput = z.input<typeof UpdateWebhookInputSchema>;
+
+export const WEBHOOK_DELIVERY_STATUSES = ['pending', 'succeeded', 'failed', 'dead'] as const;
+export type WebhookDeliveryStatus = (typeof WEBHOOK_DELIVERY_STATUSES)[number];
+
+export const WebhookDeliverySchema = z
+  .object({
+    id: z.string().meta({ description: 'Also sent as the `webhook-id` header on every attempt.' }),
+    webhookId: z.string(),
+    eventSeq: z.number().int(),
+    eventId: z.string().nullable(),
+    eventType: z.string().nullable(),
+    status: z.enum(WEBHOOK_DELIVERY_STATUSES).meta({
+      description:
+        '`pending` (not yet attempted), `failed` (will retry at `nextAttemptAt`), `succeeded`, or `dead` (retries exhausted).',
+    }),
+    attempts: z.number().int(),
+    nextAttemptAt: TimestampSchema,
+    lastAttemptAt: TimestampSchema.nullable(),
+    lastStatusCode: z.number().int().nullable(),
+    lastError: z.string().nullable(),
+    lastResponse: z
+      .string()
+      .nullable()
+      .meta({ description: 'Start of the last response body (up to 2 KB).' }),
+    lastDurationMs: z.number().int().nullable(),
+    createdAt: TimestampSchema,
+    updatedAt: TimestampSchema,
+    completedAt: TimestampSchema.nullable(),
+  })
+  .meta({ id: 'WebhookDelivery' });
+export type WebhookDelivery = z.infer<typeof WebhookDeliverySchema>;
+
+export const WebhookTestResultSchema = z
+  .object({
+    ok: z.boolean(),
+    statusCode: z.number().int().nullable(),
+    error: z.string().nullable(),
+    response: z.string().nullable(),
+    durationMs: z.number().int(),
+  })
+  .meta({ id: 'WebhookTestResult' });
+export type WebhookTestResult = z.infer<typeof WebhookTestResultSchema>;

@@ -1,0 +1,104 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design tokens: a calm, dense, Linear-like palette with a matching dark theme. */
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+
+  --color-bg: #ffffff;
+  --color-bg-subtle: #f7f7f8;
+  --color-bg-muted: #efeff1;
+  --color-bg-hover: #f0f0f2;
+  --color-border: #e4e4e7;
+  --color-border-strong: #d4d4d8;
+  --color-fg: #18181b;
+  --color-fg-muted: #52525b;
+  --color-fg-subtle: #8a8a93;
+  --color-accent: #5e6ad2;
+  --color-accent-fg: #ffffff;
+  --color-accent-subtle: #eef0fc;
+  --color-danger: #d93f3f;
+  --color-success: #3a9b6b;
+  --color-warning: #d9912b;
+}
+
+@layer base {
+  .dark {
+    --color-bg: #151518;
+    --color-bg-subtle: #1b1b1f;
+    --color-bg-muted: #232328;
+    --color-bg-hover: #26262c;
+    --color-border: #2c2c33;
+    --color-border-strong: #3a3a42;
+    --color-fg: #ececf0;
+    --color-fg-muted: #a1a1aa;
+    --color-fg-subtle: #71717a;
+    --color-accent: #7c86e6;
+    --color-accent-subtle: #25273d;
+  }
+
+  html,
+  body {
+    @apply bg-bg text-fg antialiased;
+    font-size: 14px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+/* Rendered markdown (sanitized) */
+@layer components {
+  .prose-md {
+    @apply text-sm leading-6 text-fg;
+  }
+  .prose-md :where(h1) {
+    @apply mt-4 mb-2 text-lg font-semibold;
+  }
+  .prose-md :where(h2) {
+    @apply mt-4 mb-2 text-base font-semibold;
+  }
+  .prose-md :where(h3) {
+    @apply mt-3 mb-1 font-semibold;
+  }
+  .prose-md :where(p) {
+    @apply my-2;
+  }
+  .prose-md :where(ul) {
+    @apply my-2 list-disc pl-5;
+  }
+  .prose-md :where(ol) {
+    @apply my-2 list-decimal pl-5;
+  }
+  .prose-md :where(li > input[type='checkbox']) {
+    @apply mr-1.5 align-middle;
+  }
+  .prose-md :where(a) {
+    @apply text-accent underline underline-offset-2;
+  }
+  .prose-md :where(code) {
+    @apply rounded bg-bg-muted px-1 py-0.5 font-mono text-[0.85em];
+  }
+  .prose-md :where(pre) {
+    @apply my-2 overflow-x-auto rounded-md bg-bg-muted p-3;
+  }
+  .prose-md :where(pre code) {
+    @apply bg-transparent p-0;
+  }
+  .prose-md :where(blockquote) {
+    @apply my-2 border-l-2 border-border-strong pl-3 text-fg-muted;
+  }
+  .prose-md :where(img) {
+    @apply my-2 max-w-full rounded;
+  }
+  .prose-md :where(table) {
+    @apply my-2 border-collapse text-sm;
+  }
+  .prose-md :where(th, td) {
+    @apply border border-border px-2 py-1;
+  }
+}

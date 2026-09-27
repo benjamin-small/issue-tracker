@@ -1,4 +1,4 @@
-import { fromJson, sql } from '@tracker/db';
+import { fromJson, sql, type Tx } from '@tracker/db';
 import type { EventType, Page, TrackerEvent } from '@tracker/schema';
 import type { ServiceContext } from '../context.ts';
 import { validationError } from '../errors.ts';
@@ -14,6 +14,51 @@ export interface ListEventsInput {
   includeLinksTo?: boolean | undefined;
 }
 
+function eventQuery(db: Tx) {
+  return db
+    .selectFrom('events as e')
+    .leftJoin('users as u', 'u.id', 'e.actor_id')
+    .selectAll('e')
+    .select([
+      'u.handle as u_handle',
+      'u.name as u_name',
+      'u.kind as u_kind',
+      'u.avatar_url as u_avatar',
+    ]);
+}
+
+type EventRow = Awaited<ReturnType<ReturnType<typeof eventQuery>['execute']>>[number];
+
+function toTrackerEvent(r: EventRow): TrackerEvent {
+  return {
+    seq: Number(r.seq),
+    id: r.id,
+    type: r.type as EventType,
+    actorId: r.actor_id,
+    actor:
+      r.actor_id && r.u_handle
+        ? {
+            id: r.actor_id,
+            handle: r.u_handle,
+            name: r.u_name!,
+            kind: r.u_kind!,
+            avatarUrl: r.u_avatar,
+          }
+        : null,
+    projectId: r.project_id,
+    issueId: r.issue_id,
+    data: fromJson<Record<string, unknown>>(r.data, {}),
+    createdAt: r.created_at,
+  };
+}
+
+/** Loads events by seq (in seq order); missing seqs are skipped. */
+export async function getEventsBySeq(db: Tx, seqs: number[]): Promise<TrackerEvent[]> {
+  if (seqs.length === 0) return [];
+  const rows = await eventQuery(db).where('e.seq', 'in', seqs).orderBy('e.seq').execute();
+  return rows.map(toTrackerEvent);
+}
+
 /**
  * Reads the event log in commit order. `seq` increases in commit order (ADR 0003), so polling
  * `after=<last seq seen>` never misses an event. `nextCursor` is the last seq as a string.
@@ -25,16 +70,7 @@ export async function listEvents(
   const limit = Math.min(Math.max(input.limit ?? 100, 1), 1000);
   if (input.after !== undefined && (!Number.isInteger(input.after) || input.after < 0))
     throw validationError('after must be a non-negative integer');
-  let q = ctx.db.kysely
-    .selectFrom('events as e')
-    .leftJoin('users as u', 'u.id', 'e.actor_id')
-    .selectAll('e')
-    .select([
-      'u.handle as u_handle',
-      'u.name as u_name',
-      'u.kind as u_kind',
-      'u.avatar_url as u_avatar',
-    ])
+  let q = eventQuery(ctx.db.kysely)
     .orderBy('e.seq')
     .limit(limit + 1);
   if (input.after !== undefined) q = q.where('e.seq', '>', input.after);
@@ -57,26 +93,7 @@ export async function listEvents(
   const rows = await q.execute();
   const page = rows.slice(0, limit);
   return {
-    data: page.map((r) => ({
-      seq: Number(r.seq),
-      id: r.id,
-      type: r.type as EventType,
-      actorId: r.actor_id,
-      actor:
-        r.actor_id && r.u_handle
-          ? {
-              id: r.actor_id,
-              handle: r.u_handle,
-              name: r.u_name!,
-              kind: r.u_kind!,
-              avatarUrl: r.u_avatar,
-            }
-          : null,
-      projectId: r.project_id,
-      issueId: r.issue_id,
-      data: fromJson<Record<string, unknown>>(r.data, {}),
-      createdAt: r.created_at,
-    })),
+    data: page.map(toTrackerEvent),
     nextCursor: rows.length > limit ? String(page.at(-1)!.seq) : null,
   };
 }

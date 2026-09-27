@@ -1,4 +1,4 @@
-import { type Tx, toJson } from '@tracker/db';
+import { sql, type Tx, toJson } from '@tracker/db';
 import type { EventType } from '@tracker/schema';
 import { nowIso, type ServiceContext } from './context.ts';
 
@@ -31,7 +31,12 @@ export async function recordEvent(
       created_at: nowIso(ctx),
     })
     .execute();
+  // Wake tailers in other processes as soon as this transaction commits (NOTIFY is transactional).
+  if (ctx.db.dialect === 'postgres') await sql`select pg_notify(${EVENTS_CHANNEL}, '')`.execute(tx);
 }
+
+/** Postgres NOTIFY channel signalled whenever events are committed. */
+export const EVENTS_CHANNEL = 'tracker_events';
 
 /** Computes `{ field: { from, to } }` for fields whose JSON representation changed. */
 export function diff<T extends Record<string, unknown>>(

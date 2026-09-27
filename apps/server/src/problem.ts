@@ -62,7 +62,9 @@ export function problemFromError(c: Context, error: unknown): Response {
   const status = (error as { status?: number }).status;
   if (status === 413) return problem(c, 'PAYLOAD_TOO_LARGE', 'Request body too large');
   if (error instanceof SyntaxError) return problem(c, 'VALIDATION_FAILED', 'Malformed JSON body');
-  console.error(`[${c.get('requestId') ?? '-'}] unhandled error`, error);
+  const log = c.get('logger') as { error: (o: object, m: string) => void } | undefined;
+  if (log) log.error({ err: error }, 'unhandled error');
+  else console.error(`[${c.get('requestId') ?? '-'}] unhandled error`, error);
   return problem(c, 'INTERNAL', 'An unexpected error occurred');
 }
 

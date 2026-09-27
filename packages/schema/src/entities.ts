@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { ColorSchema, DateOnlySchema, MetadataSchema, TimestampSchema } from './common.ts';
+import {
+  ColorSchema,
+  DateOnlySchema,
+  MetadataSchema,
+  nullableRef,
+  TimestampSchema,
+} from './common.ts';
 
 // ---------------------------------------------------------------------------
 // Users & auth
@@ -215,9 +221,11 @@ export const CreateLabelInputSchema = z
   .meta({ id: 'CreateLabelInput' });
 export type CreateLabelInput = z.input<typeof CreateLabelInputSchema>;
 
-export const UpdateLabelInputSchema = CreateLabelInputSchema.partial().meta({
-  id: 'UpdateLabelInput',
-});
+// Explicit (not CreateLabelInputSchema.partial()): `.partial()` keeps defaults, which would reset omitted fields.
+export const UpdateLabelInputSchema = z
+  .object({ name: z.string().min(1).max(50), color: ColorSchema, description: z.string().max(500) })
+  .partial()
+  .meta({ id: 'UpdateLabelInput' });
 export type UpdateLabelInput = z.input<typeof UpdateLabelInputSchema>;
 
 // ---------------------------------------------------------------------------
@@ -259,11 +267,11 @@ export const IssueSchema = z
     status: StatusSummarySchema,
     priority: PrioritySchema,
     assigneeId: z.string().nullable(),
-    assignee: UserSummarySchema.nullable(),
+    assignee: nullableRef(UserSummarySchema),
     creatorId: z.string(),
     creator: UserSummarySchema,
     parentId: z.string().nullable(),
-    parent: IssueRefSchema.nullable(),
+    parent: nullableRef(IssueRefSchema),
     labelIds: z.array(z.string()),
     labels: z.array(LabelSummarySchema),
     estimate: z.number().nullable(),

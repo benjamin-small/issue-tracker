@@ -27,6 +27,7 @@ import {
   revokeToken,
   updateComment,
   updateIssue,
+  updateLabel,
   updateView,
 } from './index.ts';
 import { createTestContext, type TestContext } from './testing.ts';
@@ -462,6 +463,16 @@ describe(`statuses, views, tokens (${testDialect()})`, () => {
     await deleteStatus(t.ctx, extra.id, { moveIssuesTo: 'In Review' });
     expect((await getIssue(t.ctx, issue.key)).status.name).toBe('In Review');
     expect((await listStatuses(t.ctx, 'ENG')).map((s) => s.position)).toEqual([0, 1, 2, 3, 4, 5]);
+  });
+
+  it('updates only the label fields that are given', async () => {
+    const label = await createLabel(t.ctx, 'ENG', {
+      name: 'keepme',
+      color: '#123456',
+      description: 'desc',
+    });
+    const renamed = await updateLabel(t.ctx, label.id, { name: 'kept' });
+    expect(renamed).toMatchObject({ name: 'kept', color: '#123456', description: 'desc' });
   });
 
   it('stores view config and card fields', async () => {

@@ -49,6 +49,11 @@ jobs:
     env:
       TEST_DB: ${{ matrix.db }}
       TEST_DATABASE_URL: postgres://tracker:tracker@localhost:5432/tracker
+      # The Postgres leg runs the S3 blob-store contract against real S3-compatible storage (the SQLite leg
+      # uses an in-process emulator).
+      TEST_S3_ENDPOINT: ${{ matrix.db == 'postgres' && 'http://localhost:8333' || '' }}
+      TEST_S3_ACCESS_KEY_ID: tracker
+      TEST_S3_SECRET_ACCESS_KEY: tracker-secret
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -57,4 +62,81 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Start S3-compatible storage (SeaweedFS)
+        if: matrix.db == 'postgres'
+        run: |
+          docker run -d --name s3 -p 8333:8333 \
+            -v "$PWD/deploy/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro" \
+            chrislusf/seaweedfs server -s3 -s3.config=/etc/seaweedfs/s3.json
+          for i in $(seq 60); do
+            docker exec s3 sh -c 'echo "s3.bucket.create -name tracker" | weed shell -master=localhost:9333' 2>&1 \
+              | grep -qE 'created|already exists' && break
+            sleep 2
+          done
       - run: pnpm test
+
+  e2e:
+    name: End-to-end (Playwright, ${{ matrix.db }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tracker
+          POSTGRES_PASSWORD: tracker
+          POSTGRES_DB: tracker
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U tracker"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      E2E_DATABASE_URL: ${{ matrix.db == 'postgres' && 'postgres://tracker:tracker@localhost:5432/tracker' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tracker/web exec playwright install --with-deps chromium
+      - run: pnpm e2e
+        env:
+          CI: 'true'
+      - name: Browser demo (static build, API and SQLite in the page)
+        if: matrix.db == 'sqlite'
+        run: pnpm e2e:demo
+        env:
+          CI: 'true'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.db }}
+          path: apps/web/playwright-report/
+
+  docker:
+    name: Docker image + compose smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the stack (Postgres + S3 storage)
+        run: docker compose up -d --build --wait tracker
+      - name: Bootstrap an admin and use the API through the CLI
+        run: |
+          token=$(docker compose exec -T tracker tracker db bootstrap --handle ci --name CI --json | jq -r .token)
+          docker compose exec -T -e TRACKER_SERVER=http://127.0.0.1:3000 -e TRACKER_TOKEN="$token" tracker \
+            sh -c 'tracker project create -k CI --name CI -q && tracker issue create -t "From CI" --project CI -q'
+          curl -sf http://localhost:3000/readyz
+          curl -sf http://localhost:3000/ | grep -q '<!doctype html>'
+      - name: Graceful shutdown
+        run: |
+          docker compose stop -t 20 tracker
+          test "$(docker inspect "$(docker compose ps -aq tracker)" --format '{{.State.ExitCode}}')" = 0
+      - if: failure()
+        run: docker compose logs

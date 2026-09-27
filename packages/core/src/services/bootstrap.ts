@@ -1,6 +1,9 @@
 import { type Db, withWriteTx } from '@tracker/db';
 import { type Clock, SYSTEM_ACTOR, systemClock } from '../context.ts';
-import { newId } from '@tracker/schema';
+import { newId, type User } from '@tracker/schema';
+import { conflict } from '../errors.ts';
+import { createToken } from './auth.ts';
+import { createUserUnchecked } from './users.ts';
 
 /** Built-in link types. Keys are part of the API contract (`tracker link add ENG-1 blocks ENG-2`). */
 export const BUILTIN_LINK_TYPES = [
@@ -64,4 +67,26 @@ export async function ensureBuiltins(db: Db, clock: Clock = systemClock): Promis
         .execute();
     }
   });
+}
+
+/**
+ * Creates the first admin of a fresh installation and an API token for them (production has no demo seed).
+ * Refuses once any human admin exists — after that, admins manage users through the API.
+ */
+export async function bootstrapAdmin(
+  db: Db,
+  input: { handle: string; name: string; email?: string | undefined },
+  clock: Clock = systemClock,
+): Promise<{ user: User; token: string }> {
+  const existing = await db.kysely
+    .selectFrom('users')
+    .select('handle')
+    .where('role', '=', 'admin')
+    .where('kind', '=', 'human')
+    .executeTakeFirst();
+  if (existing) throw conflict(`An admin already exists (@${existing.handle})`);
+  const ctx = { db, actor: SYSTEM_ACTOR, clock, ids: newId };
+  const user = await createUserUnchecked(ctx, { ...input, role: 'admin', kind: 'human' });
+  const { token } = await createToken(ctx, user.id, { name: 'bootstrap' });
+  return { user, token };
 }

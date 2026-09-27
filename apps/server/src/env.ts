@@ -1,6 +1,15 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Actor, Clock, IdGenerator, ServiceContext } from '@tracker/core';
+import type {
+  Actor,
+  BlobStore,
+  Clock,
+  EventTailer,
+  IdGenerator,
+  ServiceContext,
+  WebhookPolicy,
+} from '@tracker/core';
 import type { Db } from '@tracker/db';
+import type { Logger } from './logger.ts';
 
 /**
  * How requests are authenticated.
@@ -26,7 +35,19 @@ export interface AppDeps {
   ids?: IdGenerator;
   /** Directory with the built web app to serve at `/` (production). */
   webDir?: string;
-  /** Extra hooks for features that attach to the app (SSE hub, attachments, …). */
+  /** Where attachment bytes are stored. Without one, attachment routes answer 503. */
+  blobStore?: BlobStore;
+  /** Upload size limit in bytes (default 25 MB). */
+  maxUploadBytes?: number;
+  /** How webhooks may reach the network (default: https to public addresses only). */
+  webhooks?: WebhookPolicy;
+  /** Follows the event log for live streaming (`GET /events/stream`) and webhooks. */
+  tailer?: EventTailer;
+  /** Structured logger (default: silent — embedded apps such as tests and the CLI stay quiet). */
+  logger?: Logger;
+  /** Aborted when the server begins shutting down: long-lived streams end so clients reconnect elsewhere. */
+  shutdownSignal?: AbortSignal;
+  /** Extra hooks for features that attach to the app (attachments, …). */
   extensions?: AppExtension[];
 }
 
@@ -40,6 +61,7 @@ export interface ResolvedDeps extends Omit<AppDeps, 'db'> {
 export interface AppEnv {
   Variables: {
     requestId: string;
+    logger: Logger;
     actor: Actor | null;
     authVia: 'bearer' | 'session' | 'trusted' | null;
     ctx: ServiceContext;

@@ -254,6 +254,9 @@ export interface WebhookDeliveriesTable {
   locked_until: Timestamp | null;
   last_status_code: number | null;
   last_error: string | null;
+  last_attempt_at: Timestamp | null;
+  last_duration_ms: number | null;
+  last_response: string | null;
   created_at: Timestamp;
   updated_at: Timestamp;
   completed_at: Timestamp | null;

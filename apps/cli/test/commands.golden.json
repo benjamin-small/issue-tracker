@@ -1,0 +1,2250 @@
+{
+  "commands": [
+    {
+      "name": "issue list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List issues in a project (filters are ANDed; comma lists mean \"any of\")",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "-s, --status <statuses>",
+          "name": "status",
+          "description": "status names/ids",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--category <categories>",
+          "name": "category",
+          "description": "status categories: backlog,unstarted,started,completed,canceled",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-a, --assignee <users>",
+          "name": "assignee",
+          "description": "handles/ids, me, none",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--creator <users>",
+          "name": "creator",
+          "description": "creator handles/ids",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-l, --label <labels>",
+          "name": "label",
+          "description": "has any of these labels",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-p, --priority <priorities>",
+          "name": "priority",
+          "description": "priorities (names or 0-4)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--parent <issue>",
+          "name": "parent",
+          "description": "children of this issue, or none for top-level issues",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--search <text>",
+          "name": "search",
+          "description": "text in key, title or description",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-w, --where <field.op=value>",
+          "name": "where",
+          "description": "any filter, e.g. priority.gte=2, dueDate.isNull=true, cf.severity=high",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--filter-json <json|@file|->",
+          "name": "filterJson",
+          "description": "an IssueFilter JSON object",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--sort <fields>",
+          "name": "sort",
+          "description": "sort fields, - for descending (e.g. -priority,updatedAt)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--limit <n>",
+          "name": "limit",
+          "description": "page size (1-200)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--cursor <cursor>",
+          "name": "cursor",
+          "description": "continue from a previous page",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--all",
+          "name": "all",
+          "description": "fetch every page",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--include-deleted",
+          "name": "includeDeleted",
+          "description": "include issues in the trash",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--all-projects",
+          "name": "allProjects",
+          "description": "search across all projects",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "issue view",
+      "aliases": [
+        "show"
+      ],
+      "description": "Show one issue",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key (ENG-42) or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "issue create",
+      "aliases": [
+        "new"
+      ],
+      "description": "Create an issue (prints the new issue; -q prints only its key)",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "-t, --title <title>",
+          "name": "title",
+          "description": "title",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-d, --description <markdown>",
+          "name": "description",
+          "description": "description (markdown)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--body-file <path>",
+          "name": "bodyFile",
+          "description": "read the description from a file, or - for stdin",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-s, --status <status>",
+          "name": "status",
+          "description": "status name or id",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-p, --priority <priority>",
+          "name": "priority",
+          "description": "none|urgent|high|medium|low or 0-4",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-a, --assignee <user>",
+          "name": "assignee",
+          "description": "handle, @handle, me, or none to unassign",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--parent <issue>",
+          "name": "parent",
+          "description": "parent issue key, or none",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-e, --estimate <points>",
+          "name": "estimate",
+          "description": "estimate, or none",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--due <date>",
+          "name": "due",
+          "description": "due date YYYY-MM-DD, or none",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--set <field=value>",
+          "name": "set",
+          "description": "custom field (repeatable), e.g. --set severity=high --set points=3",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--meta <key=value>",
+          "name": "meta",
+          "description": "metadata entry (repeatable; merged)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--input <json|@file|->",
+          "name": "input",
+          "description": "full JSON payload (CreateIssueInput / UpdateIssueInput); flags override it",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-l, --label <labels>",
+          "name": "label",
+          "description": "labels (repeatable or comma-separated)",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "issue edit",
+      "aliases": [
+        "update"
+      ],
+      "description": "Edit one or more issues (several issues are updated atomically)",
+      "arguments": [
+        {
+          "name": "issues",
+          "required": true,
+          "variadic": true,
+          "description": "issue keys or ids"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-t, --title <title>",
+          "name": "title",
+          "description": "title",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-d, --description <markdown>",
+          "name": "description",
+          "description": "description (markdown)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--body-file <path>",
+          "name": "bodyFile",
+          "description": "read the description from a file, or - for stdin",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-s, --status <status>",
+          "name": "status",
+          "description": "status name or id",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-p, --priority <priority>",
+          "name": "priority",
+          "description": "none|urgent|high|medium|low or 0-4",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-a, --assignee <user>",
+          "name": "assignee",
+          "description": "handle, @handle, me, or none to unassign",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--parent <issue>",
+          "name": "parent",
+          "description": "parent issue key, or none",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-e, --estimate <points>",
+          "name": "estimate",
+          "description": "estimate, or none",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--due <date>",
+          "name": "due",
+          "description": "due date YYYY-MM-DD, or none",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--set <field=value>",
+          "name": "set",
+          "description": "custom field (repeatable), e.g. --set severity=high --set points=3",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--meta <key=value>",
+          "name": "meta",
+          "description": "metadata entry (repeatable; merged)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--input <json|@file|->",
+          "name": "input",
+          "description": "full JSON payload (CreateIssueInput / UpdateIssueInput); flags override it",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-l, --label <labels>",
+          "name": "label",
+          "description": "replace all labels (repeatable or comma-separated)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--add-label <labels>",
+          "name": "addLabel",
+          "description": "add labels",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--remove-label <labels>",
+          "name": "removeLabel",
+          "description": "remove labels",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--if-version <n>",
+          "name": "ifVersion",
+          "description": "fail with exit 4 unless the issue is at this version",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "issue move",
+      "aliases": [],
+      "description": "Move an issue on the board: change status and/or position within the column",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-s, --status <status>",
+          "name": "status",
+          "description": "target status (name or id)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--after <issue>",
+          "name": "after",
+          "description": "place directly after this issue",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--before <issue>",
+          "name": "before",
+          "description": "place directly before this issue",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--top",
+          "name": "top",
+          "description": "place at the top of the column (default)",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--bottom",
+          "name": "bottom",
+          "description": "place at the bottom of the column",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--if-version <n>",
+          "name": "ifVersion",
+          "description": "fail unless the issue is at this version",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "issue delete",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Move an issue to the trash (restorable); --permanent deletes for good (admin)",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--permanent",
+          "name": "permanent",
+          "description": "delete permanently, with comments and links",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--if-version <n>",
+          "name": "ifVersion",
+          "description": "fail unless the issue is at this version",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "issue restore",
+      "aliases": [],
+      "description": "Restore an issue from the trash",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "issue children",
+      "aliases": [],
+      "description": "List sub-issues",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "issue activity",
+      "aliases": [
+        "history"
+      ],
+      "description": "Show the history of an issue (changes, comments, links)",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--after <seq>",
+          "name": "after",
+          "description": "only events after this sequence number",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--limit <n>",
+          "name": "limit",
+          "description": "page size",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "comment list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List comments on an issue (oldest first)",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "comment add",
+      "aliases": [],
+      "description": "Comment on an issue (markdown)",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        },
+        {
+          "name": "text",
+          "required": false,
+          "variadic": true,
+          "description": "comment text"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-b, --body <markdown>",
+          "name": "body",
+          "description": "comment text",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--body-file <path>",
+          "name": "bodyFile",
+          "description": "read the text from a file, or - for stdin",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "comment edit",
+      "aliases": [],
+      "description": "Edit your comment",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "comment id"
+        },
+        {
+          "name": "text",
+          "required": false,
+          "variadic": true,
+          "description": "new text"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-b, --body <markdown>",
+          "name": "body",
+          "description": "new text",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--body-file <path>",
+          "name": "bodyFile",
+          "description": "read the text from a file, or - for stdin",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "comment delete",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Delete your comment",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "comment id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "link list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List an issue's links from its perspective",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "link add",
+      "aliases": [],
+      "description": "Link two issues, e.g. `link add ENG-1 blocks ENG-2` or `link add ENG-2 blocked-by ENG-1`",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        },
+        {
+          "name": "relation",
+          "required": true,
+          "variadic": false,
+          "description": "link type key or alias (blocks, blocked-by, is-blocked-by, relates, relates-to, duplicates, duplicated-by, is-duplicated-by)"
+        },
+        {
+          "name": "target",
+          "required": true,
+          "variadic": false,
+          "description": "the other issue"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "link remove",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Remove a link by id (see `link list`)",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "link id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "link types",
+      "aliases": [],
+      "description": "List link types",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "attachment add",
+      "aliases": [],
+      "description": "Upload one or more files to an issue (the media type is detected from the content)",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        },
+        {
+          "name": "files",
+          "required": true,
+          "variadic": true,
+          "description": "paths to upload, or - for stdin (with --name)"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--name <filename>",
+          "name": "name",
+          "description": "filename to store (default: the file’s basename)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--comment <id>",
+          "name": "comment",
+          "description": "associate the upload with a comment on the issue",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "attachment list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List the files attached to an issue",
+      "arguments": [
+        {
+          "name": "issue",
+          "required": true,
+          "variadic": false,
+          "description": "issue key or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "attachment view",
+      "aliases": [],
+      "description": "Show an attachment’s metadata",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "attachment id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "attachment download",
+      "aliases": [
+        "get"
+      ],
+      "description": "Download an attachment’s content to a file (default: its filename) or - for stdout",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "attachment id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-o, --output <path>",
+          "name": "output",
+          "description": "where to write it; - writes the bytes to stdout",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "attachment remove",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Delete an attachment (uploader or admin)",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "attachment id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "project list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List projects",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--include-archived",
+          "name": "includeArchived",
+          "description": "include archived projects",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "project view",
+      "aliases": [
+        "show"
+      ],
+      "description": "Show a project",
+      "arguments": [
+        {
+          "name": "project",
+          "required": false,
+          "variadic": false,
+          "description": "project key or id (default: configured project)"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "project create",
+      "aliases": [],
+      "description": "Create a project with the default workflow (admin)",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "-k, --key <KEY>",
+          "name": "key",
+          "description": "issue key prefix, e.g. ENG (immutable)",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "name",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "description",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "project edit",
+      "aliases": [],
+      "description": "Edit a project",
+      "arguments": [
+        {
+          "name": "project",
+          "required": false,
+          "variadic": false,
+          "description": "project key or id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "name",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "description",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--archive",
+          "name": "archive",
+          "description": "archive the project (admin)",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--unarchive",
+          "name": "unarchive",
+          "description": "unarchive the project (admin)",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "project schema",
+      "aliases": [],
+      "description": "JSON Schema for issue create/update in this project, with live enums (statuses, labels, users, custom fields)",
+      "arguments": [
+        {
+          "name": "project",
+          "required": false,
+          "variadic": false,
+          "description": "project key or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "status list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List statuses in board order",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "status create",
+      "aliases": [],
+      "description": "Create a status",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "name",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "-c, --category <category>",
+          "name": "category",
+          "description": "backlog|unstarted|started|completed|canceled",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "--color <hex>",
+          "name": "color",
+          "description": "color like #5e6ad2",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--position <n>",
+          "name": "position",
+          "description": "column position (0 = first)",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "status edit",
+      "aliases": [],
+      "description": "Edit a status",
+      "arguments": [
+        {
+          "name": "status",
+          "required": true,
+          "variadic": false,
+          "description": "status name or id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "new name",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-c, --category <category>",
+          "name": "category",
+          "description": "category",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--color <hex>",
+          "name": "color",
+          "description": "color",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "status delete",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Delete a status (use --move-to if issues use it)",
+      "arguments": [
+        {
+          "name": "status",
+          "required": true,
+          "variadic": false,
+          "description": "status name or id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--move-to <status>",
+          "name": "moveTo",
+          "description": "move its issues to this status first",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "status reorder",
+      "aliases": [],
+      "description": "Set the column order: list every status, in order",
+      "arguments": [
+        {
+          "name": "statuses",
+          "required": true,
+          "variadic": true,
+          "description": "status names or ids"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "label list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List labels",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "label create",
+      "aliases": [],
+      "description": "Create a label",
+      "arguments": [
+        {
+          "name": "name",
+          "required": true,
+          "variadic": false,
+          "description": "label name"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--color <hex>",
+          "name": "color",
+          "description": "color",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "description",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "label edit",
+      "aliases": [],
+      "description": "Edit a label",
+      "arguments": [
+        {
+          "name": "label",
+          "required": true,
+          "variadic": false,
+          "description": "label name or id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "new name",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--color <hex>",
+          "name": "color",
+          "description": "color",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "description",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "label delete",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Delete a label (removes it from issues)",
+      "arguments": [
+        {
+          "name": "label",
+          "required": true,
+          "variadic": false,
+          "description": "label name or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "field list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List custom fields",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--include-archived",
+          "name": "includeArchived",
+          "description": "include archived fields",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "field create",
+      "aliases": [],
+      "description": "Create a custom field, e.g. `field create severity --type select --option low,high`",
+      "arguments": [
+        {
+          "name": "key",
+          "required": true,
+          "variadic": false,
+          "description": "immutable key (lowercase, digits, _)"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--type <type>",
+          "name": "type",
+          "description": "text|number|date|boolean|select|multi_select|user|url",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "display name (default: the key)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "description",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--option <values>",
+          "name": "option",
+          "description": "options for select types (repeatable or comma-separated)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--config <json|@file|->",
+          "name": "config",
+          "description": "display hints JSON, e.g. {\"unit\":\"pts\"}",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "field edit",
+      "aliases": [],
+      "description": "Rename, describe, reorder or (un)archive a field",
+      "arguments": [
+        {
+          "name": "field",
+          "required": true,
+          "variadic": false,
+          "description": "field key or id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "display name",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "description",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--position <n>",
+          "name": "position",
+          "description": "display position",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--archive",
+          "name": "archive",
+          "description": "hide the field (values are kept)",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--unarchive",
+          "name": "unarchive",
+          "description": "show the field again",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "field delete",
+      "aliases": [],
+      "description": "Delete a field and all its values permanently (admin; prefer `field edit --archive`)",
+      "arguments": [
+        {
+          "name": "field",
+          "required": true,
+          "variadic": false,
+          "description": "field key or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "field option-add",
+      "aliases": [],
+      "description": "Add options to a select / multi_select field",
+      "arguments": [
+        {
+          "name": "field",
+          "required": true,
+          "variadic": false,
+          "description": "field key or id"
+        },
+        {
+          "name": "values",
+          "required": true,
+          "variadic": true,
+          "description": "option values"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--color <hex>",
+          "name": "color",
+          "description": "color for the new options",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "field option-edit",
+      "aliases": [],
+      "description": "Relabel, recolor or (un)archive an option",
+      "arguments": [
+        {
+          "name": "field",
+          "required": true,
+          "variadic": false,
+          "description": "field key or id"
+        },
+        {
+          "name": "value",
+          "required": true,
+          "variadic": false,
+          "description": "option value"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--label <label>",
+          "name": "label",
+          "description": "display label",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--color <hex>",
+          "name": "color",
+          "description": "color",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--archive",
+          "name": "archive",
+          "description": "archive (cannot be chosen anymore; existing values stay)",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--unarchive",
+          "name": "unarchive",
+          "description": "unarchive",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "view list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List views (shared + yours)",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "view show",
+      "aliases": [],
+      "description": "Show a view including its config",
+      "arguments": [
+        {
+          "name": "view",
+          "required": true,
+          "variadic": false,
+          "description": "view name or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "view create",
+      "aliases": [],
+      "description": "Save a view",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "name",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "--layout <layout>",
+          "name": "layout",
+          "description": "list|board",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "--shared",
+          "name": "shared",
+          "description": "share with the project (default: personal)",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--config <json|@file|->",
+          "name": "config",
+          "description": "ViewConfig JSON",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "view edit",
+      "aliases": [],
+      "description": "Rename a view or replace its config",
+      "arguments": [
+        {
+          "name": "view",
+          "required": true,
+          "variadic": false,
+          "description": "view name or id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "new name",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--config <json|@file|->",
+          "name": "config",
+          "description": "ViewConfig JSON",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "view delete",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Delete a view",
+      "arguments": [
+        {
+          "name": "view",
+          "required": true,
+          "variadic": false,
+          "description": "view name or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "event list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List events after a sequence number (use the last seq you saw as --after)",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--after <seq>",
+          "name": "after",
+          "description": "exclusive cursor",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--limit <n>",
+          "name": "limit",
+          "description": "max events (1-1000)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--issue <issue>",
+          "name": "issue",
+          "description": "only this issue (use the global --project to filter by project)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--types <types>",
+          "name": "types",
+          "description": "comma-separated event types, e.g. issue.created,issue.updated",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "event tail",
+      "aliases": [],
+      "description": "Follow new events as NDJSON (one event per line) until interrupted",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--after <seq>",
+          "name": "after",
+          "description": "start after this seq (default: now)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--interval <ms>",
+          "name": "interval",
+          "description": "poll interval",
+          "required": false,
+          "takesValue": true,
+          "default": 1000
+        },
+        {
+          "flags": "--max <n>",
+          "name": "max",
+          "description": "exit after this many events",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--issue <issue>",
+          "name": "issue",
+          "description": "only this issue (use the global --project to filter by project)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--types <types>",
+          "name": "types",
+          "description": "comma-separated event types, e.g. issue.created,issue.updated",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "webhook list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List webhooks",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "webhook create",
+      "aliases": [],
+      "description": "Register a webhook; prints its signing secret (shown only now)",
+      "arguments": [
+        {
+          "name": "url",
+          "required": true,
+          "variadic": false,
+          "description": "receiver URL (https)"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-e, --events <types>",
+          "name": "events",
+          "description": "comma-separated event types, `<noun>.*` or `*`",
+          "required": false,
+          "takesValue": true,
+          "default": "*"
+        },
+        {
+          "flags": "--scope <project>",
+          "name": "scope",
+          "description": "only events from this project",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "what the webhook is for",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--inactive",
+          "name": "inactive",
+          "description": "create it disabled",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "webhook view",
+      "aliases": [],
+      "description": "Show a webhook",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "webhook edit",
+      "aliases": [],
+      "description": "Change a webhook; --enable re-activates an automatically disabled one",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--url <url>",
+          "name": "url",
+          "description": "receiver URL",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-e, --events <types>",
+          "name": "events",
+          "description": "comma-separated event types, `<noun>.*` or `*`",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--scope <project>",
+          "name": "scope",
+          "description": "only events from this project; `all` removes the scope",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--description <text>",
+          "name": "description",
+          "description": "description",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--enable",
+          "name": "enable",
+          "description": "activate",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--disable",
+          "name": "disable",
+          "description": "deactivate",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "webhook delete",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Delete a webhook and its delivery log",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "webhook rotate-secret",
+      "aliases": [],
+      "description": "Replace the signing secret; prints the new one",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "webhook test",
+      "aliases": [],
+      "description": "Send a signed webhook.ping now and show the answer (exit 6 unless it was 2xx)",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "webhook deliveries",
+      "aliases": [],
+      "description": "Show recent deliveries, newest first",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "webhook id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--status <status>",
+          "name": "status",
+          "description": "pending | succeeded | failed | dead",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--limit <n>",
+          "name": "limit",
+          "description": "page size (1-200)",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "webhook redeliver",
+      "aliases": [],
+      "description": "Send a delivery again (with a fresh set of retries)",
+      "arguments": [
+        {
+          "name": "delivery",
+          "required": true,
+          "variadic": false,
+          "description": "delivery id (whd_…)"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "user list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List users",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--include-deactivated",
+          "name": "includeDeactivated",
+          "description": "include deactivated users",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "user view",
+      "aliases": [
+        "show"
+      ],
+      "description": "Show a user",
+      "arguments": [
+        {
+          "name": "user",
+          "required": true,
+          "variadic": false,
+          "description": "handle, @handle, me or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "user create",
+      "aliases": [],
+      "description": "Create a user (admin). Give every agent its own user so its work is attributed.",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--handle <handle>",
+          "name": "handle",
+          "description": "unique handle",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "display name",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "--email <email>",
+          "name": "email",
+          "description": "email",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--kind <kind>",
+          "name": "kind",
+          "description": "human|agent",
+          "required": false,
+          "takesValue": true,
+          "default": "human"
+        },
+        {
+          "flags": "--role <role>",
+          "name": "role",
+          "description": "admin|member",
+          "required": false,
+          "takesValue": true,
+          "default": "member"
+        }
+      ]
+    },
+    {
+      "name": "user edit",
+      "aliases": [],
+      "description": "Edit a user",
+      "arguments": [
+        {
+          "name": "user",
+          "required": true,
+          "variadic": false,
+          "description": "handle or id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "display name",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--email <email>",
+          "name": "email",
+          "description": "email",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--role <role>",
+          "name": "role",
+          "description": "admin|member (admin only)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--deactivate",
+          "name": "deactivate",
+          "description": "deactivate (admin only)",
+          "required": false,
+          "takesValue": false
+        },
+        {
+          "flags": "--reactivate",
+          "name": "reactivate",
+          "description": "reactivate (admin only)",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "token list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List API tokens (never shows secrets)",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "-u, --user <user>",
+          "name": "user",
+          "description": "whose tokens (admin for others)",
+          "required": false,
+          "takesValue": true,
+          "default": "me"
+        }
+      ]
+    },
+    {
+      "name": "token create",
+      "aliases": [],
+      "description": "Create an API token; prints the secret once (-q prints only the secret)",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "-n, --name <name>",
+          "name": "name",
+          "description": "what the token is for",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "-u, --user <user>",
+          "name": "user",
+          "description": "for which user (admin for others)",
+          "required": false,
+          "takesValue": true,
+          "default": "me"
+        },
+        {
+          "flags": "--expires <iso>",
+          "name": "expires",
+          "description": "expiry timestamp, e.g. 2027-01-01T00:00:00Z",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "token revoke",
+      "aliases": [],
+      "description": "Revoke a token",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "variadic": false,
+          "description": "token id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "auth login",
+      "aliases": [],
+      "description": "Store an API token for a server (verifies it first): auth login --server <url> --token <t> | --with-token",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--with-token",
+          "name": "withToken",
+          "description": "read the token from stdin",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "auth logout",
+      "aliases": [],
+      "description": "Forget the stored token for the server (--server or the current default)",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "auth status",
+      "aliases": [],
+      "description": "Show how the CLI connects and who it acts as",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "whoami",
+      "aliases": [],
+      "description": "Show the user the CLI acts as",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "init",
+      "aliases": [],
+      "description": "Write .tracker.json here from the global --server/--database, --project and --actor (never tokens)",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--force",
+          "name": "force",
+          "description": "overwrite an existing file",
+          "required": false,
+          "takesValue": false
+        }
+      ]
+    },
+    {
+      "name": "db migrate",
+      "aliases": [],
+      "description": "Apply pending migrations",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "db status",
+      "aliases": [],
+      "description": "Show applied and pending migrations",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "db bootstrap",
+      "aliases": [],
+      "description": "Create the first admin of a fresh installation (migrating if needed) and print their API token",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--handle <handle>",
+          "name": "handle",
+          "description": "admin handle, e.g. ada",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "--name <name>",
+          "name": "name",
+          "description": "display name",
+          "required": true,
+          "takesValue": true
+        },
+        {
+          "flags": "--email <email>",
+          "name": "email",
+          "description": "email address",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "db seed",
+      "aliases": [],
+      "description": "Create demo users (ada, grace, claude), project ENG and sample issues; prints API tokens",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "serve",
+      "aliases": [],
+      "description": "Run the tracker server (API + web app if built) on the local database",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--port <port>",
+          "name": "port",
+          "description": "port",
+          "required": false,
+          "takesValue": true,
+          "default": "3000"
+        },
+        {
+          "flags": "--host <host>",
+          "name": "host",
+          "description": "host",
+          "required": false,
+          "takesValue": true,
+          "default": "127.0.0.1"
+        }
+      ]
+    },
+    {
+      "name": "schema",
+      "aliases": [],
+      "description": "Print a JSON Schema: resources and inputs (use `project schema` for live per-project enums)",
+      "arguments": [
+        {
+          "name": "name",
+          "required": false,
+          "variadic": false,
+          "description": "one of: issue, issue-create, issue-update, issue-move, issue-filter, comment, comment-create, link, link-create, project, project-create, view-create, view-config, event, problem"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "api",
+      "aliases": [],
+      "description": "Call any API endpoint directly and print the JSON response (like `gh api`)",
+      "arguments": [
+        {
+          "name": "method",
+          "required": true,
+          "variadic": false,
+          "description": "GET, POST, PATCH, DELETE"
+        },
+        {
+          "name": "path",
+          "required": true,
+          "variadic": false,
+          "description": "path under /api/v1, e.g. /issues/ENG-1"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--input <json|@file|->",
+          "name": "input",
+          "description": "request body (JSON)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "-f, --field <key=value>",
+          "name": "field",
+          "description": "body field (repeatable; values parsed as JSON when possible)",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--query <key=value>",
+          "name": "query",
+          "description": "query parameter (repeatable)",
+          "required": false,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "commands",
+      "aliases": [],
+      "description": "Describe every command, option, exit code and error code (use --json for agents)",
+      "arguments": [],
+      "options": []
+    }
+  ],
+  "globalOptions": [
+    {
+      "flags": "-V, --version",
+      "name": "version",
+      "description": "output the version number",
+      "required": false,
+      "takesValue": false
+    },
+    {
+      "flags": "--server <url>",
+      "name": "server",
+      "description": "tracker server URL (remote mode)",
+      "required": false,
+      "takesValue": true
+    },
+    {
+      "flags": "--token <token>",
+      "name": "token",
+      "description": "API token (remote mode)",
+      "required": false,
+      "takesValue": true
+    },
+    {
+      "flags": "--database <url>",
+      "name": "database",
+      "description": "database URL (local mode), e.g. sqlite:./data/dev.db",
+      "required": false,
+      "takesValue": true
+    },
+    {
+      "flags": "--actor <handle>",
+      "name": "actor",
+      "description": "local mode: act as this user",
+      "required": false,
+      "takesValue": true
+    },
+    {
+      "flags": "-P, --project <key>",
+      "name": "project",
+      "description": "project key (default from TRACKER_PROJECT or .tracker.json)",
+      "required": false,
+      "takesValue": true
+    },
+    {
+      "flags": "--format <format>",
+      "name": "format",
+      "description": "output format",
+      "required": false,
+      "takesValue": true
+    },
+    {
+      "flags": "--json",
+      "name": "json",
+      "description": "JSON output (same as --format json)",
+      "required": false,
+      "takesValue": false
+    },
+    {
+      "flags": "-q, --quiet",
+      "name": "quiet",
+      "description": "print only ids/keys (same as --format ids)",
+      "required": false,
+      "takesValue": false
+    },
+    {
+      "flags": "--fields <fields>",
+      "name": "fields",
+      "description": "comma-separated fields to include, e.g. key,title,status",
+      "required": false,
+      "takesValue": true
+    }
+  ],
+  "exitCodes": {
+    "0": "Success",
+    "1": "Internal or unexpected error",
+    "2": "Usage or validation error (bad flags, invalid input, invalid relation)",
+    "3": "Not found",
+    "4": "Conflict (duplicate, version mismatch, idempotency)",
+    "5": "Authentication or permission error",
+    "6": "Unavailable (server unreachable, database not migrated)"
+  },
+  "errorCodes": {
+    "VALIDATION_FAILED": {
+      "status": 400,
+      "exit": 2
+    },
+    "UNAUTHENTICATED": {
+      "status": 401,
+      "exit": 5
+    },
+    "FORBIDDEN": {
+      "status": 403,
+      "exit": 5
+    },
+    "NOT_FOUND": {
+      "status": 404,
+      "exit": 3
+    },
+    "CONFLICT": {
+      "status": 409,
+      "exit": 4
+    },
+    "IDEMPOTENCY_IN_PROGRESS": {
+      "status": 409,
+      "exit": 4
+    },
+    "VERSION_MISMATCH": {
+      "status": 412,
+      "exit": 4
+    },
+    "PAYLOAD_TOO_LARGE": {
+      "status": 413,
+      "exit": 2
+    },
+    "UNSUPPORTED_MEDIA_TYPE": {
+      "status": 415,
+      "exit": 2
+    },
+    "INVALID_RELATION": {
+      "status": 422,
+      "exit": 2
+    },
+    "IDEMPOTENCY_KEY_REUSED": {
+      "status": 422,
+      "exit": 4
+    },
+    "RATE_LIMITED": {
+      "status": 429,
+      "exit": 6
+    },
+    "INTERNAL": {
+      "status": 500,
+      "exit": 1
+    },
+    "UNAVAILABLE": {
+      "status": 503,
+      "exit": 6
+    }
+  },
+  "environment": {
+    "TRACKER_SERVER": "Server URL (remote mode)",
+    "TRACKER_TOKEN": "API token for the server",
+    "TRACKER_DATABASE_URL": "Database URL (local mode), e.g. sqlite:./data/dev.db",
+    "TRACKER_ACTOR": "Local mode: user handle to act as",
+    "TRACKER_PROJECT": "Default project key",
+    "TRACKER_FORMAT": "Default output format: table|json|ndjson|ids",
+    "TRACKER_FIELDS": "Default --fields projection"
+  }
+}

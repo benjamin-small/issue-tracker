@@ -1,15 +1,27 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { serve } from '@hono/node-server';
-import { createContext, ensureBuiltins, seedDemoData, SYSTEM_ACTOR } from '@tracker/core';
+import {
+  blobStoreFromEnv,
+  createContext,
+  ensureBuiltins,
+  EventTailer,
+  seedDemoData,
+  SYSTEM_ACTOR,
+  WebhookRunner,
+} from '@tracker/core';
 import { createDb, type Db, migrateToLatest, migrationStatus, parseDatabaseUrl } from '@tracker/db';
 import { createApp } from './app.ts';
 import type { ServerConfig } from './config.ts';
 import type { AppExtension } from './env.ts';
+import { createLogger, type Logger } from './logger.ts';
 
 export interface RunningServer {
   url: string;
   db: Db;
+  tailer: EventTailer;
+  logger: Logger;
+  /** Graceful shutdown: stop accepting, end live streams, drain requests, stop workers, close the database. */
   close(): Promise<void>;
 }
 
@@ -17,10 +29,11 @@ export interface RunningServer {
 export async function prepareDatabase(
   db: Db,
   config: Pick<ServerConfig, 'TRACKER_AUTO_MIGRATE' | 'TRACKER_SEED'>,
+  logger: Pick<Logger, 'info'> = createLogger({ level: 'silent' }),
 ) {
   if (config.TRACKER_AUTO_MIGRATE) {
     const applied = await migrateToLatest(db);
-    if (applied.length) console.log(`Applied migrations: ${applied.join(', ')}`);
+    if (applied.length) logger.info({ migrations: applied }, 'applied migrations');
   } else {
     const status = await migrationStatus(db);
     if (!status.upToDate)
@@ -37,24 +50,41 @@ export async function prepareDatabase(
       .executeTakeFirstOrThrow();
     if (Number(users.n) === 0) {
       const seeded = await seedDemoData(createContext(db, SYSTEM_ACTOR));
-      console.log('Seeded demo data (users: ada [admin], grace, claude [agent]; project ENG).');
-      console.log(`  admin token (ada):    ${seeded.adminToken}`);
-      console.log(`  agent token (claude): ${seeded.agentToken}`);
+      logger.info(
+        { adminToken: seeded.adminToken, agentToken: seeded.agentToken },
+        'seeded demo data (users: ada [admin], grace, claude [agent]; project ENG)',
+      );
     }
   }
 }
 
-/** Starts the HTTP server. Used by `node apps/server/src/main.ts` and `tracker serve`. */
+/** Starts the HTTP server. Used by `node apps/server/src/main.ts`, the bundled server and `tracker serve`. */
 export async function startServer(
   config: ServerConfig,
   extensions: AppExtension[] = [],
 ): Promise<RunningServer> {
+  const logger = createLogger({
+    level: config.TRACKER_LOG_LEVEL,
+    format: config.TRACKER_LOG_FORMAT,
+  });
   const dbConfig = parseDatabaseUrl(config.TRACKER_DATABASE_URL);
   if (dbConfig.dialect === 'sqlite' && dbConfig.filename !== ':memory:')
     mkdirSync(dirname(dbConfig.filename), { recursive: true });
   const db = createDb(dbConfig);
-  await prepareDatabase(db, config);
+  await prepareDatabase(db, config, logger);
+  const tailer = new EventTailer(db);
+  await tailer.start();
 
+  const webhooks = { allowPrivate: config.TRACKER_WEBHOOK_ALLOW_PRIVATE };
+  const runner = config.TRACKER_WEBHOOKS
+    ? new WebhookRunner(db, {
+        policy: webhooks,
+        onError: (error) => logger.error({ err: error }, 'webhook runner failed'),
+      })
+    : undefined;
+  runner?.start(tailer);
+
+  const shutdown = new AbortController();
   const app = createApp({
     db,
     auth: {
@@ -64,6 +94,12 @@ export async function startServer(
       allowedOrigins: config.TRACKER_ALLOWED_ORIGINS,
     },
     ...(config.TRACKER_WEB_DIR && { webDir: config.TRACKER_WEB_DIR }),
+    tailer,
+    webhooks,
+    blobStore: blobStoreFromEnv(config as unknown as Record<string, string | undefined>),
+    maxUploadBytes: config.TRACKER_MAX_UPLOAD_MB * 1024 * 1024,
+    logger,
+    shutdownSignal: shutdown.signal,
     extensions,
   });
 
@@ -72,16 +108,48 @@ export async function startServer(
       { fetch: app.fetch, hostname: config.TRACKER_HOST, port: config.TRACKER_PORT },
       (info) => {
         const url = `http://${info.address.includes(':') ? `[${info.address}]` : info.address}:${info.port}`;
-        resolve({
-          url,
-          db,
-          close: () =>
-            new Promise<void>((done) => {
-              server.close(() => {
-                void db.destroy().then(() => done());
-              });
-            }),
-        });
+        logger.info(
+          {
+            url,
+            dialect: db.dialect,
+            auth: config.TRACKER_AUTH_MODE,
+            webhooks: Boolean(runner),
+            web: Boolean(config.TRACKER_WEB_DIR),
+          },
+          'tracker listening',
+        );
+        let closing: Promise<void> | undefined;
+        const http = server as unknown as {
+          close(cb: () => void): void;
+          closeIdleConnections?: () => void;
+          closeAllConnections?: () => void;
+        };
+        const close = () =>
+          (closing ??= (async () => {
+            logger.info('shutting down');
+            // End SSE streams (clients reconnect) and stop accepting new connections.
+            shutdown.abort();
+            const drained = new Promise<void>((done) => http.close(done));
+            // Keep-alive connections become idle as their last response (or stream) finishes: close them as
+            // they do, so draining ends as soon as the work does.
+            const reaper = setInterval(() => http.closeIdleConnections?.(), 50);
+            http.closeIdleConnections?.();
+            void drained.then(() => clearInterval(reaper));
+            const timeout = new Promise<'timeout'>((done) =>
+              setTimeout(() => done('timeout'), config.TRACKER_SHUTDOWN_TIMEOUT_MS).unref(),
+            );
+            if ((await Promise.race([drained, timeout])) === 'timeout') {
+              logger.warn('in-flight requests did not finish in time; closing connections');
+              http.closeAllConnections?.();
+              await drained;
+            }
+            clearInterval(reaper);
+            await runner?.stop();
+            await tailer.stop();
+            await db.destroy();
+            logger.info('stopped');
+          })());
+        resolve({ url, db, tailer, logger, close });
       },
     );
   });

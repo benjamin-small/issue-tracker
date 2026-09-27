@@ -54,6 +54,65 @@ Lists return `{ "data": [...], "nextCursor": "…" | null }`. Pass `cursor=<next
 - **Filter semantics:** conditions are ANDed. `in` gives OR within a field. Labels and multi-selects use "has" semantics.
 - **Sortable fields:** `rank` (board order), `priority` (urgent first, none last), `createdAt`, `updatedAt`, `dueDate` and `estimate` (nulls last), `title`, `key`.
 
+## Custom fields
+
+Projects define typed fields with `POST /projects/{project}/fields`. The types are `text`, `number`, `date`, `boolean`, `select`, `multi_select`, `user` and `url`. `select` and `multi_select` fields also take `options`.
+
+- **Setting values.** Issues carry values in `customFields`, keyed by field key:
+
+  ```json
+  {
+    "customFields": {
+      "severity": "high",
+      "points": 3,
+      "platforms": ["web", "ios"],
+      "reviewer": "@ada"
+    }
+  }
+  ```
+
+  - Updates merge: only the fields you send change, and `null` clears one.
+  - Select fields take option _values_.
+  - User fields accept handles, `me` or ids. They are returned as ids.
+  - Unset fields are omitted from responses.
+
+- **Filtering.** Use `cf.<key>` in query strings (`cf.severity=high,critical`, `cf.points.gte=3`) and `cf:<key>` in `IssueFilter`.
+- **Discovery.** `GET /projects/{project}/schema/issue` lists every field, with its options as enums.
+- **Archiving.** Archiving a field or an option hides it without deleting stored values. Option values are immutable, while labels and colors can change.
+
+## Attachments
+
+Files belong to an issue (and optionally a comment on it).
+
+- **Upload:** `POST /issues/{issue}/attachments` as `multipart/form-data` with a `file` part and an optional `commentId`. The limit is `TRACKER_MAX_UPLOAD_MB` (default 25); larger bodies get `413 PAYLOAD_TOO_LARGE`. The server detects the media type from the file's bytes and ignores the type the client declares.
+- **Read:** `GET /issues/{issue}/attachments` lists them. `GET /attachments/{id}` returns metadata, including `sha256` and a `url`. `GET /attachments/{id}/content` returns the bytes.
+- **Delete:** `DELETE /attachments/{id}` (the uploader or an admin). The row is soft-deleted and the stored bytes are removed.
+
+Markdown can embed an attachment by its `url`, e.g. `![shot.png](/api/v1/attachments/att_…/content)`. The web editor does this for pasted and dropped files.
+
+**Download safety.** Uploaded files are untrusted, so the content route never lets them run as part of the app:
+
+- Only raster images (PNG, JPEG, GIF, WebP) are served `inline`. Everything else, SVG, HTML and PDF included, is served with `Content-Disposition: attachment`.
+- Every response carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; sandbox`.
+- Filenames are sanitized for the header (RFC 6266 `filename*`).
+
+**Storage** is pluggable (`TRACKER_BLOB_STORE`):
+
+| Setting           | Storage                                                                                                                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `local` (default) | Files under `TRACKER_BLOB_DIR` (`./data/blobs`)                                                                                                                                       |
+| `s3`              | Any S3-compatible store: `TRACKER_S3_ENDPOINT`, `_BUCKET`, `_REGION`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`, `_FORCE_PATH_STYLE`. Downloads redirect to a short-lived presigned URL. |
+
+Storage keys are random and never derived from the filename. Bytes are written before the database transaction and removed if it fails, so no network I/O happens inside a write transaction.
+
+## Webhooks
+
+Admins register webhooks with `POST /webhooks` (`url`, `eventTypes`, optional `project`). The response contains the signing `secret`, which is shown only once. `POST /webhooks/{id}/rotate-secret` issues a new one.
+
+`POST /webhooks/{id}/test` sends a signed `webhook.ping` right away. `GET /webhooks/{id}/deliveries` is the delivery log, and `POST /webhook-deliveries/{id}/redeliver` retries a delivery.
+
+The payload is documented in the OpenAPI document's `webhooks` section. Signatures, retries and network rules are covered in [events.md](events.md#webhooks).
+
 ## Errors
 
 Every error is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json` body:
@@ -112,7 +171,7 @@ Every change is appended to the event log. Each event carries a full resource sn
 - `GET /events?after=<seq>` pages through all events in commit order.
 - `GET /issues/{issue}/activity` gives one issue's history, including comments and links.
 
-See [events.md](events.md) for the catalogue, live streaming and webhooks.
+`GET /events/stream` streams them live (Server-Sent Events). See [events.md](events.md) for the catalogue, live streaming and webhooks.
 
 ## Discovery for agents
 

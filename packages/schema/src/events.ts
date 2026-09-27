@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { TimestampSchema } from './common.ts';
+import { nullableRef, TimestampSchema } from './common.ts';
+import { AttachmentSchema } from './attachments.ts';
+import { CustomFieldSchema } from './custom-fields.ts';
 import {
   CommentSchema,
   IssueRefSchema,
@@ -35,6 +37,11 @@ export const EVENT_TYPES = [
   'label.deleted',
   'user.created',
   'user.updated',
+  'field.created',
+  'field.updated',
+  'field.deleted',
+  'attachment.created',
+  'attachment.deleted',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 export const EventTypeSchema = z.enum(EVENT_TYPES);
@@ -76,6 +83,12 @@ export const StatusEventDataSchema = z
 export const LabelEventDataSchema = z
   .object({ ...base, label: LabelSchema, changes: ChangesSchema.optional() })
   .meta({ id: 'LabelEventData' });
+export const AttachmentEventDataSchema = z
+  .object({ ...base, attachment: AttachmentSchema, issue: IssueRefSchema })
+  .meta({ id: 'AttachmentEventData' });
+export const FieldEventDataSchema = z
+  .object({ ...base, field: CustomFieldSchema, changes: ChangesSchema.optional() })
+  .meta({ id: 'FieldEventData' });
 export const UserEventDataSchema = z
   .object({ ...base, user: UserSchema, changes: ChangesSchema.optional() })
   .meta({ id: 'UserEventData' });
@@ -100,6 +113,11 @@ export const EVENT_DATA_SCHEMAS = {
   'label.deleted': LabelEventDataSchema,
   'user.created': UserEventDataSchema,
   'user.updated': UserEventDataSchema,
+  'field.created': FieldEventDataSchema,
+  'field.updated': FieldEventDataSchema,
+  'field.deleted': FieldEventDataSchema,
+  'attachment.created': AttachmentEventDataSchema,
+  'attachment.deleted': AttachmentEventDataSchema,
 } as const satisfies Record<EventType, z.ZodType>;
 
 export const EventSchema = z
@@ -110,7 +128,7 @@ export const EventSchema = z
     id: z.string(),
     type: EventTypeSchema,
     actorId: z.string().nullable(),
-    actor: UserSummarySchema.nullable(),
+    actor: nullableRef(UserSummarySchema),
     projectId: z.string().nullable(),
     issueId: z.string().nullable(),
     data: z
