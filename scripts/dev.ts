@@ -1,5 +1,5 @@
 // `pnpm dev`: runs the API server (watch mode, SQLite, dev auth, seeded) and the Vite dev server together.
-// Open http://127.0.0.1:5173 — Vite proxies /api to the server on :3000.
+// Open http://127.0.0.1:5943 — Vite proxies /api to the server on :3000.
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';

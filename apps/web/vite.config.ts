@@ -25,7 +25,7 @@ export default defineConfig({
   server: {
     // Bind IPv4 like the API; `localhost` resolves to ::1 only on macOS, so 127.0.0.1 links would miss Vite.
     host: '127.0.0.1',
-    port: 5173,
+    port: 5943,
     // Same-origin in development: the browser talks to Vite, which forwards API calls (and SSE) to the server.
     proxy: { '/api': { target: api, changeOrigin: false } },
   },

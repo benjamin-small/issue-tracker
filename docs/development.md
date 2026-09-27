@@ -52,7 +52,7 @@ pnpm test:pg
 
 `apps/web` is a SvelteKit single-page app (Svelte 5 runes, Tailwind 4, bits-ui, TanStack Query).
 
-- **Development.** `pnpm dev` runs the API (`:3000`) and Vite (`127.0.0.1:5173`, or the next free port). Vite proxies `/api` to the API, so the browser sees one origin and the session cookie works. Set `TRACKER_API_URL` to point Vite at another server.
+- **Development.** `pnpm dev` runs the API (`:3000`) and Vite (`127.0.0.1:5943`, or the next free port). Vite proxies `/api` to the API, so the browser sees one origin and the session cookie works. Set `TRACKER_API_URL` to point Vite at another server.
   - `pnpm dev` loads a repo-root `.env` if there is one.
   - It resolves a relative SQLite path and the blob directory against the repo root, so the server and the CLI's local mode share `data/dev.db` and `data/blobs`.
 - **Production.** `pnpm build:web` writes `apps/web/build/`. The API server serves it when `TRACKER_WEB_DIR` points there, with an SPA fallback for deep links.
