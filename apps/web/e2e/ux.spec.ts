@@ -76,3 +76,39 @@ test('creates a project, then renames it', async ({ page }) => {
   await input.press('Tab');
   await expect(page.getByRole('navigation', { name: 'Main' })).toContainText(`${name} (renamed)`);
 });
+
+test('board columns collapse, remember it, and scroll into view', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.goto('/p/ENG/board');
+  const backlog = page.locator('[data-testid="board-column"][data-column="Backlog"]');
+  await backlog.locator('header').hover();
+  await page.getByRole('button', { name: 'Collapse Backlog' }).click();
+  await expect(
+    page.locator('[data-testid="board-column-collapsed"][data-column="Backlog"]'),
+  ).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Expand Backlog' }).click();
+  await expect(backlog).toBeVisible();
+
+  const canceled = page.locator('[data-testid="board-column"][data-column="Canceled"]');
+  await expect(canceled).not.toBeInViewport();
+  await expect(async () => {
+    if (await page.getByTestId('board-scroll-right').isVisible())
+      await page.getByTestId('board-scroll-right').click();
+    await expect(canceled).toBeInViewport({ ratio: 0.9, timeout: 800 });
+  }).toPass({ timeout: 8000 });
+  await expect(page.getByTestId('board-scroll-right')).toBeHidden();
+});
+
+test('issue sections explain what is empty and show sub-issue progress', async ({ page }) => {
+  const parent = await apiCreateIssue(page.request, { title: 'Parent with progress' });
+  await page.goto(`/i/${parent}`);
+  await expect(page.getByTestId('sub-issues')).toContainText('No sub-issues');
+  await expect(page.getByTestId('links')).toContainText('No linked issues');
+  await apiCreateIssue(page.request, { title: 'Child one', parent });
+  await page.reload();
+  await expect(page.getByRole('progressbar', { name: 'Sub-issues done' })).toHaveAttribute(
+    'aria-valuemax',
+    '1',
+  );
+});

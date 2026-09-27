@@ -132,7 +132,7 @@
         {#each group.issues as issue (issue.id)}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
           <li
-            class="grid cursor-pointer items-center gap-3 border-b border-border px-4 hover:bg-bg-subtle {dense
+            class="group grid cursor-pointer items-center gap-3 border-b border-border px-4 hover:bg-bg-subtle {dense
               ? 'py-1'
               : 'py-2'} {active === issue.key ? 'bg-accent-subtle hover:bg-accent-subtle' : ''}"
             style:grid-template-columns={template}
@@ -152,7 +152,14 @@
               onclick={() => onopen(issue.key)}>{issue.title}</button
             >
             {#each columns as field (field)}
-              <span class="flex min-w-0 items-center overflow-hidden" data-field={field}>
+              <span
+                class="flex min-w-0 items-center overflow-hidden {(field === 'assignee' &&
+                  !issue.assigneeId) ||
+                (field === 'priority' && issue.priority === 0)
+                  ? 'opacity-40 transition-opacity group-hover:opacity-100 focus-within:opacity-100'
+                  : ''}"
+                data-field={field}
+              >
                 <FieldValue {issue} {field} {project} compact={field !== 'status'} nowrap />
               </span>
             {/each}

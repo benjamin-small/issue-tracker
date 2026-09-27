@@ -74,8 +74,8 @@
 </script>
 
 <section data-testid="links">
-  <div class="mb-1 flex items-center">
-    <h3 class="text-xs font-medium text-fg-subtle">Links</h3>
+  <div class="mb-2 flex items-center">
+    <h3 class="text-sm font-semibold">Links</h3>
     <button
       class="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-fg-muted hover:bg-bg-hover"
       onclick={() => (adding = !adding)}
@@ -127,5 +127,9 @@
         </li>
       {/each}
     </ul>
+  {:else}
+    {#if links.data && !adding}
+      <p class="text-sm text-fg-subtle">No linked issues.</p>
+    {/if}
   {/each}
 </section>

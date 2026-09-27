@@ -158,7 +158,7 @@
 </script>
 
 <section data-testid="activity">
-  <h3 class="mb-3 text-xs font-medium text-fg-subtle">Activity</h3>
+  <h3 class="mb-3 text-sm font-semibold">Activity</h3>
   <ol class="space-y-3">
     {#each entries as entry (entry.kind === 'comment' ? entry.comment.id : entry.event.id)}
       {#if entry.kind === 'event'}

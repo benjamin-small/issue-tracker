@@ -74,9 +74,11 @@
     }
   }}
 >
-  <div class="mb-1 flex items-center">
-    <h3 class="text-xs font-medium text-fg-subtle">
-      Attachments{#if uploading}<span class="ml-1 font-normal">· uploading {uploading}…</span>{/if}
+  <div class="mb-2 flex items-center">
+    <h3 class="text-sm font-semibold">
+      Attachments{#if uploading}<span class="ml-1 text-xs font-normal text-fg-subtle"
+          >· uploading {uploading}…</span
+        >{/if}
     </h3>
     {#if !issue.deletedAt}
       <button
