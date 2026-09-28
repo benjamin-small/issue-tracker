@@ -41,4 +41,4 @@ Run a single package's tests with `pnpm vitest run --project <name>`, for exampl
 - Internal packages export `src/*.ts` directly. There is no build step inside the monorepo.
 - Tests sit next to the code as `*.test.ts`. Tests that touch the database must pass under both `TEST_DB=sqlite` and `TEST_DB=postgres`.
 - Ids are TypeID-style with fixed prefixes (`packages/schema/src/ids.ts`). Never change an existing prefix.
-- Keep commits scoped to one milestone or concern, and make sure `pnpm check` passes before each one.
+- Keep commits scoped to one concern, and make sure `pnpm check` passes before each one.
