@@ -1,6 +1,6 @@
 # Development
 
-To set up and run the project, start with [Run it locally](../README.md#run-it-locally) in the README. This page covers how the pieces work.
+To set up and run the project, start with the [Quickstart](../README.md#quickstart) in the README. This page covers how the pieces work.
 
 ## Toolchain
 
@@ -18,6 +18,20 @@ To set up and run the project, start with [Run it locally](../README.md#run-it-l
 4. `pnpm test`: Vitest across all workspace projects
 
 CI (`.github/workflows/ci.yml`) runs the same gates and runs the tests twice, with `TEST_DB=sqlite` and with `TEST_DB=postgres` (a `postgres:16` service container).
+
+To run everything CI runs, locally:
+
+```sh
+pnpm check                                                   # gates + tests on SQLite
+pnpm pg start && pnpm test:pg                                # tests on Postgres
+pnpm --filter @tracker/web exec playwright install chromium  # once, for the browser tests
+pnpm e2e                                                     # Playwright against the real server (SQLite)
+E2E_DATABASE_URL=$(pnpm -s pg url) pnpm e2e                  # ...and on Postgres
+pnpm e2e:demo                                                # the static browser demo
+pnpm pg stop
+```
+
+CI also runs the S3 attachment tests on its Postgres leg (set the `TEST_S3_*` variables from `ci.yml` to run them locally), plus the Docker Compose smoke test.
 
 ## Databases
 
