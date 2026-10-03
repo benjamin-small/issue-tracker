@@ -26,7 +26,7 @@ pnpm check                                                   # gates + tests on 
 pnpm pg start && pnpm test:pg                                # tests on Postgres
 pnpm --filter @tracker/web exec playwright install chromium  # once, for the browser tests
 pnpm e2e                                                     # Playwright against the real server (SQLite)
-E2E_DATABASE_URL=$(pnpm -s pg url) pnpm e2e                  # ...and on Postgres
+E2E_DATABASE_URL=$(pnpm --silent pg url) pnpm e2e                  # ...and on Postgres
 pnpm e2e:demo                                                # the static browser demo
 pnpm pg stop
 ```

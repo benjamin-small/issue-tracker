@@ -13,15 +13,20 @@ export interface ProjectData {
   readonly loaded: boolean;
 }
 
-/** Reactive reference data for a project (statuses, labels, users, views, fields), cached by TanStack Query. */
+/**
+ * Reactive reference data for a project (statuses, labels, users, views, fields), cached by TanStack Query.
+ * Project queries wait for a key: global components (command menu, create dialog) mount before one is chosen.
+ */
 export function useProjectData(key: () => string): ProjectData {
   const statuses = createQuery(() => ({
     queryKey: keys.statuses(key()),
     queryFn: () => fetchers.statuses(key()),
+    enabled: !!key(),
   }));
   const labels = createQuery(() => ({
     queryKey: keys.labels(key()),
     queryFn: () => fetchers.labels(key()),
+    enabled: !!key(),
   }));
   const users = createQuery(() => ({
     queryKey: keys.users,
@@ -31,10 +36,12 @@ export function useProjectData(key: () => string): ProjectData {
   const views = createQuery(() => ({
     queryKey: keys.views(key()),
     queryFn: () => fetchers.views(key()),
+    enabled: !!key(),
   }));
   const fields = createQuery(() => ({
     queryKey: keys.fields(key()),
     queryFn: () => fetchers.fields(key()),
+    enabled: !!key(),
   }));
   return {
     get key() {

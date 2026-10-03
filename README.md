@@ -29,7 +29,7 @@ To develop against Postgres instead (it uses local binaries if you have them, or
 
 ```sh
 pnpm pg start
-TRACKER_DATABASE_URL=$(pnpm -s pg url) pnpm dev
+TRACKER_DATABASE_URL=$(pnpm --silent pg url) pnpm dev
 ```
 
 ## Use the CLI
