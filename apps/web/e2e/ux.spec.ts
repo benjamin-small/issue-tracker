@@ -112,3 +112,16 @@ test('issue sections explain what is empty and show sub-issue progress', async (
     '1',
   );
 });
+
+test('never asks the API for project data without a project key', async ({ page }) => {
+  const keyless: string[] = [];
+  page.on('request', (r) => {
+    if (/\/api\/v1\/projects\/\//.test(r.url())) keyless.push(r.url());
+  });
+  await page.goto('/'); // redirects to the first project
+  await expect(page).toHaveURL(/\/p\/ENG$/);
+  await expect(page.getByTestId('issue-row').first()).toBeVisible();
+  await page.goto('/p/ENG/board');
+  await expect(page.getByTestId('nav-board')).toBeVisible();
+  expect(keyless).toEqual([]);
+});
