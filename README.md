@@ -67,19 +67,19 @@ pnpm build:demo      # writes apps/web/build-demo/
 pnpm check           # typecheck + lint + format check + tests on SQLite; must pass before every commit
 ```
 
-CI also runs the tests on Postgres, the Playwright end-to-end suite on both databases, and a Docker smoke test. [development.md](docs/development.md) shows how to run all of it locally. [AGENTS.md](AGENTS.md) has the architecture rules and conventions for humans and coding agents alike.
+CI also runs the tests on Postgres, the Playwright end-to-end suite on both databases, and a Docker smoke test. [development.md](docs/development.md) shows how to run all of it locally. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, and [AGENTS.md](AGENTS.md) for the architecture rules and conventions, which apply to humans and coding agents alike. Report security issues as described in [SECURITY.md](SECURITY.md), not in public issues.
 
 ## Documentation
 
-| Topic                          | Guide                                                                                                         |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| How the pieces fit             | [architecture.md](docs/architecture.md), [data-model.md](docs/data-model.md), [decision records](docs/adr/)   |
-| HTTP API                       | [api.md](docs/api.md), with the full contract in [openapi.json](docs/openapi.json) (browsable at `/api/docs`) |
-| CLI                            | [cli.md](docs/cli.md), [cli-reference.md](docs/cli-reference.md)                                              |
-| Agents                         | [agents.md](docs/agents.md)                                                                                   |
-| Events, live updates, webhooks | [events.md](docs/events.md)                                                                                   |
-| Running it                     | [deployment.md](docs/deployment.md), [security.md](docs/security.md)                                          |
-| Working on it                  | [development.md](docs/development.md), [extending.md](docs/extending.md), [AGENTS.md](AGENTS.md)              |
+| Topic                          | Guide                                                                                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| How the pieces fit             | [architecture.md](docs/architecture.md), [data-model.md](docs/data-model.md), [decision records](docs/adr/)                                                         |
+| HTTP API                       | [api.md](docs/api.md), with the full contract in [openapi.json](docs/openapi.json) (browsable at `/api/docs`)                                                       |
+| CLI                            | [cli.md](docs/cli.md), [cli-reference.md](docs/cli-reference.md)                                                                                                    |
+| Agents                         | [agents.md](docs/agents.md)                                                                                                                                         |
+| Events, live updates, webhooks | [events.md](docs/events.md)                                                                                                                                         |
+| Running it                     | [deployment.md](docs/deployment.md), [security.md](docs/security.md), [releases.md](docs/releases.md)                                                               |
+| Working on it                  | [CONTRIBUTING.md](CONTRIBUTING.md), [development.md](docs/development.md), [testing.md](docs/testing.md), [extending.md](docs/extending.md), [AGENTS.md](AGENTS.md) |
 
 ## Repository layout
 
