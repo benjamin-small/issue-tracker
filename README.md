@@ -93,3 +93,7 @@ CI also runs the tests on Postgres, the Playwright end-to-end suite on both data
 | `apps/cli`        | The `tracker` CLI, which talks to a server or runs in-process against a local database   |
 | `apps/web`        | SvelteKit single-page app (served by the API server in production)                       |
 | `docs/`           | Architecture, API/CLI guides, and [architecture decision records](docs/adr/)             |
+
+## License
+
+[MIT](LICENSE)
