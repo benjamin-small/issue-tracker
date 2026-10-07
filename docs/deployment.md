@@ -160,15 +160,26 @@ The production instance runs on Cloudflare Containers. See [ADR 0019](adr/0019-c
 
 **Layout:** `deploy/cloudflare/` holds the Worker (`src/worker.ts`), container configuration (`src/container-env.ts`, `wrangler.jsonc`, `Dockerfile`), and Litestream setup (`litestream.yml`, `entrypoint.sh`). Requests flow: browser → Worker (`poietic-issues`) at https://issues.poietic.tech → container on `:3000`. The route is owned by OpenTofu in benjamin-small/poietic-dot-tech.
 
-**Data:** The database is SQLite at `/data/tracker.db` inside the container, replicated by Litestream 0.5 to the R2 bucket `poietic-issues-db`. A cold start restores the latest replica before serving. Attachments are stored in R2 bucket `poietic-issues-attachments` via the S3 API. Backups: copy both buckets at the same point in time. Restore: delete nothing; a fresh container automatically restores from the latest replica.
+**Data:** The database is SQLite at `/data/tracker.db` inside the container, replicated by Litestream 0.5 to the R2 bucket `poietic-issues-db`. Attachments are stored in R2 bucket `poietic-issues-attachments` via the S3 API. The container sleeps after 30 minutes without requests (`sleepAfter = '30m'`; an open live-update stream counts as activity), and Litestream syncs on the way down.
 
-**Deploys:** `.github/workflows/deploy.yml` runs after CI passes on a push to `main` (or manual dispatch). It requires these secrets:
+**Restore:** The entrypoint restores only when `/data/tracker.db` is absent, which means a fresh container disk (every cold start, since Containers have no persistent disk). On the very first boot, when the bucket holds no replica, it starts a new, empty database and the tracker migrates it. Restore fails closed: if the replica cannot be read (wrong credentials, R2 unreachable, missing bucket), Litestream exits non-zero before the tracker starts, so the container never serves an empty database in place of the real one. `deploy/cloudflare/test/restore.sh` covers both. To recover, fix the cause and let the next start restore; delete nothing.
 
-- `CLOUDFLARE_API_TOKEN`: Cloudflare API token with Containers and R2 permissions.
+**Backups:** The replica is not a backup. Litestream's retention prunes old history, and the R2 bucket has no object versioning, so a bad write or a deleted bucket is not recoverable from it alone. Take periodic independent copies, for example locally, with the R2 credentials exported as `LITESTREAM_ACCESS_KEY_ID` and `LITESTREAM_SECRET_ACCESS_KEY`:
+
+```sh
+litestream restore -o tracker-$(date +%F).db \
+  "s3://poietic-issues-db/tracker?endpoint=https://<account-id>.r2.cloudflarestorage.com&region=auto&forcePathStyle=true"
+```
+
+Store the file somewhere other than R2. Copy the attachments bucket at the same time.
+
+**Deploys:** `.github/workflows/deploy.yml` runs after CI passes on a push to `main`. It can also be started by hand (`workflow_dispatch` on `main`); that is the owner's escape hatch and deploys `main` as it is, without waiting for CI. The workflow is the only deploy path: the deploy package has no `deploy` script, because a manual `wrangler deploy` without `--var R2_ENDPOINT:…` breaks every request. It requires these secrets:
+
+- `CLOUDFLARE_API_TOKEN`: Cloudflare API token with **Workers Scripts Write** and **Workers Containers Write**. It needs no R2 permission.
 - `CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID.
-- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`: R2 credentials (minted by poietic-dot-tech's infra/api scripts for this repository, benjamin-small/issue-tracker).
+- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`: the separate R2 S3 credential used by Litestream and attachments (minted by poietic-dot-tech's infra/api scripts for this repository, benjamin-small/issue-tracker).
 
-The workflow deploys the image with R2 secrets and smoke-checks `/healthz`.
+The workflow sets the R2 credentials as Worker secrets, deploys, and smoke-checks `/readyz` for up to about 10 minutes (a cold start includes the restore).
 
 **Admin:** There is no `docker exec` on a remote container. Use the CLI in remote mode:
 
@@ -178,4 +189,4 @@ tracker user list
 tracker user edit <handle> --reactivate   # approve pending SSO users
 ```
 
-**Local test:** `deploy/cloudflare/test/restore.sh` builds the container image and uses SeaweedFS to simulate S3 storage, proving that Litestream restore works locally on `linux/amd64`.
+**Local test:** `deploy/cloudflare/test/restore.sh` builds the container image and uses SeaweedFS to simulate S3 storage, proving on `linux/amd64` that data survives a container replacement and that a fresh container with an unreachable replica (wrong secret key, closed endpoint) exits without serving.
