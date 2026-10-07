@@ -8,6 +8,7 @@ export const ERROR_CODES = {
   VALIDATION_FAILED: { status: 400, title: 'Validation failed', exit: 2 },
   UNAUTHENTICATED: { status: 401, title: 'Authentication required', exit: 5 },
   FORBIDDEN: { status: 403, title: 'Forbidden', exit: 5 },
+  PENDING_APPROVAL: { status: 403, title: 'Awaiting approval', exit: 5 },
   NOT_FOUND: { status: 404, title: 'Not found', exit: 3 },
   CONFLICT: { status: 409, title: 'Conflict', exit: 4 },
   IDEMPOTENCY_IN_PROGRESS: {

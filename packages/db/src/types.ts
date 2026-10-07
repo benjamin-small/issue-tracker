@@ -50,6 +50,15 @@ export interface SessionsTable {
   expires_at: Timestamp;
 }
 
+export interface UserIdentitiesTable {
+  /** The SSO issuer (`iss`), e.g. `https://auth.example.com`. */
+  issuer: string;
+  /** The issuer's stable user id (`sub`). */
+  subject: string;
+  user_id: string;
+  created_at: Timestamp;
+}
+
 export interface ProjectsTable {
   id: string;
   key: string;
@@ -284,6 +293,7 @@ export interface Database {
   users: UsersTable;
   api_tokens: ApiTokensTable;
   sessions: SessionsTable;
+  user_identities: UserIdentitiesTable;
   projects: ProjectsTable;
   statuses: StatusesTable;
   labels: LabelsTable;

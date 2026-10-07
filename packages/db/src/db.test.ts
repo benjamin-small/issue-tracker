@@ -270,6 +270,8 @@ describe(`migrations (${dialect})`, () => {
   it('migrate down removes everything and migrate up restores it', async () => {
     const db = await createTestDb();
     try {
+      expect(await migrateDown(db)).toEqual(['0003_user_identities']);
+      await expect(sql`select count(*) from user_identities`.execute(db.kysely)).rejects.toThrow();
       expect(await migrateDown(db)).toEqual(['0002_webhook_delivery_details']);
       await expect(
         sql`select last_response from webhook_deliveries`.execute(db.kysely),
@@ -279,8 +281,13 @@ describe(`migrations (${dialect})`, () => {
       expect((await migrationStatus(db)).pending).toEqual([
         '0001_init',
         '0002_webhook_delivery_details',
+        '0003_user_identities',
       ]);
-      expect(await migrateToLatest(db)).toEqual(['0001_init', '0002_webhook_delivery_details']);
+      expect(await migrateToLatest(db)).toEqual([
+        '0001_init',
+        '0002_webhook_delivery_details',
+        '0003_user_identities',
+      ]);
       expect((await migrationStatus(db)).upToDate).toBe(true);
     } finally {
       await db.destroy();
