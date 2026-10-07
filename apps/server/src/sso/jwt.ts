@@ -31,7 +31,7 @@ const JWKS_TTL_MS = 3_600_000;
 /** How often an unknown `kid` may force a refetch, so forged kids can't turn requests into JWKS fetches. */
 const FORCED_REFETCH_MIN_MS = 60_000;
 
-function b64urlDecode(value: string): Uint8Array {
+function b64urlDecode(value: string): Uint8Array<ArrayBuffer> {
   return new Uint8Array(Buffer.from(value, 'base64url'));
 }
 
