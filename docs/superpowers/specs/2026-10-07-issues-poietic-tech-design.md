@@ -89,7 +89,7 @@ browser ──▶ issues.poietic.tech (Workers route, OpenTofu)
   - the `poietic-issues-deploy` token, via `deploy-token.sh`, with Workers Scripts Write plus whatever Containers permission `wrangler deploy` needs (confirm the exact permission group);
   - one R2 S3 credential scoped to the two buckets.
 
-  Both are piped straight into `benjamin-small/poietic-issues` GitHub secrets. Minting tokens is a permissions change, so confirm with the owner first.
+  Both are piped straight into `benjamin-small/issue-tracker` GitHub secrets (this repository's GitHub name). Minting tokens is a permissions change, so confirm with the owner first.
 
 - **README:**
   - add `issues` to the subdomain list, and a row to the "Where the site lives" table;
@@ -103,20 +103,20 @@ The feature is generic, so the MIT-licensed tracker doesn't hard-code poietic. T
 
 ### Configuration (`apps/server/src/config.ts`)
 
-| Variable                  | poietic value                                                                    |
-| ------------------------- | -------------------------------------------------------------------------------- |
-| `TRACKER_SSO_NAME`        | `poietic.tech` (label on the button)                                             |
-| `TRACKER_SSO_COOKIE`      | `__Secure-poietic-session`                                                       |
-| `TRACKER_SSO_ISSUER`      | `https://auth.poietic.tech`                                                      |
-| `TRACKER_SSO_AUDIENCE`    | `poietic:public`                                                                 |
-| `TRACKER_SSO_JWKS_URL`    | `https://auth.poietic.tech/.well-known/jwks.json`                                |
-| `TRACKER_SSO_LOGIN_URL`   | `https://auth.poietic.tech/` (the tracker appends `?redirect=<its sign-in URL>`) |
-| `TRACKER_SSO_REFRESH_URL` | `https://auth.poietic.tech/me`                                                   |
-| `TRACKER_SSO_ADMIN_ROLE`  | `admin` (the token `role` that maps to an active tracker admin)                  |
+| Variable                  | poietic value                                                                          |
+| ------------------------- | -------------------------------------------------------------------------------------- |
+| `TRACKER_SSO_NAME`        | `poietic.tech` (label on the button)                                                   |
+| `TRACKER_SSO_COOKIE`      | `__Secure-poietic-session`                                                             |
+| `TRACKER_SSO_ISSUER`      | `https://auth.poietic.tech`                                                            |
+| `TRACKER_SSO_AUDIENCE`    | `poietic:public`                                                                       |
+| `TRACKER_SSO_JWKS_URL`    | `https://auth.poietic.tech/.well-known/jwks.json`                                      |
+| `TRACKER_SSO_LOGIN_URL`   | `https://auth.poietic.tech/signin` (the tracker appends `?redirect=<its sign-in URL>`) |
+| `TRACKER_SSO_REFRESH_URL` | `https://auth.poietic.tech/me`                                                         |
+| `TRACKER_SSO_ADMIN_ROLE`  | `admin` (the token `role` that maps to an active tracker admin)                        |
 
 SSO is enabled when `TRACKER_SSO_ISSUER` is set. In that case the cookie, audience, JWKS and login settings are required, and startup validation fails with a list of whatever is missing.
 
-The exact auth sign-in page URL gets confirmed against `services/auth` during planning.
+The sign-in page is `/signin` (confirmed: it lists the providers and honours `redirect` for any `https://*.poietic.tech` URL; `/` is a 404).
 
 ### Data (`packages/db` migration `0003_user_identities`)
 
