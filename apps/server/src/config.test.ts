@@ -16,7 +16,10 @@ describe('SSO configuration', () => {
 
   it('requires the cookie, audience, JWKS and login URL with an issuer', () => {
     expect(() => loadConfig({ TRACKER_SSO_ISSUER: 'https://auth.example.test' })).toThrow(
-      /TRACKER_SSO_COOKIE is required/,
+      /TRACKER_SSO_COOKIE, TRACKER_SSO_AUDIENCE, TRACKER_SSO_JWKS_URL, TRACKER_SSO_LOGIN_URL are required/,
+    );
+    expect(() => loadConfig({ ...SSO, TRACKER_SSO_AUDIENCE: undefined })).toThrow(
+      /TRACKER_SSO_AUDIENCE is required/,
     );
   });
 

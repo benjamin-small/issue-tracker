@@ -21,6 +21,8 @@ export interface SsoSignIn {
 }
 
 const HANDLE_MAX = 30;
+/** Handles that resolve to something else (`me` is the actor, `system` the system user). */
+const RESERVED_HANDLES = new Set(['me', 'system']);
 
 /** Derives a handle from a display name: lowercase ASCII letters, digits, `-` and `_`; `user` if nothing usable remains. */
 export function handleFromName(name: string): string {
@@ -32,7 +34,7 @@ export function handleFromName(name: string): string {
     .replace(/^[-_]+|[-_]+$/g, '')
     .slice(0, HANDLE_MAX)
     .replace(/[-_]+$/, '');
-  return slug.length >= 2 ? slug : 'user';
+  return slug.length >= 2 && !RESERVED_HANDLES.has(slug) ? slug : 'user';
 }
 
 /**

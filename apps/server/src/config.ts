@@ -81,14 +81,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       'TRACKER_S3_SECRET_ACCESS_KEY',
     ] as const)
       if (!parsed.data[name]) throw new Error(`${name} is required when TRACKER_BLOB_STORE=s3`);
-  if (parsed.data.TRACKER_SSO_ISSUER)
-    for (const name of [
-      'TRACKER_SSO_COOKIE',
-      'TRACKER_SSO_AUDIENCE',
-      'TRACKER_SSO_JWKS_URL',
-      'TRACKER_SSO_LOGIN_URL',
-    ] as const)
-      if (!parsed.data[name]) throw new Error(`${name} is required when TRACKER_SSO_ISSUER is set`);
+  if (parsed.data.TRACKER_SSO_ISSUER) {
+    const missing = (
+      [
+        'TRACKER_SSO_COOKIE',
+        'TRACKER_SSO_AUDIENCE',
+        'TRACKER_SSO_JWKS_URL',
+        'TRACKER_SSO_LOGIN_URL',
+      ] as const
+    ).filter((name) => !parsed.data[name]);
+    if (missing.length)
+      throw new Error(
+        `${missing.join(', ')} ${missing.length > 1 ? 'are' : 'is'} required when TRACKER_SSO_ISSUER is set`,
+      );
+  }
   return parsed.data;
 }
 

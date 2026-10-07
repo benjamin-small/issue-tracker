@@ -21,6 +21,8 @@ describe('handleFromName', () => {
     expect(handleFromName('  Zoë  Ünder_score ')).toBe('zoe-under_score');
     expect(handleFromName('李')).toBe('user');
     expect(handleFromName('x')).toBe('user');
+    expect(handleFromName('Me')).toBe('user');
+    expect(handleFromName('SYSTEM')).toBe('user');
     expect(handleFromName('a'.repeat(80))).toHaveLength(30);
   });
 });
@@ -101,6 +103,22 @@ describe(`signInWithSso (${testDialect()})`, () => {
     );
     expect(other.user.id).not.toBe(r.user.id);
     expect(other.user.handle).toBe('member-3');
+  });
+
+  it('creates a user named User from a whitespace-only name, never a reserved handle', async () => {
+    const blank = await signInWithSso(
+      sys(),
+      { issuer: ISS, subject: 'blank', name: '   ', role: 'user' },
+      opts,
+    );
+    expect(blank.user.name).toBe('User');
+    const me = await signInWithSso(
+      sys(),
+      { issuer: ISS, subject: 'me1', name: 'Me', role: 'user' },
+      opts,
+    );
+    expect(me.user.handle).not.toBe('me');
+    expect(me.user.handle).toMatch(/^user(-\d+)?$/);
   });
 
   it('records a user.created event', async () => {
