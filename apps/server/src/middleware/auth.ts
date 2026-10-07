@@ -84,7 +84,7 @@ export const requireActor = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
-function sameOrigin(request: Request, allowed: string[]): boolean {
+export function sameOrigin(request: Request, allowed: string[]): boolean {
   const target = new URL(request.url).origin;
   const origin = request.headers.get('origin');
   if (origin) return origin === target || allowed.includes(origin);

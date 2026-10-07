@@ -183,6 +183,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/sso": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in with single sign-on
+         * @description Exchanges the SSO issuer's cookie (sent automatically by the browser) for a session. A first sign-in creates the user; users other than the issuer's admins wait for an admin to reactivate them (`PENDING_APPROVAL`). Browser-only: must be same-origin. `UNAVAILABLE` means the issuer's signing keys could not be fetched.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Signed in */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["User"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN, PENDING_APPROVAL. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAVAILABLE. */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -5136,6 +5220,15 @@ export interface components {
             devLogin: boolean;
             /** @description Users to pick from (dev login only). */
             users?: components["schemas"]["UserSummary"][];
+            /** @description Single sign-on, when configured. */
+            sso: {
+                /** @description Label for the sign-in button. */
+                name: string;
+                /** @description Where to sign in; append `redirect=<this page>`. */
+                loginUrl: string;
+                /** @description Call with credentials before `POST /auth/sso` to renew a lapsed SSO cookie. */
+                refreshUrl: string | null;
+            } | null;
         };
         User: {
             /** @example usr_01h455vb4pex5vsknk084sn02q */
@@ -5179,7 +5272,7 @@ export interface components {
             title: string;
             status: number;
             /** @enum {string} */
-            code: "VALIDATION_FAILED" | "UNAUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "IDEMPOTENCY_IN_PROGRESS" | "VERSION_MISMATCH" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "INVALID_RELATION" | "IDEMPOTENCY_KEY_REUSED" | "RATE_LIMITED" | "INTERNAL" | "UNAVAILABLE";
+            code: "VALIDATION_FAILED" | "UNAUTHENTICATED" | "FORBIDDEN" | "PENDING_APPROVAL" | "NOT_FOUND" | "CONFLICT" | "IDEMPOTENCY_IN_PROGRESS" | "VERSION_MISMATCH" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "INVALID_RELATION" | "IDEMPOTENCY_KEY_REUSED" | "RATE_LIMITED" | "INTERNAL" | "UNAVAILABLE";
             detail?: string;
             errors?: {
                 /**

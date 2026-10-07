@@ -176,10 +176,40 @@
               "$ref": "#/components/schemas/UserSummary"
             },
             "description": "Users to pick from (dev login only)."
+          },
+          "sso": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Label for the sign-in button."
+              },
+              "loginUrl": {
+                "type": "string",
+                "description": "Where to sign in; append `redirect=<this page>`."
+              },
+              "refreshUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Call with credentials before `POST /auth/sso` to renew a lapsed SSO cookie."
+              }
+            },
+            "required": [
+              "name",
+              "loginUrl",
+              "refreshUrl"
+            ],
+            "description": "Single sign-on, when configured."
           }
         },
         "required": [
-          "devLogin"
+          "devLogin",
+          "sso"
         ]
       },
       "User": {
@@ -279,6 +309,7 @@
               "VALIDATION_FAILED",
               "UNAUTHENTICATED",
               "FORBIDDEN",
+              "PENDING_APPROVAL",
               "NOT_FOUND",
               "CONFLICT",
               "IDEMPOTENCY_IN_PROGRESS",
@@ -3058,6 +3089,78 @@
           },
           "404": {
             "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/sso": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "security": [],
+        "summary": "Sign in with single sign-on",
+        "description": "Exchanges the SSO issuer's cookie (sent automatically by the browser) for a session. A first sign-in creates the user; users other than the issuer's admins wait for an admin to reactivate them (`PENDING_APPROVAL`). Browser-only: must be same-origin. `UNAVAILABLE` means the issuer's signing keys could not be fetched.",
+        "responses": {
+          "200": {
+            "description": "Signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN, PENDING_APPROVAL.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem details. Codes: UNAVAILABLE.",
             "content": {
               "application/problem+json": {
                 "schema": {
