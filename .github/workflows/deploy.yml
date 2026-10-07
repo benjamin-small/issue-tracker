@@ -8,15 +8,21 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: |
+      github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+      || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,7 +57,7 @@ jobs:
       - name: Smoke check
         run: |
           for i in $(seq 30); do
-            curl -fs https://issues.poietic.tech/healthz && exit 0
+            curl -fsS --max-time 10 -o /dev/null https://issues.poietic.tech/healthz && exit 0
             sleep 10
           done
           echo "::error::issues.poietic.tech did not become healthy"; exit 1
