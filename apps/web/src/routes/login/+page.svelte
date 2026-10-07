@@ -1,7 +1,7 @@
 <script lang="ts">
   import { btn, input } from '$lib/styles.ts';
   import { asset } from '$app/paths';
-  import { current, navigate } from '$lib/nav.ts';
+  import { current, navigate, shareUrl } from '$lib/nav.ts';
 
   const DEMO = import.meta.env.TRACKER_DEMO;
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -47,6 +47,52 @@
       busy = false;
     }
   }
+  let pending = $state('');
+  let ssoTried = false;
+
+  /** Where the SSO issuer should send the browser back to: this page, keeping `next`. */
+  function ssoRedirectTarget(): string {
+    return shareUrl(`/login?next=${encodeURIComponent(next)}`);
+  }
+
+  async function ssoLogin(interactive: boolean) {
+    const sso = config.data?.sso;
+    if (!sso) return;
+    busy = true;
+    error = '';
+    try {
+      // Renew a lapsed SSO cookie (its tokens are short-lived); failures just mean "not signed in".
+      if (sso.refreshUrl)
+        await fetch(sso.refreshUrl, { credentials: 'include' }).catch(() => undefined);
+      const { error: problem, response } = await api.POST('/auth/sso');
+      if (response.ok) return await finish();
+      const code = (problem as { code?: string; detail?: string } | undefined)?.code;
+      if (code === 'PENDING_APPROVAL') {
+        pending =
+          (problem as { detail?: string }).detail ?? 'Your account is waiting for approval.';
+      } else if (response.status === 401) {
+        if (interactive) {
+          const url = new URL(sso.loginUrl);
+          url.searchParams.set('redirect', ssoRedirectTarget());
+          location.assign(url.href);
+        }
+      } else if (interactive) {
+        error =
+          (problem as { detail?: string } | undefined)?.detail ??
+          `Sign-in failed (${response.status})`;
+      }
+    } finally {
+      busy = false;
+    }
+  }
+
+  // One silent attempt per visit, so someone already signed in to the SSO issuer goes straight in.
+  $effect(() => {
+    if (config.data?.sso && !ssoTried) {
+      ssoTried = true;
+      void ssoLogin(false);
+    }
+  });
 </script>
 
 <svelte:head><title>Sign in · Tracker</title></svelte:head>
@@ -57,6 +103,21 @@
       <img src={asset('/favicon.svg')} alt="" class="size-7" />
       <h1 class="text-lg font-semibold">Sign in to Tracker</h1>
     </div>
+
+    {#if pending}
+      <div class="mb-4 rounded-md border border-border bg-bg-subtle p-3" role="status">
+        <p class="text-sm font-medium">Waiting for approval</p>
+        <p class="mt-1 text-sm text-fg-muted">{pending}</p>
+        <p class="mt-2 text-xs text-fg-subtle">
+          An admin can approve you with
+          <code class="font-mono">tracker user edit &lt;handle&gt; --reactivate</code>.
+        </p>
+      </div>
+    {:else if config.data?.sso}
+      <button class="{btn.primary} mb-6 w-full" disabled={busy} onclick={() => ssoLogin(true)}
+        >Sign in with {config.data.sso.name}</button
+      >
+    {/if}
 
     {#if config.data?.devLogin && config.data.users?.length}
       <p class="mb-1 text-sm font-medium">{DEMO ? 'Explore as…' : 'Continue as…'}</p>
@@ -93,7 +154,7 @@
       </p>
     {:else}
       <form onsubmit={tokenLogin} class="space-y-3">
-        {#if config.data?.devLogin && config.data.users?.length}
+        {#if (config.data?.devLogin && config.data.users?.length) || config.data?.sso}
           <div class="flex items-center gap-2 text-xs text-fg-subtle" aria-hidden="true">
             <span class="h-px flex-1 bg-border"></span>or use a token<span
               class="h-px flex-1 bg-border"
