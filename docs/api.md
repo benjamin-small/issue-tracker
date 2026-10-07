@@ -8,10 +8,10 @@ The REST API lives under `/api/v1`. The OpenAPI 3.1 document is the contract:
 
 ## Authentication
 
-| Client               | How                                                                                                                                                   |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CLI, agents, scripts | `Authorization: Bearer trk_…`, an API token from `POST /users/{user}/tokens` (or `tracker token create`)                                              |
-| Web app              | An HttpOnly session cookie from `POST /auth/token-login` (paste a token), or `POST /auth/dev-login` when the server runs with `TRACKER_AUTH_MODE=dev` |
+| Client               | How                                                                                                                                                                                             |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CLI, agents, scripts | `Authorization: Bearer trk_…`, an API token from `POST /users/{user}/tokens` (or `tracker token create`)                                                                                        |
+| Web app              | An HttpOnly session cookie from `POST /auth/token-login` (paste a token), `POST /auth/dev-login` when the server runs with `TRACKER_AUTH_MODE=dev`, or `POST /auth/sso` when configured for SSO |
 
 Every actor is a user. Create one `agent` user per automated worker (`POST /users` with `kind: "agent"`) so its changes are attributed in history, events and webhooks.
 

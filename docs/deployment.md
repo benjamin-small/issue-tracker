@@ -49,28 +49,36 @@ Without Docker: `pnpm install && pnpm build`, then run `node dist/server.mjs` wi
 
 All settings are environment variables, validated at startup. An invalid value stops the process with a list of the problems. Defaults depend on `NODE_ENV`: development defaults (left) favour convenience, production defaults (right) favour safety.
 
-| Variable                                                                 | Default (dev / production)      | Meaning                                                                                                         |
-| ------------------------------------------------------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `TRACKER_DATABASE_URL`                                                   | `sqlite:./data/dev.db`          | `postgres://user:pass@host:5432/db` or `sqlite:/path/file.db`.                                                  |
-| `TRACKER_HOST` / `TRACKER_PORT`                                          | `127.0.0.1` / `0.0.0.0`; `3000` | Listen address.                                                                                                 |
-| `TRACKER_AUTH_MODE`                                                      | `dev` / `standard`              | `dev` adds a user picker to the sign-in page (anyone can act as anyone). Refused in production.                 |
-| `TRACKER_AUTO_MIGRATE`                                                   | `1` / `0` (`1` in the image)    | Apply pending migrations at startup. Otherwise the server refuses to start until `tracker db migrate` has run.  |
-| `TRACKER_SEED`                                                           | `1` / `0`                       | Seed demo users and a project into an empty database.                                                           |
-| `TRACKER_WEB_DIR`                                                        | —                               | Directory of the built web app to serve at `/`.                                                                 |
-| `TRACKER_SECURE_COOKIES`                                                 | `0` / `1`                       | `Secure` session cookies (requires HTTPS).                                                                      |
-| `TRACKER_ALLOWED_ORIGINS`                                                | —                               | Extra origins, comma-separated, that may send cookie-authenticated writes (CSRF allow-list).                    |
-| `TRACKER_BLOB_STORE`                                                     | `local`                         | `local` or `s3`.                                                                                                |
-| `TRACKER_BLOB_DIR`                                                       | `./data/blobs`                  | Attachment directory for `local`.                                                                               |
-| `TRACKER_S3_ENDPOINT`, `_BUCKET`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY` | —                               | Required for `s3`. `TRACKER_S3_REGION` defaults to `us-east-1`.                                                 |
-| `TRACKER_S3_FORCE_PATH_STYLE`                                            | `true`                          | `endpoint/bucket/key` URLs. Set `false` for virtual-hosted buckets.                                             |
-| `TRACKER_S3_PRESIGN`                                                     | `true`                          | Downloads redirect to presigned URLs. Set `0` to stream through the server when browsers can't reach the store. |
-| `TRACKER_S3_PUBLIC_ENDPOINT`                                             | —                               | Browser-facing endpoint for presigned URLs, if it differs from `TRACKER_S3_ENDPOINT`.                           |
-| `TRACKER_MAX_UPLOAD_MB`                                                  | `25`                            | Attachment size limit.                                                                                          |
-| `TRACKER_WEBHOOKS`                                                       | `1`                             | Run the webhook worker in this process.                                                                         |
-| `TRACKER_WEBHOOK_ALLOW_PRIVATE`                                          | `1` / `0`                       | Allow webhooks to use `http` and private addresses. Refused in production.                                      |
-| `TRACKER_LOG_LEVEL`                                                      | `info`                          | `trace` … `fatal`, or `silent`.                                                                                 |
-| `TRACKER_LOG_FORMAT`                                                     | `pretty` / `json`               | JSON lines for log collectors, or compact human-readable lines.                                                 |
-| `TRACKER_SHUTDOWN_TIMEOUT_MS`                                            | `10000`                         | How long shutdown waits for in-flight requests.                                                                 |
+| Variable                                                                 | Default (dev / production)      | Meaning                                                                                                                      |
+| ------------------------------------------------------------------------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `TRACKER_DATABASE_URL`                                                   | `sqlite:./data/dev.db`          | `postgres://user:pass@host:5432/db` or `sqlite:/path/file.db`.                                                               |
+| `TRACKER_HOST` / `TRACKER_PORT`                                          | `127.0.0.1` / `0.0.0.0`; `3000` | Listen address.                                                                                                              |
+| `TRACKER_AUTH_MODE`                                                      | `dev` / `standard`              | `dev` adds a user picker to the sign-in page (anyone can act as anyone). Refused in production.                              |
+| `TRACKER_AUTO_MIGRATE`                                                   | `1` / `0` (`1` in the image)    | Apply pending migrations at startup. Otherwise the server refuses to start until `tracker db migrate` has run.               |
+| `TRACKER_SEED`                                                           | `1` / `0`                       | Seed demo users and a project into an empty database.                                                                        |
+| `TRACKER_WEB_DIR`                                                        | —                               | Directory of the built web app to serve at `/`.                                                                              |
+| `TRACKER_SECURE_COOKIES`                                                 | `0` / `1`                       | `Secure` session cookies (requires HTTPS).                                                                                   |
+| `TRACKER_ALLOWED_ORIGINS`                                                | —                               | Extra origins, comma-separated, that may send cookie-authenticated writes (CSRF allow-list).                                 |
+| `TRACKER_BLOB_STORE`                                                     | `local`                         | `local` or `s3`.                                                                                                             |
+| `TRACKER_BLOB_DIR`                                                       | `./data/blobs`                  | Attachment directory for `local`.                                                                                            |
+| `TRACKER_S3_ENDPOINT`, `_BUCKET`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY` | —                               | Required for `s3`. `TRACKER_S3_REGION` defaults to `us-east-1`.                                                              |
+| `TRACKER_S3_FORCE_PATH_STYLE`                                            | `true`                          | `endpoint/bucket/key` URLs. Set `false` for virtual-hosted buckets.                                                          |
+| `TRACKER_S3_PRESIGN`                                                     | `true`                          | Downloads redirect to presigned URLs. Set `0` to stream through the server when browsers can't reach the store.              |
+| `TRACKER_S3_PUBLIC_ENDPOINT`                                             | —                               | Browser-facing endpoint for presigned URLs, if it differs from `TRACKER_S3_ENDPOINT`.                                        |
+| `TRACKER_MAX_UPLOAD_MB`                                                  | `25`                            | Attachment size limit.                                                                                                       |
+| `TRACKER_WEBHOOKS`                                                       | `1`                             | Run the webhook worker in this process.                                                                                      |
+| `TRACKER_WEBHOOK_ALLOW_PRIVATE`                                          | `1` / `0`                       | Allow webhooks to use `http` and private addresses. Refused in production.                                                   |
+| `TRACKER_LOG_LEVEL`                                                      | `info`                          | `trace` … `fatal`, or `silent`.                                                                                              |
+| `TRACKER_LOG_FORMAT`                                                     | `pretty` / `json`               | JSON lines for log collectors, or compact human-readable lines.                                                              |
+| `TRACKER_SHUTDOWN_TIMEOUT_MS`                                            | `10000`                         | How long shutdown waits for in-flight requests.                                                                              |
+| `TRACKER_SSO_ISSUER`                                                     | —                               | The JWT issuer URL; set this to enable SSO. When set, also set `TRACKER_SSO_COOKIE`, `_AUDIENCE`, `_JWKS_URL`, `_LOGIN_URL`. |
+| `TRACKER_SSO_NAME`                                                       | issuer's hostname               | Display name for the SSO provider (e.g., "Poietic Identity").                                                                |
+| `TRACKER_SSO_COOKIE`                                                     | —                               | Name of the JWT cookie sent by the issuer (e.g., `poietic-sso`).                                                             |
+| `TRACKER_SSO_AUDIENCE`                                                   | —                               | The JWT `aud` claim this tracker expects.                                                                                    |
+| `TRACKER_SSO_JWKS_URL`                                                   | —                               | The issuer's public key set endpoint.                                                                                        |
+| `TRACKER_SSO_LOGIN_URL`                                                  | —                               | Where to send the user to sign in; append `redirect=<return URL>`.                                                           |
+| `TRACKER_SSO_REFRESH_URL`                                                | —                               | Optional: call this before sign-in to renew a lapsed cookie.                                                                 |
+| `TRACKER_SSO_ADMIN_ROLE`                                                 | `admin`                         | JWT role claim that makes new users admin. Anyone else starts deactivated and must be approved.                              |
 
 ## Database and migrations
 
@@ -104,6 +112,19 @@ Several replicas can run against one Postgres database:
 - **Webhooks.** Every replica with `TRACKER_WEBHOOKS=1` may deliver. Fan-out and claiming are serialized, so each delivery is sent once per attempt.
 - **Attachments** must use S3 (or shared storage).
 - **Sessions** live in the database, so no sticky sessions are needed.
+
+## Single sign-on
+
+Set `TRACKER_SSO_ISSUER` and the related configuration variables to enable SSO. See [ADR 0018](adr/0018-sso-via-shared-cookie-jwt.md) for the design.
+
+New users signed in via SSO start deactivated (status `PENDING_APPROVAL`) until an admin approves them, unless their SSO role matches `TRACKER_SSO_ADMIN_ROLE` (default `admin`). To list and approve pending users:
+
+```sh
+tracker user list --include-deactivated  # find pending users
+tracker user edit <handle> --reactivate   # approve them
+```
+
+The route returns `503 UNAVAILABLE` when the issuer's JWKS (signing keys) cannot be fetched.
 
 ## Reverse proxy
 
