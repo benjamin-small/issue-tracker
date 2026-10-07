@@ -53,6 +53,8 @@ export function createJwtVerifier(opts: {
   issuer: string;
   audience: string;
   fetchImpl?: typeof fetch;
+  /** Abort a JWKS fetch after this many milliseconds (default 5000). */
+  fetchTimeoutMs?: number;
   /** Milliseconds since the epoch. */
   now?: () => number;
 }): JwtVerifier {
@@ -63,7 +65,9 @@ export function createJwtVerifier(opts: {
   let lastForcedAt = -Infinity;
 
   async function fetchKeys(): Promise<Map<string, webcrypto.CryptoKey>> {
-    const res = await fetchImpl(opts.jwksUrl);
+    const res = await fetchImpl(opts.jwksUrl, {
+      signal: AbortSignal.timeout(opts.fetchTimeoutMs ?? 5000),
+    });
     if (!res.ok) throw new Error(`JWKS fetch failed: ${res.status}`);
     const body = (await res.json()) as { keys?: (JsonWebKey & { kid?: string })[] };
     const keys = new Map<string, webcrypto.CryptoKey>();
@@ -91,8 +95,10 @@ export function createJwtVerifier(opts: {
     if (cache && !force && now() - cache.fetchedAt < JWKS_TTL_MS) return cache.keys;
     inFlight ??= fetchKeys()
       .then((keys) => {
-        cache = { keys, fetchedAt: now() };
-        return keys;
+        // A response with no usable keys must not evict a working cache.
+        if (keys.size === 0 && cache) cache = { keys: cache.keys, fetchedAt: now() };
+        else cache = { keys, fetchedAt: now() };
+        return cache.keys;
       })
       .finally(() => {
         inFlight = null;

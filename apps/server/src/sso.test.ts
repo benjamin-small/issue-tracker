@@ -1,5 +1,6 @@
 import { createTestContext, type TestContext } from '@tracker/core/testing';
 import { testDialect } from '@tracker/db/testing';
+import { pino } from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
 import type { SsoOptions } from './env.ts';
@@ -95,5 +96,13 @@ describe(`SSO sign-in (${testDialect()})`, () => {
     expect(res.status).toBe(503);
     expect(((await res.json()) as { code: string }).code).toBe('UNAVAILABLE');
     expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('logs a warning when the verifier fails', async () => {
+    const lines: string[] = [];
+    const logger = pino({ level: 'warn' }, { write: (l: string) => void lines.push(l) });
+    const app = createApp({ db: t.db, auth: { mode: 'standard', sso: sso() }, logger });
+    await post(app, 'down');
+    expect(lines.join('')).toContain('JWKS unavailable');
   });
 });

@@ -177,7 +177,8 @@ export function registerAuthRoutes(app: TrackerApp, deps: ResolvedDeps) {
       if (token) {
         try {
           claims = await sso.verifier.verify(token);
-        } catch {
+        } catch (error) {
+          c.get('logger').warn({ err: error }, 'SSO token verification failed');
           throw new DomainError('UNAVAILABLE', `Could not reach ${sso.name} to verify the sign-in`);
         }
       }

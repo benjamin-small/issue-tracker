@@ -106,4 +106,46 @@ describe('createJwtVerifier', () => {
     await verifier.verify(bogus);
     expect(fetches()).toBe(3);
   });
+
+  it('times out a JWKS fetch that never answers', async () => {
+    const fetchImpl = ((_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      })) as unknown as typeof fetch;
+    const verifier = createJwtVerifier({
+      jwksUrl: JWKS,
+      issuer: ISS,
+      audience: AUD,
+      fetchImpl,
+      fetchTimeoutMs: 20,
+    });
+    const { privateKey } = await keypair('k1');
+    const token = await sign(privateKey, { alg: 'ES256', kid: 'k1' }, claims());
+    await expect(verifier.verify(token)).rejects.toThrow();
+  });
+
+  it('keeps cached keys when a refetch returns no usable keys', async () => {
+    const k = await keypair('k1');
+    let t = NOW;
+    let empty = false;
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({ keys: empty ? [] : [k.jwk] }))) as typeof fetch;
+    const verifier = createJwtVerifier({
+      jwksUrl: JWKS,
+      issuer: ISS,
+      audience: AUD,
+      fetchImpl,
+      now: () => t,
+    });
+    const token = await sign(k.privateKey, { alg: 'ES256', kid: 'k1' }, claims());
+    expect(await verifier.verify(token)).not.toBeNull();
+    empty = true;
+    t += 2 * 3_600_000; // past the TTL, so the next verify refetches
+    const later = await sign(
+      k.privateKey,
+      { alg: 'ES256', kid: 'k1' },
+      claims({ iat: t / 1000 - 10, exp: t / 1000 + 600 }),
+    );
+    expect(await verifier.verify(later)).not.toBeNull();
+  });
 });
