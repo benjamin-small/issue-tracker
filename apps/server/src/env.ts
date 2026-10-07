@@ -10,6 +10,24 @@ import type {
 } from '@tracker/core';
 import type { Db } from '@tracker/db';
 import type { Logger } from './logger.ts';
+import type { JwtVerifier } from './sso/jwt.ts';
+
+/** Single sign-on with a JWT that a shared issuer keeps in a cookie. */
+export interface SsoOptions {
+  /** Shown on the sign-in button, e.g. "poietic.tech". */
+  name: string;
+  /** Cookie holding the issuer's JWT. */
+  cookie: string;
+  /** The issuer (`iss`); identities are stored under it. */
+  issuer: string;
+  /** Where to send a browser without a valid cookie; the tracker appends `redirect=<sign-in URL>`. */
+  loginUrl: string;
+  /** Optional endpoint the browser calls (with credentials) to renew a lapsed cookie before signing in. */
+  refreshUrl?: string | undefined;
+  /** Token `role` that makes a new user an active admin. */
+  adminRole: string;
+  verifier: JwtVerifier;
+}
 
 /**
  * How requests are authenticated.
@@ -24,6 +42,7 @@ export type AuthConfig =
       allowDevLogin?: boolean;
       secureCookies?: boolean;
       allowedOrigins?: string[];
+      sso?: SsoOptions | undefined;
     }
   | { mode: 'trusted'; actor: string };
 

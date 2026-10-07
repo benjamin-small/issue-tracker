@@ -1,0 +1,5 @@
+# The image only COPYs litestream.yml and entrypoint.sh; keep the build context (wrangler and test/restore.sh) small.
+node_modules
+src
+test
+*.test.ts

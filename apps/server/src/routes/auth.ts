@@ -7,10 +7,13 @@ import {
   DomainError,
   getUser,
   listUsers,
+  signInWithSso,
+  SYSTEM_ACTOR,
 } from '@tracker/core';
 import { UserSchema, UserSummarySchema } from '@tracker/schema';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Context } from 'hono';
+import { sameOrigin } from '../middleware/auth.ts';
 import { type AppEnv, type ResolvedDeps, SESSION_COOKIE, type TrackerApp } from '../env.ts';
 import { errorResponses, json, jsonBody, noContent } from './common.ts';
 
@@ -25,12 +28,29 @@ const AuthConfigSchema = z
       .array(UserSummarySchema)
       .optional()
       .openapi({ description: 'Users to pick from (dev login only).' }),
+    sso: z
+      .object({
+        name: z.string().openapi({ description: 'Label for the sign-in button.' }),
+        loginUrl: z
+          .string()
+          .openapi({ description: 'Where to sign in; append `redirect=<this page>`.' }),
+        refreshUrl: z.string().nullable().openapi({
+          description:
+            'Call with credentials before `POST /auth/sso` to renew a lapsed SSO cookie.',
+        }),
+      })
+      .nullable()
+      .openapi({ description: 'Single sign-on, when configured.' }),
   })
   .openapi('AuthConfig');
 
 export function registerAuthRoutes(app: TrackerApp, deps: ResolvedDeps) {
   const devLogin = deps.auth.mode === 'standard' && deps.auth.allowDevLogin === true;
   const secure = deps.auth.mode === 'standard' && deps.auth.secureCookies === true;
+  const sso = deps.auth.mode === 'standard' ? deps.auth.sso : undefined;
+  const ssoInfo = sso
+    ? { name: sso.name, loginUrl: sso.loginUrl, refreshUrl: sso.refreshUrl ?? null }
+    : null;
 
   async function startSession(c: Context<AppEnv>, userId: string) {
     const ctx = c.get('ctx');
@@ -56,11 +76,12 @@ export function registerAuthRoutes(app: TrackerApp, deps: ResolvedDeps) {
       responses: { 200: json(AuthConfigSchema, 'Auth configuration') },
     }),
     async (c) => {
-      if (!devLogin) return c.json({ devLogin: false }, 200);
+      if (!devLogin) return c.json({ devLogin: false, sso: ssoInfo }, 200);
       const users = await listUsers(c.get('ctx'));
       return c.json(
         {
           devLogin: true,
+          sso: ssoInfo,
           users: users.map(({ id, handle, name, kind, avatarUrl }) => ({
             id,
             handle,
@@ -123,6 +144,58 @@ export function registerAuthRoutes(app: TrackerApp, deps: ResolvedDeps) {
       if (!actor) throw new DomainError('NOT_FOUND', `User "${user}" not found`);
       await startSession(c, actor.id);
       return c.json(await getUser(c.get('ctx'), actor.id), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: 'post',
+      path: '/auth/sso',
+      tags,
+      security: [],
+      summary: 'Sign in with single sign-on',
+      description:
+        "Exchanges the SSO issuer's cookie (sent automatically by the browser) for a session. A first sign-in " +
+        "creates the user; users other than the issuer's admins wait for an admin to reactivate them " +
+        "(`PENDING_APPROVAL`). Browser-only: must be same-origin. `UNAVAILABLE` means the issuer's signing keys could not be fetched.",
+      responses: {
+        200: json(UserSchema, 'Signed in'),
+        ...errorResponses('FORBIDDEN', 'NOT_FOUND', 'PENDING_APPROVAL', 'UNAVAILABLE'),
+      },
+    }),
+    async (c) => {
+      if (!sso) throw new DomainError('NOT_FOUND', 'Single sign-on is not configured');
+      if (
+        !sameOrigin(
+          c.req.raw,
+          deps.auth.mode === 'standard' ? (deps.auth.allowedOrigins ?? []) : [],
+        )
+      )
+        throw new DomainError('FORBIDDEN', 'Cross-origin request rejected (CSRF protection)');
+      const token = getCookie(c, sso.cookie);
+      let claims: Awaited<ReturnType<typeof sso.verifier.verify>> = null;
+      if (token) {
+        try {
+          claims = await sso.verifier.verify(token);
+        } catch (error) {
+          c.get('logger').warn({ err: error }, 'SSO token verification failed');
+          throw new DomainError('UNAVAILABLE', `Could not reach ${sso.name} to verify the sign-in`);
+        }
+      }
+      if (!claims) throw new DomainError('UNAUTHENTICATED', `Not signed in to ${sso.name}`);
+      const ctx = { ...c.get('ctx'), actor: SYSTEM_ACTOR };
+      const { user, status } = await signInWithSso(
+        ctx,
+        { issuer: sso.issuer, subject: claims.sub, name: claims.name, role: claims.role },
+        { adminRole: sso.adminRole },
+      );
+      if (status === 'pending')
+        throw new DomainError(
+          'PENDING_APPROVAL',
+          `@${user.handle} is waiting for an admin to approve access`,
+        );
+      await startSession(c, user.id);
+      return c.json(user, 200);
     },
   );
 

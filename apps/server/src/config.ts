@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import type { SsoOptions } from './env.ts';
+import { createJwtVerifier } from './sso/jwt.ts';
 
 const bool = (fallback: boolean) =>
   z
@@ -52,6 +54,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
           .map((s) => s.trim())
           .filter(Boolean),
       ),
+    /** SSO: enabled when the issuer is set. See docs/deployment.md "Single sign-on". */
+    TRACKER_SSO_ISSUER: z.url().optional(),
+    TRACKER_SSO_NAME: z.string().optional(),
+    TRACKER_SSO_COOKIE: z.string().optional(),
+    TRACKER_SSO_AUDIENCE: z.string().optional(),
+    TRACKER_SSO_JWKS_URL: z.url().optional(),
+    TRACKER_SSO_LOGIN_URL: z.url().optional(),
+    TRACKER_SSO_REFRESH_URL: z.url().optional(),
+    TRACKER_SSO_ADMIN_ROLE: z.string().default('admin'),
   });
   const parsed = schema.safeParse(env);
   if (!parsed.success) {
@@ -70,7 +81,37 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       'TRACKER_S3_SECRET_ACCESS_KEY',
     ] as const)
       if (!parsed.data[name]) throw new Error(`${name} is required when TRACKER_BLOB_STORE=s3`);
+  if (parsed.data.TRACKER_SSO_ISSUER) {
+    const missing = (
+      [
+        'TRACKER_SSO_COOKIE',
+        'TRACKER_SSO_AUDIENCE',
+        'TRACKER_SSO_JWKS_URL',
+        'TRACKER_SSO_LOGIN_URL',
+      ] as const
+    ).filter((name) => !parsed.data[name]);
+    if (missing.length)
+      throw new Error(
+        `${missing.join(', ')} ${missing.length > 1 ? 'are' : 'is'} required when TRACKER_SSO_ISSUER is set`,
+      );
+  }
   return parsed.data;
 }
 
 export type ServerConfig = ReturnType<typeof loadConfig>;
+
+/** SSO options for the app, or undefined when SSO is off. */
+export function ssoOptionsFromConfig(config: ServerConfig): SsoOptions | undefined {
+  const issuer = config.TRACKER_SSO_ISSUER;
+  if (!issuer) return undefined;
+  const audience = config.TRACKER_SSO_AUDIENCE!;
+  return {
+    name: config.TRACKER_SSO_NAME ?? new URL(issuer).hostname,
+    cookie: config.TRACKER_SSO_COOKIE!,
+    issuer,
+    loginUrl: config.TRACKER_SSO_LOGIN_URL!,
+    refreshUrl: config.TRACKER_SSO_REFRESH_URL,
+    adminRole: config.TRACKER_SSO_ADMIN_ROLE,
+    verifier: createJwtVerifier({ jwksUrl: config.TRACKER_SSO_JWKS_URL!, issuer, audience }),
+  };
+}

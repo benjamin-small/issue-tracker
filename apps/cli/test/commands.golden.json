@@ -2193,6 +2193,10 @@
       "status": 403,
       "exit": 5
     },
+    "PENDING_APPROVAL": {
+      "status": 403,
+      "exit": 5
+    },
     "NOT_FOUND": {
       "status": 404,
       "exit": 3

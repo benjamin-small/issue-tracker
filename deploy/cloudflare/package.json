@@ -1,0 +1,19 @@
+{
+  "name": "@tracker/deploy-cloudflare",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runs the tracker on Cloudflare Containers at issues.poietic.tech (SQLite replicated to R2 by Litestream).",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261007.1",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2",
+    "wrangler": "^4.148.0"
+  }
+}

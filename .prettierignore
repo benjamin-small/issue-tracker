@@ -8,3 +8,4 @@ docs/openapi.json
 packages/client/src/generated/
 docs/cli-reference.md
 apps/cli/test/commands.golden.json
+.superpowers/

@@ -1,0 +1,37 @@
+{
+  // OpenTofu in benjamin-small/poietic-dot-tech (infra/issues.tf) owns this Worker's existence, DNS and route.
+  // This file owns only what it serves. Never add routes or enable workers.dev here.
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "poietic-issues",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-07",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "TrackerContainer",
+      "image": "./Dockerfile",
+      "instance_type": "basic",
+      "max_instances": 1,
+    },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "TRACKER", "class_name": "TrackerContainer" }],
+  },
+  "exports": { "TrackerContainer": { "type": "durable-object", "storage": "sqlite" } },
+  "vars": {
+    "PUBLIC_ORIGIN": "https://issues.poietic.tech",
+    "DB_BUCKET": "poietic-issues-db",
+    "ATTACHMENTS_BUCKET": "poietic-issues-attachments",
+    "SSO_NAME": "poietic.tech",
+    "SSO_COOKIE": "__Secure-poietic-session",
+    "SSO_ISSUER": "https://auth.poietic.tech",
+    "SSO_AUDIENCE": "poietic:public",
+    "SSO_JWKS_URL": "https://auth.poietic.tech/.well-known/jwks.json",
+    "SSO_LOGIN_URL": "https://auth.poietic.tech/signin",
+    "SSO_REFRESH_URL": "https://auth.poietic.tech/me",
+  },
+  // R2_ENDPOINT is passed at deploy time (--var), built from CLOUDFLARE_ACCOUNT_ID.
+  // Secrets (set by .github/workflows/deploy.yml): R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY.
+}

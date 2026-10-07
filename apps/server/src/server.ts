@@ -12,7 +12,7 @@ import {
 } from '@tracker/core';
 import { createDb, type Db, migrateToLatest, migrationStatus, parseDatabaseUrl } from '@tracker/db';
 import { createApp } from './app.ts';
-import type { ServerConfig } from './config.ts';
+import { ssoOptionsFromConfig, type ServerConfig } from './config.ts';
 import type { AppExtension } from './env.ts';
 import { createLogger, type Logger } from './logger.ts';
 
@@ -92,6 +92,7 @@ export async function startServer(
       allowDevLogin: config.TRACKER_AUTH_MODE === 'dev',
       secureCookies: config.TRACKER_SECURE_COOKIES,
       allowedOrigins: config.TRACKER_ALLOWED_ORIGINS,
+      sso: ssoOptionsFromConfig(config),
     },
     ...(config.TRACKER_WEB_DIR && { webDir: config.TRACKER_WEB_DIR }),
     tailer,

@@ -1,4 +1,4 @@
-import { withWriteTx } from '@tracker/db';
+import { type Tx, withWriteTx } from '@tracker/db';
 import {
   type CreateUserInput,
   CreateUserInputSchema,
@@ -6,6 +6,7 @@ import {
   UpdateUserInputSchema,
   type User,
 } from '@tracker/schema';
+import type { z } from 'zod';
 import { type Actor, nowIso, type ServiceContext } from '../context.ts';
 import { conflict, forbidden, isUniqueViolation, parseInput } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';
@@ -49,34 +50,42 @@ export async function createUserUnchecked(
   input: CreateUserInput,
 ): Promise<User> {
   const data = parseInput(CreateUserInputSchema, input);
-  const now = nowIso(ctx);
   try {
-    return await withWriteTx(ctx.db, async (tx) => {
-      const row = await tx
-        .insertInto('users')
-        .values({
-          id: ctx.ids('user'),
-          handle: data.handle,
-          name: data.name,
-          email: data.email ?? null,
-          kind: data.kind,
-          role: data.role,
-          avatar_url: data.avatarUrl ?? null,
-          created_at: now,
-          updated_at: now,
-          deactivated_at: null,
-        })
-        .returningAll()
-        .executeTakeFirstOrThrow();
-      const user = toUser(row);
-      await recordEvent(tx, ctx, 'user.created', { data: { user } });
-      return user;
-    });
+    return await withWriteTx(ctx.db, (tx) => insertUser(tx, ctx, data));
   } catch (error) {
     if (isUniqueViolation(error))
       throw conflict(`A user with handle "${data.handle}" or that email already exists`);
     throw error;
   }
+}
+
+/** Inserts a user inside an existing write transaction and records `user.created`. */
+export async function insertUser(
+  tx: Tx,
+  ctx: ServiceContext,
+  data: z.output<typeof CreateUserInputSchema>,
+  opts: { deactivated?: boolean } = {},
+): Promise<User> {
+  const now = nowIso(ctx);
+  const row = await tx
+    .insertInto('users')
+    .values({
+      id: ctx.ids('user'),
+      handle: data.handle,
+      name: data.name,
+      email: data.email ?? null,
+      kind: data.kind,
+      role: data.role,
+      avatar_url: data.avatarUrl ?? null,
+      created_at: now,
+      updated_at: now,
+      deactivated_at: opts.deactivated ? now : null,
+    })
+    .returningAll()
+    .executeTakeFirstOrThrow();
+  const user = toUser(row);
+  await recordEvent(tx, ctx, 'user.created', { data: { user } });
+  return user;
 }
 
 /** Updates a user. Admins can change anything; users can change their own name, email and avatar. */

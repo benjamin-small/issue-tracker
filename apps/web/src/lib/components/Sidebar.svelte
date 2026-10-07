@@ -30,7 +30,7 @@
   async function logout() {
     await api.POST('/auth/logout');
     qc.clear();
-    await navigate('/login');
+    await navigate('/login?signedout=1');
   }
 
   const path = $derived(current().path);
