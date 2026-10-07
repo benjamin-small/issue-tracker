@@ -322,7 +322,7 @@
                     run(async () => {
                       await api.POST('/auth/logout');
                       qc.clear();
-                      await navigate('/login');
+                      await navigate('/login?signedout=1');
                     })}>Sign out</Command.Item
                 >
               </Command.GroupItems>

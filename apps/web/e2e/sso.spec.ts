@@ -67,3 +67,35 @@ test('enters the app when SSO sign-in succeeds', async ({ page }) => {
   await page.goto('/login?next=%2Fp%2FENG');
   await page.waitForURL(/\/p\/ENG/);
 });
+
+test('does not sign back in silently after signing out', async ({ page }) => {
+  const user = await (
+    await page.request.post('/api/v1/auth/dev-login', { data: { user: 'ada' } })
+  ).json();
+  let ssoCalls = 0;
+  await page.route('**/api/v1/auth/sso', (r) => {
+    ssoCalls++;
+    return r.fulfill({ status: 200, json: user });
+  });
+  await page.goto('/login?signedout=1&next=%2Fp%2FENG');
+  await expect(page.getByRole('button', { name: 'Sign in with Example' })).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(page.url()).toContain('/login');
+  expect(ssoCalls).toBe(0);
+});
+
+test('signing out from the app lands on the login page without re-signing in', async ({ page }) => {
+  await page.request.post('/api/v1/auth/dev-login', { data: { user: 'ada' } });
+  let ssoCalls = 0;
+  await page.route('**/api/v1/auth/sso', (r) => {
+    ssoCalls++;
+    return r.fulfill({ status: 200, json: {} });
+  });
+  await page.goto('/');
+  await page.getByTestId('logout').click();
+  await page.waitForURL(/\/login\?signedout=1/);
+  await expect(page.getByRole('button', { name: 'Sign in with Example' })).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(page.url()).toContain('/login');
+  expect(ssoCalls).toBe(0);
+});

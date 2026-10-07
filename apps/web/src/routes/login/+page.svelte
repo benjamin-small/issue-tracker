@@ -81,14 +81,22 @@
           (problem as { detail?: string } | undefined)?.detail ??
           `Sign-in failed (${response.status})`;
       }
+    } catch (e) {
+      // A network failure on the silent attempt just leaves the button for the user to press.
+      if (interactive) error = errorMessage(e);
     } finally {
       busy = false;
     }
   }
 
   // One silent attempt per visit, so someone already signed in to the SSO issuer goes straight in.
+  // Not right after signing out, or the issuer's cookie would sign them straight back in.
   $effect(() => {
     if (config.data?.sso && !ssoTried) {
+      if (current().params.has('signedout')) {
+        ssoTried = true;
+        return;
+      }
       ssoTried = true;
       void ssoLogin(false);
     }
