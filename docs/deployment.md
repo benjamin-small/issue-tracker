@@ -72,8 +72,8 @@ All settings are environment variables, validated at startup. An invalid value s
 | `TRACKER_LOG_FORMAT`                                                     | `pretty` / `json`               | JSON lines for log collectors, or compact human-readable lines.                                                              |
 | `TRACKER_SHUTDOWN_TIMEOUT_MS`                                            | `10000`                         | How long shutdown waits for in-flight requests.                                                                              |
 | `TRACKER_SSO_ISSUER`                                                     | —                               | The JWT issuer URL; set this to enable SSO. When set, also set `TRACKER_SSO_COOKIE`, `_AUDIENCE`, `_JWKS_URL`, `_LOGIN_URL`. |
-| `TRACKER_SSO_NAME`                                                       | issuer's hostname               | Display name for the SSO provider (e.g., "Poietic Identity").                                                                |
-| `TRACKER_SSO_COOKIE`                                                     | —                               | Name of the JWT cookie sent by the issuer (e.g., `poietic-sso`).                                                             |
+| `TRACKER_SSO_NAME`                                                       | issuer's hostname               | Display name for the SSO provider (e.g., `Example SSO`).                                                                     |
+| `TRACKER_SSO_COOKIE`                                                     | —                               | Name of the JWT cookie sent by the issuer (e.g., `__Secure-example-session`).                                                |
 | `TRACKER_SSO_AUDIENCE`                                                   | —                               | The JWT `aud` claim this tracker expects.                                                                                    |
 | `TRACKER_SSO_JWKS_URL`                                                   | —                               | The issuer's public key set endpoint.                                                                                        |
 | `TRACKER_SSO_LOGIN_URL`                                                  | —                               | Where to send the user to sign in; append `redirect=<return URL>`.                                                           |
@@ -117,7 +117,7 @@ Several replicas can run against one Postgres database:
 
 Set `TRACKER_SSO_ISSUER` and the related configuration variables to enable SSO. See [ADR 0018](adr/0018-sso-via-shared-cookie-jwt.md) for the design.
 
-New users signed in via SSO start deactivated (status `PENDING_APPROVAL`) until an admin approves them, unless their SSO role matches `TRACKER_SSO_ADMIN_ROLE` (default `admin`). To list and approve pending users:
+New users signed in via SSO start deactivated (the sign-in answers with the `PENDING_APPROVAL` error code) until an admin approves them, unless their SSO role matches `TRACKER_SSO_ADMIN_ROLE` (default `admin`). To list and approve pending users:
 
 ```sh
 tracker user list --include-deactivated  # find pending users
@@ -147,3 +147,9 @@ location /api/v1/events/stream {
 ```
 
 If the web app is served from a different origin than the API, add that origin to `TRACKER_ALLOWED_ORIGINS`.
+
+Notes:
+
+- Behind a TLS-terminating proxy, `TRACKER_ALLOWED_ORIGINS` must include the public origin (for example `https://issues.example.com`), or `POST /auth/sso` answers 403 (CSRF protection).
+- The handle of a pending user is derived from the name in the token. Confirm it with the person before approving.
+- Signing out lands on `/login?signedout=1`, which skips the automatic SSO attempt so the user is not signed straight back in; they can press the SSO button to sign in again.
