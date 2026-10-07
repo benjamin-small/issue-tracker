@@ -1,0 +1,57 @@
+name: Deploy
+
+# Deploys to Cloudflare (issues.poietic.tech) after CI passes on main.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the tracker base image
+        run: docker build -t tracker:local .
+      - name: Set Worker secrets
+        working-directory: deploy/cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          for s in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+            [ -n "${!s}" ] || { echo "::error::secret $s is empty"; exit 1; }
+          done
+          jq -n --arg id "$R2_ACCESS_KEY_ID" --arg secret "$R2_SECRET_ACCESS_KEY" \
+            '{R2_ACCESS_KEY_ID: $id, R2_SECRET_ACCESS_KEY: $secret}' | pnpm exec wrangler secret bulk
+      - name: Deploy
+        working-directory: deploy/cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy --var "R2_ENDPOINT:https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+      - name: Smoke check
+        run: |
+          for i in $(seq 30); do
+            curl -fs https://issues.poietic.tech/healthz && exit 0
+            sleep 10
+          done
+          echo "::error::issues.poietic.tech did not become healthy"; exit 1
