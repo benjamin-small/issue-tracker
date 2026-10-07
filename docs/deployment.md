@@ -153,3 +153,29 @@ Notes:
 - Behind a TLS-terminating proxy, `TRACKER_ALLOWED_ORIGINS` must include the public origin (for example `https://issues.example.com`), or `POST /auth/sso` answers 403 (CSRF protection).
 - The handle of a pending user is derived from the name in the token. Confirm it with the person before approving.
 - Signing out lands on `/login?signedout=1`, which skips the automatic SSO attempt so the user is not signed straight back in; they can press the SSO button to sign in again.
+
+## Cloudflare Containers (issues.poietic.tech)
+
+The production instance runs on Cloudflare Containers. See [ADR 0019](adr/0019-cloudflare-containers-with-litestream.md) for the design.
+
+**Layout:** `deploy/cloudflare/` holds the Worker (`src/worker.ts`), container configuration (`src/container-env.ts`, `wrangler.jsonc`, `Dockerfile`), and Litestream setup (`litestream.yml`, `entrypoint.sh`). Requests flow: browser → Worker (`poietic-issues`) at https://issues.poietic.tech → container on `:3000`. The route is owned by OpenTofu in benjamin-small/poietic-dot-tech.
+
+**Data:** The database is SQLite at `/data/tracker.db` inside the container, replicated by Litestream 0.5 to the R2 bucket `poietic-issues-db`. A cold start restores the latest replica before serving. Attachments are stored in R2 bucket `poietic-issues-attachments` via the S3 API. Backups: copy both buckets at the same point in time. Restore: delete nothing; a fresh container automatically restores from the latest replica.
+
+**Deploys:** `.github/workflows/deploy.yml` runs after CI passes on a push to `main` (or manual dispatch). It requires these secrets:
+
+- `CLOUDFLARE_API_TOKEN`: Cloudflare API token with Containers and R2 permissions.
+- `CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID.
+- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`: R2 credentials (minted by poietic-dot-tech's infra/api scripts for this repository, benjamin-small/issue-tracker).
+
+The workflow deploys the image with R2 secrets and smoke-checks `/healthz`.
+
+**Admin:** There is no `docker exec` on a remote container. Use the CLI in remote mode:
+
+```sh
+export TRACKER_SERVER=https://issues.poietic.tech TRACKER_TOKEN=<admin-token>
+tracker user list
+tracker user edit <handle> --reactivate   # approve pending SSO users
+```
+
+**Local test:** `deploy/cloudflare/test/restore.sh` builds the container image and uses SeaweedFS to simulate S3 storage, proving that Litestream restore works locally on `linux/amd64`.
