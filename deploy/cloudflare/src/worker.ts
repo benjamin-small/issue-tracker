@@ -1,5 +1,6 @@
 import { Container, getContainer } from '@cloudflare/containers';
 import { containerEnv, type WorkerEnv } from './container-env.ts';
+import { withoutTargetPort } from './forward.ts';
 
 interface Env extends WorkerEnv {
   TRACKER: DurableObjectNamespace<TrackerContainer>;
@@ -23,6 +24,6 @@ export class TrackerContainer extends Container<Env> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    return getContainer(env.TRACKER, 'main').fetch(request);
+    return getContainer(env.TRACKER, 'main').fetch(withoutTargetPort(request));
   },
 } satisfies ExportedHandler<Env>;

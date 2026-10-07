@@ -24,8 +24,9 @@ const REQUIRED = [
 
 /**
  * The container's environment. The tracker image's own defaults (NODE_ENV=production, port 3000, /data) stay;
- * this adds storage, the public origin (Containers rewrites Host to "container", so same-origin checks need it)
- * and SSO. Litestream reads the LITESTREAM_* values through litestream.yml.
+ * this adds storage, the public origin and SSO. TRACKER_ALLOWED_ORIGINS is needed because Containers forward the
+ * request with its scheme downgraded to http, so the browser's https Origin would not match the request URL and the
+ * tracker's same-origin check would reject writes. Litestream reads the LITESTREAM_* values through litestream.yml.
  */
 export function containerEnv(env: WorkerEnv): Record<string, string> {
   for (const name of REQUIRED)
