@@ -3,6 +3,7 @@ export * from './errors.ts';
 export { diff, EVENTS_CHANNEL, recordEvent } from './events.ts';
 export { loadIssue, loadIssues, queryIssues } from './issue-query.ts';
 export { projectFieldRegistry } from './custom-field-query.ts';
+export { applyLegacyEnv, legacyEnvWarning } from './legacy-env.ts';
 export * from './permissions.ts';
 export * from './refs.ts';
 export * from './services/auth.ts';

@@ -512,6 +512,9 @@ export async function deliverDueWebhooks(
                 Math.floor(attemptAt.getTime() / 1000),
                 JSON.stringify(event),
               ),
+              'x-poietic-issues-event': event.type,
+              'x-poietic-issues-event-seq': String(event.seq),
+              // Deprecated pre-rename names, sent for one more release (ADR 0020).
               'x-tracker-event': event.type,
               'x-tracker-event-seq': String(event.seq),
             },

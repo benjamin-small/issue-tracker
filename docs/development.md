@@ -35,7 +35,7 @@ CI also runs the S3 attachment tests on its Postgres leg (set the `TEST_S3_*` va
 
 ## Databases
 
-Development uses SQLite; production uses Postgres. The `TRACKER_DATABASE_URL` scheme selects the dialect (see `.env.example`).
+Development uses SQLite; production uses Postgres. The `POIETIC_ISSUES_DATABASE_URL` scheme selects the dialect (see `.env.example`).
 
 ### Local Postgres
 
@@ -50,11 +50,11 @@ pnpm pg stop
 
 Details:
 
-- Data lives in `/var/tmp/tracker-pg` and the cluster listens on `127.0.0.1:54329`. Override these with `TRACKER_PG_DIR` and `TRACKER_PG_PORT`.
+- Data lives in `/var/tmp/tracker-pg` and the cluster listens on `127.0.0.1:54329`. Override these with `POIETIC_ISSUES_PG_DIR` and `POIETIC_ISSUES_PG_PORT`.
 - Auth is `trust` for the `tracker` user, and `fsync` is off. It's fast and **not durable**; it's for tests only.
 - When run as root, the script uses `runuser -u postgres`, because `initdb` refuses to run as root.
 - It finds the server binaries on `PATH` or under `/usr/lib/postgresql/*/bin`.
-- Without them, it runs a `postgres:16` container named `tracker-pg` with the same user, database, port and settings. Its data lives in the container, and `reset` recreates it. Set `TRACKER_PG_BACKEND=native` or `docker` to choose explicitly.
+- Without them, it runs a `postgres:16` container named `tracker-pg` with the same user, database, port and settings. Its data lives in the container, and `reset` recreates it. Set `POIETIC_ISSUES_PG_BACKEND=native` or `docker` to choose explicitly.
 
 To run the suites against it (the URL is also the default for `TEST_DATABASE_URL`):
 
@@ -66,10 +66,10 @@ pnpm test:pg
 
 `apps/web` is a SvelteKit single-page app (Svelte 5 runes, Tailwind 4, bits-ui, TanStack Query).
 
-- **Development.** `pnpm dev` runs the API (`:3000`) and Vite (`127.0.0.1:5943`, or the next free port). Vite proxies `/api` to the API, so the browser sees one origin and the session cookie works. Set `TRACKER_API_URL` to point Vite at another server.
+- **Development.** `pnpm dev` runs the API (`:3000`) and Vite (`127.0.0.1:5943`, or the next free port). Vite proxies `/api` to the API, so the browser sees one origin and the session cookie works. Set `POIETIC_ISSUES_API_URL` to point Vite at another server.
   - `pnpm dev` loads a repo-root `.env` if there is one.
   - It resolves a relative SQLite path and the blob directory against the repo root, so the server and the CLI's local mode share `data/dev.db` and `data/blobs`.
-- **Production.** `pnpm build:web` writes `apps/web/build/`. The API server serves it when `TRACKER_WEB_DIR` points there, with an SPA fallback for deep links.
+- **Production.** `pnpm build:web` writes `apps/web/build/`. The API server serves it when `POIETIC_ISSUES_WEB_DIR` points there, with an SPA fallback for deep links.
 - **Data layer.**
   - The web app only talks to the API through `@poietic-tech/issues-client`.
   - `src/lib/queries.ts` holds the query keys and fetchers.

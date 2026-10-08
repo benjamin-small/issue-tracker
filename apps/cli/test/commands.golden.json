@@ -1949,7 +1949,7 @@
     {
       "name": "init",
       "aliases": [],
-      "description": "Write .tracker.json here from the global --server/--database, --project and --actor (never tokens)",
+      "description": "Write .poietic-issues.json here from the global --server/--database, --project and --actor (never tokens)",
       "arguments": [],
       "options": [
         {
@@ -2110,7 +2110,7 @@
     {
       "flags": "--server <url>",
       "name": "server",
-      "description": "tracker server URL (remote mode)",
+      "description": "poietic-issues server URL (remote mode)",
       "required": false,
       "takesValue": true
     },
@@ -2138,7 +2138,7 @@
     {
       "flags": "-P, --project <key>",
       "name": "project",
-      "description": "project key (default from TRACKER_PROJECT or .tracker.json)",
+      "description": "project key (default from POIETIC_ISSUES_PROJECT or .poietic-issues.json)",
       "required": false,
       "takesValue": true
     },
@@ -2243,12 +2243,12 @@
     }
   },
   "environment": {
-    "TRACKER_SERVER": "Server URL (remote mode)",
-    "TRACKER_TOKEN": "API token for the server",
-    "TRACKER_DATABASE_URL": "Database URL (local mode), e.g. sqlite:./data/dev.db",
-    "TRACKER_ACTOR": "Local mode: user handle to act as",
-    "TRACKER_PROJECT": "Default project key",
-    "TRACKER_FORMAT": "Default output format: table|json|ndjson|ids",
-    "TRACKER_FIELDS": "Default --fields projection"
+    "POIETIC_ISSUES_SERVER": "Server URL (remote mode)",
+    "POIETIC_ISSUES_TOKEN": "API token for the server",
+    "POIETIC_ISSUES_DATABASE_URL": "Database URL (local mode), e.g. sqlite:./data/dev.db",
+    "POIETIC_ISSUES_ACTOR": "Local mode: user handle to act as",
+    "POIETIC_ISSUES_PROJECT": "Default project key",
+    "POIETIC_ISSUES_FORMAT": "Default output format: table|json|ndjson|ids",
+    "POIETIC_ISSUES_FIELDS": "Default --fields projection"
   }
 }

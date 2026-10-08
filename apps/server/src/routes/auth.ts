@@ -14,7 +14,13 @@ import { UserSchema, UserSummarySchema } from '@poietic-tech/issues-schema';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Context } from 'hono';
 import { sameOrigin } from '../middleware/auth.ts';
-import { type AppEnv, type ResolvedDeps, SESSION_COOKIE, type TrackerApp } from '../env.ts';
+import {
+  type AppEnv,
+  LEGACY_SESSION_COOKIE,
+  type ResolvedDeps,
+  SESSION_COOKIE,
+  type TrackerApp,
+} from '../env.ts';
 import { errorResponses, json, jsonBody, noContent } from './common.ts';
 
 const tags = ['Auth'];
@@ -122,7 +128,7 @@ export function registerAuthRoutes(app: TrackerApp, deps: ResolvedDeps) {
       tags,
       security: [],
       summary: 'Sign in as any user (development only)',
-      description: 'Only available when the server runs with `TRACKER_AUTH_MODE=dev`.',
+      description: 'Only available when the server runs with `POIETIC_ISSUES_AUTH_MODE=dev`.',
       request: {
         body: jsonBody(
           z
@@ -209,9 +215,11 @@ export function registerAuthRoutes(app: TrackerApp, deps: ResolvedDeps) {
       responses: { 204: noContent },
     }),
     async (c) => {
-      const cookie = getCookie(c, SESSION_COOKIE);
-      if (cookie) await deleteSession(c.get('ctx'), cookie);
-      deleteCookie(c, SESSION_COOKIE, { path: '/' });
+      for (const name of [SESSION_COOKIE, LEGACY_SESSION_COOKIE]) {
+        const cookie = getCookie(c, name);
+        if (cookie) await deleteSession(c.get('ctx'), cookie);
+        if (cookie) deleteCookie(c, name, { path: '/' });
+      }
       return c.body(null, 204);
     },
   );

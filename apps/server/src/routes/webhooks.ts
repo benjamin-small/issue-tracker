@@ -212,8 +212,16 @@ export function registerWebhookRoutes(app: TrackerApp, policy: WebhookPolicy) {
         'webhook-signature': z
           .string()
           .openapi({ description: 'Space-separated `v1,<base64>` signatures.' }),
-        'x-tracker-event': z.string().openapi({ example: 'issue.updated' }),
-        'x-tracker-event-seq': z.string().openapi({ example: '1042' }),
+        'x-poietic-issues-event': z.string().openapi({ example: 'issue.updated' }),
+        'x-poietic-issues-event-seq': z.string().openapi({ example: '1042' }),
+        'x-tracker-event': z.string().openapi({
+          description: 'Deprecated: same as `x-poietic-issues-event`.',
+          deprecated: true,
+        }),
+        'x-tracker-event-seq': z.string().openapi({
+          description: 'Deprecated: same as `x-poietic-issues-event-seq`.',
+          deprecated: true,
+        }),
       }),
       body: jsonBody(EventSchema),
     },

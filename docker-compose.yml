@@ -1,22 +1,22 @@
-# Production-shaped stack: tracker on Postgres with S3-compatible object storage (SeaweedFS).
+# Production-shaped stack: poietic-issues on Postgres with S3-compatible object storage (SeaweedFS).
 #   docker compose up -d --build
-#   docker compose exec tracker tracker db bootstrap --handle you --name "Your Name"
+#   docker compose exec poietic-issues poietic-issues db bootstrap --handle you --name "Your Name"
 # then sign in at http://localhost:3000 with the printed token.
 services:
-  tracker:
+  poietic-issues:
     build: .
     ports: ['3000:3000']
     environment:
-      TRACKER_DATABASE_URL: postgres://tracker:tracker@postgres:5432/tracker
-      TRACKER_BLOB_STORE: s3
-      TRACKER_S3_ENDPOINT: http://seaweedfs:8333
-      TRACKER_S3_BUCKET: tracker
-      TRACKER_S3_ACCESS_KEY_ID: tracker
-      TRACKER_S3_SECRET_ACCESS_KEY: tracker-secret
+      POIETIC_ISSUES_DATABASE_URL: postgres://tracker:tracker@postgres:5432/tracker
+      POIETIC_ISSUES_BLOB_STORE: s3
+      POIETIC_ISSUES_S3_ENDPOINT: http://seaweedfs:8333
+      POIETIC_ISSUES_S3_BUCKET: tracker
+      POIETIC_ISSUES_S3_ACCESS_KEY_ID: tracker
+      POIETIC_ISSUES_S3_SECRET_ACCESS_KEY: tracker-secret
       # The object store is internal to this network, so downloads stream through the server instead of redirecting.
-      TRACKER_S3_PRESIGN: '0'
+      POIETIC_ISSUES_S3_PRESIGN: '0'
       # Behind TLS in real deployments; plain http here, so cookies must not be Secure-only.
-      TRACKER_SECURE_COOKIES: '0'
+      POIETIC_ISSUES_SECURE_COOKIES: '0'
     depends_on:
       postgres: { condition: service_healthy }
       seaweedfs-init: { condition: service_completed_successfully }

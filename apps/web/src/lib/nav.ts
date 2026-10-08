@@ -6,7 +6,7 @@ import { page } from '$app/state';
  * App-internal links and navigation that work with both routers: normal path routing (the served app) and hash
  * routing (the self-contained demo, which may be hosted at any URL). Always build internal URLs through these.
  */
-const HASH = import.meta.env.TRACKER_DEMO;
+const HASH = import.meta.env.POIETIC_ISSUES_DEMO;
 
 /** Link target for an app path such as `/p/ENG/board` or `/login?next=/p/ENG`. */
 export function href(path: string): string {

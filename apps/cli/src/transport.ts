@@ -74,7 +74,9 @@ export async function openTransport(config: ResolvedConfig, io: CliIO): Promise<
     db,
     auth: { mode: 'trusted', actor },
     blobStore,
-    webhooks: { allowPrivate: ['1', 'true'].includes(io.env.TRACKER_WEBHOOK_ALLOW_PRIVATE ?? '') },
+    webhooks: {
+      allowPrivate: ['1', 'true'].includes(io.env.POIETIC_ISSUES_WEBHOOK_ALLOW_PRIVATE ?? ''),
+    },
   });
   return {
     client: createClient({
@@ -103,7 +105,7 @@ export async function openLocalDatabase(url: string, requireMigrated: boolean): 
       await db.destroy();
       throw new CliError(
         'UNAVAILABLE',
-        `Database ${url} is not migrated (pending: ${status.pending.join(', ')}). Run \`tracker db migrate\`.`,
+        `Database ${url} is not migrated (pending: ${status.pending.join(', ')}). Run \`poietic-issues db migrate\`.`,
       );
     }
     await ensureBuiltins(db);
@@ -111,7 +113,7 @@ export async function openLocalDatabase(url: string, requireMigrated: boolean): 
   return db;
 }
 
-/** Local mode acts as TRACKER_ACTOR, or else the first admin human. */
+/** Local mode acts as POIETIC_ISSUES_ACTOR, or else the first admin human. */
 async function defaultLocalActor(db: Db): Promise<string> {
   const row = await db.kysely
     .selectFrom('users')
@@ -124,7 +126,7 @@ async function defaultLocalActor(db: Db): Promise<string> {
   if (!row)
     throw new CliError(
       'UNAUTHENTICATED',
-      'No admin user in the local database. Run `tracker db seed`, or `tracker user create` with TRACKER_ACTOR set.',
+      'No admin user in the local database. Run `poietic-issues db seed`, or `poietic-issues user create` with POIETIC_ISSUES_ACTOR set.',
     );
   return row.handle;
 }

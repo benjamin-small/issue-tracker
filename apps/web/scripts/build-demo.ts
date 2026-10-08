@@ -16,7 +16,7 @@ rmSync(`${routes}/+layout.ts`);
 const result = spawnSync('pnpm', ['exec', 'vite', 'build'], {
   cwd: root,
   stdio: 'inherit',
-  env: { ...process.env, TRACKER_DEMO: '1' },
+  env: { ...process.env, POIETIC_ISSUES_DEMO: '1' },
 });
 rmSync(routes, { recursive: true, force: true });
 if (result.status !== 0) process.exit(result.status ?? 1);
@@ -28,7 +28,7 @@ writeFileSync(
   readFileSync(index, 'utf8')
     .replaceAll('"/app/', '"./app/')
     .replaceAll('"/favicon.svg"', '"./favicon.svg"')
-    .replace('<title>Tracker</title>', '<title>Tracker Demo</title>'),
+    .replace('<title>Issues</title>', '<title>Issues Demo</title>'),
 );
 // Some hosts reject files containing a literal U+FFFD (it looks like corrupted text); libraries use it inside
 // string literals, where the escape sequence means exactly the same.

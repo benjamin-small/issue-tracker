@@ -8,10 +8,10 @@ The REST API lives under `/api/v1`. The OpenAPI 3.1 document is the contract:
 
 ## Authentication
 
-| Client               | How                                                                                                                                                                                             |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CLI, agents, scripts | `Authorization: Bearer trk_…`, an API token from `POST /users/{user}/tokens` (or `tracker token create`)                                                                                        |
-| Web app              | An HttpOnly session cookie from `POST /auth/token-login` (paste a token), `POST /auth/dev-login` when the server runs with `TRACKER_AUTH_MODE=dev`, or `POST /auth/sso` when configured for SSO |
+| Client               | How                                                                                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CLI, agents, scripts | `Authorization: Bearer trk_…`, an API token from `POST /users/{user}/tokens` (or `poietic-issues token create`)                                                                                        |
+| Web app              | An HttpOnly session cookie from `POST /auth/token-login` (paste a token), `POST /auth/dev-login` when the server runs with `POIETIC_ISSUES_AUTH_MODE=dev`, or `POST /auth/sso` when configured for SSO |
 
 Every actor is a user. Create one `agent` user per automated worker (`POST /users` with `kind: "agent"`) so its changes are attributed in history, events and webhooks.
 
@@ -84,7 +84,7 @@ Projects define typed fields with `POST /projects/{project}/fields`. The types a
 
 Files belong to an issue (and optionally a comment on it).
 
-- **Upload:** `POST /issues/{issue}/attachments` as `multipart/form-data` with a `file` part and an optional `commentId`. The limit is `TRACKER_MAX_UPLOAD_MB` (default 25); larger bodies get `413 PAYLOAD_TOO_LARGE`. The server detects the media type from the file's bytes and ignores the type the client declares.
+- **Upload:** `POST /issues/{issue}/attachments` as `multipart/form-data` with a `file` part and an optional `commentId`. The limit is `POIETIC_ISSUES_MAX_UPLOAD_MB` (default 25); larger bodies get `413 PAYLOAD_TOO_LARGE`. The server detects the media type from the file's bytes and ignores the type the client declares.
 - **Read:** `GET /issues/{issue}/attachments` lists them. `GET /attachments/{id}` returns metadata, including `sha256` and a `url`. `GET /attachments/{id}/content` returns the bytes.
 - **Delete:** `DELETE /attachments/{id}` (the uploader or an admin). The row is soft-deleted and the stored bytes are removed.
 
@@ -96,12 +96,12 @@ Markdown can embed an attachment by its `url`, e.g. `![shot.png](/api/v1/attachm
 - Every response carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; sandbox`.
 - Filenames are sanitized for the header (RFC 6266 `filename*`).
 
-**Storage** is pluggable (`TRACKER_BLOB_STORE`):
+**Storage** is pluggable (`POIETIC_ISSUES_BLOB_STORE`):
 
-| Setting           | Storage                                                                                                                                                                               |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `local` (default) | Files under `TRACKER_BLOB_DIR` (`./data/blobs`)                                                                                                                                       |
-| `s3`              | Any S3-compatible store: `TRACKER_S3_ENDPOINT`, `_BUCKET`, `_REGION`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`, `_FORCE_PATH_STYLE`. Downloads redirect to a short-lived presigned URL. |
+| Setting           | Storage                                                                                                                                                                                      |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `local` (default) | Files under `POIETIC_ISSUES_BLOB_DIR` (`./data/blobs`)                                                                                                                                       |
+| `s3`              | Any S3-compatible store: `POIETIC_ISSUES_S3_ENDPOINT`, `_BUCKET`, `_REGION`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`, `_FORCE_PATH_STYLE`. Downloads redirect to a short-lived presigned URL. |
 
 Storage keys are random and never derived from the filename. Bytes are written before the database transaction and removed if it fails, so no network I/O happens inside a write transaction.
 

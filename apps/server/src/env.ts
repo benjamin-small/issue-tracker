@@ -89,5 +89,7 @@ export interface AppEnv {
 
 export type TrackerApp = OpenAPIHono<AppEnv>;
 
-export const SESSION_COOKIE = 'tracker_session';
+export const SESSION_COOKIE = 'poietic_issues_session';
+/** Pre-rename cookie name, still accepted for one release (ADR 0020). */
+export const LEGACY_SESSION_COOKIE = 'tracker_session';
 export const API_PREFIX = '/api/v1';

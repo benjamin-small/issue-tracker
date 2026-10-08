@@ -178,7 +178,7 @@ export function linkCommand(io: CliIO): Command {
   return cmd;
 }
 
-/** The event log is global; filter by project only when --project/TRACKER_PROJECT is given explicitly. */
+/** The event log is global; filter by project only when --project/POIETIC_ISSUES_PROJECT is given explicitly. */
 function explicitProject(rt: Runtime): string | undefined {
   return rt.config.sources.project === 'flag' || rt.config.sources.project === 'env'
     ? rt.config.project

@@ -2,12 +2,12 @@
 
 Every change is appended to the `events` table in the same transaction as the change ([ADR 0004](adr/0004-event-log-bus-and-outbox.md)). That one log feeds:
 
-| Consumer                   | How                                                                                   |
-| -------------------------- | ------------------------------------------------------------------------------------- |
-| Issue activity             | `GET /issues/{issue}/activity`                                                        |
-| Agents and scripts polling | `GET /events?after=<seq>` · `tracker event list --after <seq>` · `tracker event tail` |
-| The web app (live)         | `GET /events/stream` (Server-Sent Events)                                             |
-| Webhooks                   | outbound HTTP POSTs to subscribed URLs (see below)                                    |
+| Consumer                   | How                                                                                                 |
+| -------------------------- | --------------------------------------------------------------------------------------------------- |
+| Issue activity             | `GET /issues/{issue}/activity`                                                                      |
+| Agents and scripts polling | `GET /events?after=<seq>` · `poietic-issues event list --after <seq>` · `poietic-issues event tail` |
+| The web app (live)         | `GET /events/stream` (Server-Sent Events)                                                           |
+| Webhooks                   | outbound HTTP POSTs to subscribed URLs (see below)                                                  |
 
 ## Event shape
 
@@ -71,10 +71,10 @@ data: {"seq":1042,"type":"issue.updated",…}
 Each server process runs an `EventTailer` that follows the event log. It wakes:
 
 1. immediately after local commits;
-2. on Postgres `NOTIFY tracker_events`, which is sent inside every event-writing transaction and so reaches replicas;
+2. on Postgres `NOTIFY poietic_issues_events`, which is sent inside every event-writing transaction and so reaches replicas;
 3. on a 300 ms poll, which also picks up writes from other processes on SQLite, such as the CLI in local mode.
 
-So an agent that runs `tracker issue create` against the same database shows up on everyone's board within a fraction of a second, even without talking to the server.
+So an agent that runs `poietic-issues issue create` against the same database shows up on everyone's board within a fraction of a second, even without talking to the server.
 
 ### How the web app applies events
 
@@ -86,13 +86,13 @@ So an agent that runs `tracker issue create` against the same database shows up 
 
 ## Webhooks
 
-Webhooks push events to other services. They are managed by admins: through the web app (**Workspace → Webhooks**), `tracker webhook …`, or the API (`/webhooks`).
+Webhooks push events to other services. They are managed by admins: through the web app (**Workspace → Webhooks**), `poietic-issues webhook …`, or the API (`/webhooks`).
 
 ```sh
-tracker webhook create https://ci.example.com/hooks/tracker --events 'issue.*,comment.created' --scope ENG
-tracker webhook test whk_…          # sends a signed webhook.ping now
-tracker webhook deliveries whk_…    # the delivery log, newest first
-tracker webhook redeliver whd_…
+poietic-issues webhook create https://ci.example.com/hooks/tracker --events 'issue.*,comment.created' --scope ENG
+poietic-issues webhook test whk_…          # sends a signed webhook.ping now
+poietic-issues webhook deliveries whk_…    # the delivery log, newest first
+poietic-issues webhook redeliver whd_…
 ```
 
 **Subscriptions.**
@@ -103,13 +103,14 @@ tracker webhook redeliver whd_…
 
 **Request.** Each delivery is a `POST` with the event as the JSON body. The body has exactly the shape returned by `GET /events` and documented under `webhooks.event` in the OpenAPI document. Headers:
 
-| Header                | Value                                                                               |
-| --------------------- | ----------------------------------------------------------------------------------- |
-| `webhook-id`          | The delivery id (`whd_…`). It is the same on every retry, so use it to deduplicate. |
-| `webhook-timestamp`   | Unix seconds of this attempt                                                        |
-| `webhook-signature`   | `v1,<base64 HMAC-SHA256>`                                                           |
-| `x-tracker-event`     | The event type, e.g. `issue.updated`                                                |
-| `x-tracker-event-seq` | The event's `seq`. Deliveries can arrive out of order; sort by it if order matters. |
+| Header                                   | Value                                                                                                                        |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `webhook-id`                             | The delivery id (`whd_…`). It is the same on every retry, so use it to deduplicate.                                          |
+| `webhook-timestamp`                      | Unix seconds of this attempt                                                                                                 |
+| `webhook-signature`                      | `v1,<base64 HMAC-SHA256>`                                                                                                    |
+| `x-poietic-issues-event`                 | The event type, e.g. `issue.updated`                                                                                         |
+| `x-poietic-issues-event-seq`             | The event's `seq`. Deliveries can arrive out of order; sort by it if order matters.                                          |
+| `x-tracker-event`, `x-tracker-event-seq` | Deprecated pre-rename copies of the two above, sent for one more release ([ADR 0020](adr/0020-rename-to-poietic-issues.md)). |
 
 ### Verifying signatures
 
@@ -140,7 +141,7 @@ function verify(secret: string, headers: Headers, rawBody: string): boolean {
 }
 ```
 
-`verifyWebhook(secret, headers, body)` from `@poietic-tech/issues-core` does the same. Rotating the secret (`tracker webhook rotate-secret`) takes effect on the next attempt.
+`verifyWebhook(secret, headers, body)` from `@poietic-tech/issues-core` does the same. Rotating the secret (`poietic-issues webhook rotate-secret`) takes effect on the next attempt.
 
 ### Retries and failure handling
 
@@ -149,12 +150,12 @@ Any 2xx response within 10 seconds counts as delivered. Everything else is retri
 - **Failures:** non-2xx responses, timeouts, connection errors and refused addresses.
 - **Retry schedule:** after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours.
 - **Giving up:** after 6 attempts in total the delivery is marked `dead`.
-- **Auto-disable:** after 5 dead deliveries in a row the webhook is disabled. Re-enabling it (`tracker webhook edit whk_… --enable`) resumes its queued deliveries.
+- **Auto-disable:** after 5 dead deliveries in a row the webhook is disabled. Re-enabling it (`poietic-issues webhook edit whk_… --enable`) resumes its queued deliveries.
 - **Redelivery:** `redeliver` queues any delivery again with a fresh set of retries.
 
 ### How delivery works
 
-- **Scheduling:** every server process with `TRACKER_WEBHOOKS=1` (the default) runs a webhook runner. The event tailer wakes it on new events, and a 5-second timer covers retries.
+- **Scheduling:** every server process with `POIETIC_ISSUES_WEBHOOKS=1` (the default) runs a webhook runner. The event tailer wakes it on new events, and a 5-second timer covers retries.
 - **Fan-out:** the runner turns new events into `webhook_deliveries` rows, advancing a durable cursor (`system_state.webhook_cursor`) under the write lock. Concurrent replicas never skip or duplicate an event.
 - **Sending:** due deliveries are claimed with a 60-second lease and sent outside any transaction. A crashed worker's claims simply expire.
 - **CLI local mode** never sends webhooks itself. A server running against the same database picks up its events.
@@ -168,4 +169,4 @@ Webhook URLs are admin-supplied, but the server still refuses to call into its o
 - **DNS pinning:** the connection is pinned to the address that was checked, so DNS rebinding cannot swap it.
 - **Responses:** redirects are not followed. Responses are capped at 64 KB (2 KB is kept in the log).
 
-`TRACKER_WEBHOOK_ALLOW_PRIVATE=1` lifts the address checks and allows `http`, for local receivers during development. It defaults to on outside `NODE_ENV=production` and must stay off in production.
+`POIETIC_ISSUES_WEBHOOK_ALLOW_PRIVATE=1` lifts the address checks and allows `http`, for local receivers during development. It defaults to on outside `NODE_ENV=production` and must stay off in production.

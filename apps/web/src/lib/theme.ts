@@ -2,7 +2,7 @@ export type Theme = 'light' | 'dark' | 'system';
 
 export function currentTheme(): Theme {
   try {
-    return (localStorage.getItem('tracker.theme') as Theme | null) ?? 'system';
+    return (localStorage.getItem('poietic-issues.theme') as Theme | null) ?? 'system';
   } catch {
     return 'system';
   }
@@ -10,8 +10,8 @@ export function currentTheme(): Theme {
 
 export function applyTheme(theme: Theme) {
   try {
-    if (theme === 'system') localStorage.removeItem('tracker.theme');
-    else localStorage.setItem('tracker.theme', theme);
+    if (theme === 'system') localStorage.removeItem('poietic-issues.theme');
+    else localStorage.setItem('poietic-issues.theme', theme);
   } catch {
     // storage unavailable: theme applies for this page only
   }

@@ -34,21 +34,21 @@ export interface RunningServer {
 /** Prepares the database (migrate, builtins, optional demo seed) according to config. */
 export async function prepareDatabase(
   db: Db,
-  config: Pick<ServerConfig, 'TRACKER_AUTO_MIGRATE' | 'TRACKER_SEED'>,
+  config: Pick<ServerConfig, 'POIETIC_ISSUES_AUTO_MIGRATE' | 'POIETIC_ISSUES_SEED'>,
   logger: Pick<Logger, 'info'> = createLogger({ level: 'silent' }),
 ) {
-  if (config.TRACKER_AUTO_MIGRATE) {
+  if (config.POIETIC_ISSUES_AUTO_MIGRATE) {
     const applied = await migrateToLatest(db);
     if (applied.length) logger.info({ migrations: applied }, 'applied migrations');
   } else {
     const status = await migrationStatus(db);
     if (!status.upToDate)
       throw new Error(
-        `Database is not migrated (pending: ${status.pending.join(', ')}). Run \`tracker db migrate\`.`,
+        `Database is not migrated (pending: ${status.pending.join(', ')}). Run \`poietic-issues db migrate\`.`,
       );
   }
   await ensureBuiltins(db);
-  if (config.TRACKER_SEED) {
+  if (config.POIETIC_ISSUES_SEED) {
     const users = await db.kysely
       .selectFrom('users')
       .select((eb) => eb.fn.countAll<number>().as('n'))
@@ -64,16 +64,16 @@ export async function prepareDatabase(
   }
 }
 
-/** Starts the HTTP server. Used by `node apps/server/src/main.ts`, the bundled server and `tracker serve`. */
+/** Starts the HTTP server. Used by `node apps/server/src/main.ts`, the bundled server and `poietic-issues serve`. */
 export async function startServer(
   config: ServerConfig,
   extensions: AppExtension[] = [],
 ): Promise<RunningServer> {
   const logger = createLogger({
-    level: config.TRACKER_LOG_LEVEL,
-    format: config.TRACKER_LOG_FORMAT,
+    level: config.POIETIC_ISSUES_LOG_LEVEL,
+    format: config.POIETIC_ISSUES_LOG_FORMAT,
   });
-  const dbConfig = parseDatabaseUrl(config.TRACKER_DATABASE_URL);
+  const dbConfig = parseDatabaseUrl(config.POIETIC_ISSUES_DATABASE_URL);
   if (dbConfig.dialect === 'sqlite' && dbConfig.filename !== ':memory:')
     mkdirSync(dirname(dbConfig.filename), { recursive: true });
   const db = createDb(dbConfig);
@@ -81,8 +81,8 @@ export async function startServer(
   const tailer = new EventTailer(db);
   await tailer.start();
 
-  const webhooks = { allowPrivate: config.TRACKER_WEBHOOK_ALLOW_PRIVATE };
-  const runner = config.TRACKER_WEBHOOKS
+  const webhooks = { allowPrivate: config.POIETIC_ISSUES_WEBHOOK_ALLOW_PRIVATE };
+  const runner = config.POIETIC_ISSUES_WEBHOOKS
     ? new WebhookRunner(db, {
         policy: webhooks,
         onError: (error) => logger.error({ err: error }, 'webhook runner failed'),
@@ -95,16 +95,16 @@ export async function startServer(
     db,
     auth: {
       mode: 'standard',
-      allowDevLogin: config.TRACKER_AUTH_MODE === 'dev',
-      secureCookies: config.TRACKER_SECURE_COOKIES,
-      allowedOrigins: config.TRACKER_ALLOWED_ORIGINS,
+      allowDevLogin: config.POIETIC_ISSUES_AUTH_MODE === 'dev',
+      secureCookies: config.POIETIC_ISSUES_SECURE_COOKIES,
+      allowedOrigins: config.POIETIC_ISSUES_ALLOWED_ORIGINS,
       sso: ssoOptionsFromConfig(config),
     },
-    ...(config.TRACKER_WEB_DIR && { webDir: config.TRACKER_WEB_DIR }),
+    ...(config.POIETIC_ISSUES_WEB_DIR && { webDir: config.POIETIC_ISSUES_WEB_DIR }),
     tailer,
     webhooks,
     blobStore: blobStoreFromEnv(config as unknown as Record<string, string | undefined>),
-    maxUploadBytes: config.TRACKER_MAX_UPLOAD_MB * 1024 * 1024,
+    maxUploadBytes: config.POIETIC_ISSUES_MAX_UPLOAD_MB * 1024 * 1024,
     logger,
     shutdownSignal: shutdown.signal,
     extensions,
@@ -112,16 +112,16 @@ export async function startServer(
 
   return new Promise((resolve) => {
     const server = serve(
-      { fetch: app.fetch, hostname: config.TRACKER_HOST, port: config.TRACKER_PORT },
+      { fetch: app.fetch, hostname: config.POIETIC_ISSUES_HOST, port: config.POIETIC_ISSUES_PORT },
       (info) => {
         const url = `http://${info.address.includes(':') ? `[${info.address}]` : info.address}:${info.port}`;
         logger.info(
           {
             url,
             dialect: db.dialect,
-            auth: config.TRACKER_AUTH_MODE,
+            auth: config.POIETIC_ISSUES_AUTH_MODE,
             webhooks: Boolean(runner),
-            web: Boolean(config.TRACKER_WEB_DIR),
+            web: Boolean(config.POIETIC_ISSUES_WEB_DIR),
           },
           'tracker listening',
         );
@@ -143,7 +143,7 @@ export async function startServer(
             http.closeIdleConnections?.();
             void drained.then(() => clearInterval(reaper));
             const timeout = new Promise<'timeout'>((done) =>
-              setTimeout(() => done('timeout'), config.TRACKER_SHUTDOWN_TIMEOUT_MS).unref(),
+              setTimeout(() => done('timeout'), config.POIETIC_ISSUES_SHUTDOWN_TIMEOUT_MS).unref(),
             );
             if ((await Promise.race([drained, timeout])) === 'timeout') {
               logger.warn('in-flight requests did not finish in time; closing connections');

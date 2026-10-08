@@ -13,13 +13,13 @@ if (url.startsWith('sqlite:'))
 
 const server = await startServer(
   loadConfig({
-    TRACKER_DATABASE_URL: url,
-    TRACKER_PORT: process.env.E2E_PORT ?? '3100',
-    TRACKER_WEB_DIR: fileURLToPath(new URL('../build', import.meta.url)),
-    TRACKER_AUTH_MODE: 'dev',
-    TRACKER_SEED: '1',
-    TRACKER_BLOB_DIR: blobDir,
-    TRACKER_LOG_LEVEL: process.env.TRACKER_LOG_LEVEL ?? 'warn',
+    POIETIC_ISSUES_DATABASE_URL: url,
+    POIETIC_ISSUES_PORT: process.env.E2E_PORT ?? '3100',
+    POIETIC_ISSUES_WEB_DIR: fileURLToPath(new URL('../build', import.meta.url)),
+    POIETIC_ISSUES_AUTH_MODE: 'dev',
+    POIETIC_ISSUES_SEED: '1',
+    POIETIC_ISSUES_BLOB_DIR: blobDir,
+    POIETIC_ISSUES_LOG_LEVEL: process.env.POIETIC_ISSUES_LOG_LEVEL ?? 'warn',
   }),
 );
 console.log(`e2e server on ${server.url}`);

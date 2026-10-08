@@ -9,10 +9,15 @@ const envFile = resolve(root, '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 // pnpm runs the server from apps/server, so resolve relative paths against the repo root, where the CLI's
 // local mode looks: both then share data/dev.db and data/blobs.
-const dbUrl = process.env.TRACKER_DATABASE_URL ?? 'sqlite:./data/dev.db';
+const dbUrl = process.env.POIETIC_ISSUES_DATABASE_URL ?? 'sqlite:./data/dev.db';
 const sqliteFile = /^sqlite:(?!:memory:)(.+)$/.exec(dbUrl)?.[1];
-process.env.TRACKER_DATABASE_URL = sqliteFile ? `sqlite:${resolve(root, sqliteFile)}` : dbUrl;
-process.env.TRACKER_BLOB_DIR = resolve(root, process.env.TRACKER_BLOB_DIR ?? 'data/blobs');
+process.env.POIETIC_ISSUES_DATABASE_URL = sqliteFile
+  ? `sqlite:${resolve(root, sqliteFile)}`
+  : dbUrl;
+process.env.POIETIC_ISSUES_BLOB_DIR = resolve(
+  root,
+  process.env.POIETIC_ISSUES_BLOB_DIR ?? 'data/blobs',
+);
 
 const procs = [
   { name: 'api', color: 36, cmd: 'pnpm', args: ['--filter', '@poietic-tech/issues-server', 'dev'] },

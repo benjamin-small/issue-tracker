@@ -63,7 +63,11 @@ test('a CLI write in local mode (another process, same database) appears in the 
     process.execPath,
     [bin, 'issue', 'create', '-P', 'ENG', '-t', 'Created by an agent via the CLI', '-q'],
     {
-      env: { ...process.env, TRACKER_DATABASE_URL: `sqlite:${db}`, TRACKER_ACTOR: 'claude' },
+      env: {
+        ...process.env,
+        POIETIC_ISSUES_DATABASE_URL: `sqlite:${db}`,
+        POIETIC_ISSUES_ACTOR: 'claude',
+      },
     },
   );
   const key = stdout.trim();

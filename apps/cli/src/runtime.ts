@@ -40,7 +40,7 @@ export class Runtime {
     const project = explicit ?? this.config.project;
     if (!project)
       throw usage(
-        'No project given: pass --project <KEY>, set TRACKER_PROJECT, or run `tracker init --project <KEY>`',
+        'No project given: pass --project <KEY>, set POIETIC_ISSUES_PROJECT, or run `poietic-issues init --project <KEY>`',
       );
     return project;
   }

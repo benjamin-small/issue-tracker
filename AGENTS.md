@@ -12,12 +12,12 @@ pnpm test:pg          # same suites against Postgres (run `pnpm pg start` first)
 pnpm format           # apply Prettier
 pnpm pg start|stop|reset|status|url   # throwaway local Postgres (local binaries, else Docker)
 pnpm e2e              # build the web app, run Playwright (E2E_DATABASE_URL=postgres://… for Postgres)
-pnpm build            # web app + dist/server.mjs + dist/tracker.mjs (tsdown bundles)
+pnpm build            # web app + dist/server.mjs + dist/poietic-issues.mjs (tsdown bundles)
 pnpm build:demo       # self-contained browser demo in apps/web/build-demo/ (pnpm e2e:demo tests it)
-docker compose up -d --build --wait tracker   # production shape: Postgres + S3 storage
+docker compose up -d --build --wait poietic-issues   # production shape: Postgres + S3 storage
 pnpm openapi:gen      # regenerate docs/openapi.json + client types after API changes
 pnpm vitest run --project cli -u      # refresh CLI golden files + docs/cli-reference.md after CLI changes
-pnpm tracker …        # run the CLI from source
+pnpm poietic-issues … # run the CLI from source
 ```
 
 Run a single package's tests with `pnpm vitest run --project <name>`, for example `--project db`.

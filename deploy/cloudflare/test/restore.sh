@@ -18,7 +18,7 @@ retry() {
   echo "FAIL: gave up waiting for: $what"; exit 1
 }
 
-docker build --platform "$PLATFORM" -t tracker:local .
+docker build --platform "$PLATFORM" -t poietic-issues:local .
 docker build --platform "$PLATFORM" -t tracker-cloudflare:test deploy/cloudflare
 docker compose up -d seaweedfs
 SW=$(docker compose ps -q seaweedfs)
@@ -34,7 +34,7 @@ retry 60 "SeaweedFS to recreate an empty bucket" bucket_created
 
 # The bucket is created through the master; wait until the S3 gateway itself accepts connections (probed from the test network).
 s3_up() {
-  docker run --rm --platform "$PLATFORM" --network "$NET" --entrypoint node tracker:local \
+  docker run --rm --platform "$PLATFORM" --network "$NET" --entrypoint node poietic-issues:local \
     -e 'require("net").connect(8333,"seaweedfs").on("connect",()=>process.exit(0)).on("error",()=>process.exit(1))'
 }
 retry 60 "SeaweedFS S3 gateway on seaweedfs:8333" s3_up
@@ -45,7 +45,7 @@ start() {
   docker run -d --platform "$PLATFORM" --name "$name" --network "$NET" -p 3999:3000 \
     -e LITESTREAM_ENDPOINT=http://seaweedfs:8333 -e LITESTREAM_BUCKET=tracker-db \
     -e LITESTREAM_ACCESS_KEY_ID=tracker -e LITESTREAM_SECRET_ACCESS_KEY=tracker-secret \
-    -e TRACKER_SECURE_COOKIES=0 "$@" tracker-cloudflare:test >/dev/null
+    -e POIETIC_ISSUES_SECURE_COOKIES=0 "$@" tracker-cloudflare:test >/dev/null
 }
 run() {
   start "$1"
@@ -76,7 +76,7 @@ expect_fail_closed() {
 }
 
 run tr-a
-TOKEN=$(docker exec tr-a tracker db bootstrap --handle ada --name Ada | grep -oE 'trk_[A-Za-z0-9]+' | head -1)
+TOKEN=$(docker exec tr-a poietic-issues db bootstrap --handle ada --name Ada | grep -oE 'trk_[A-Za-z0-9]+' | head -1)
 curl -fs -X POST http://127.0.0.1:3999/api/v1/projects -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' -d '{"key":"RST","name":"Restore test"}' >/dev/null
 docker stop -t 60 tr-a >/dev/null   # SIGTERM → tracker exits → Litestream final sync

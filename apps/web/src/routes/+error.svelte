@@ -9,7 +9,7 @@
   const missing = $derived(page.status === 404);
 </script>
 
-<svelte:head><title>{missing ? 'Not found' : 'Error'} · Tracker</title></svelte:head>
+<svelte:head><title>{missing ? 'Not found' : 'Error'} · Issues</title></svelte:head>
 
 <main class="flex min-h-dvh bg-bg-subtle">
   <EmptyState

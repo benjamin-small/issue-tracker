@@ -115,7 +115,7 @@ export interface paths {
         put?: never;
         /**
          * Sign in as any user (development only)
-         * @description Only available when the server runs with `TRACKER_AUTH_MODE=dev`.
+         * @description Only available when the server runs with `POIETIC_ISSUES_AUTH_MODE=dev`.
          */
         post: {
             parameters: {
@@ -5150,7 +5150,11 @@ export interface webhooks {
                     "webhook-timestamp": string;
                     /** @description Space-separated `v1,<base64>` signatures. */
                     "webhook-signature": string;
+                    "x-poietic-issues-event": string;
+                    "x-poietic-issues-event-seq": string;
+                    /** @description Deprecated: same as `x-poietic-issues-event`. */
                     "x-tracker-event": string;
+                    /** @description Deprecated: same as `x-poietic-issues-event-seq`. */
                     "x-tracker-event-seq": string;
                 };
                 path?: never;

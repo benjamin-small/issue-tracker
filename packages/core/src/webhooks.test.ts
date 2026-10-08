@@ -184,6 +184,10 @@ describe(`webhooks (${testDialect()})`, () => {
       ).not.toThrow();
       expect(headers['webhook-id']).toMatch(/^whd_/);
       expect(headers['content-type']).toBe('application/json');
+      const type = JSON.parse(r.body).type;
+      expect(headers['x-poietic-issues-event']).toBe(type);
+      expect(headers['x-tracker-event']).toBe(type); // deprecated alias, one release
+      expect(headers['user-agent']).toBe('poietic-issues-webhooks/1');
     }
     const created = received.find((r) => JSON.parse(r.body).type === 'issue.created')!;
     expect(JSON.parse(created.body).data.issue.key).toBe(issue.key);

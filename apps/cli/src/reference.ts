@@ -2,13 +2,13 @@ import type { describeCommands } from './commands/system.ts';
 
 type Info = ReturnType<typeof describeCommands>;
 
-/** Renders `tracker commands --json` output as the markdown reference in docs/cli-reference.md. */
+/** Renders `poietic-issues commands --json` output as the markdown reference in docs/cli-reference.md. */
 export function renderCliReference(info: Info): string {
   const esc = (s: string) => s.replace(/\|/g, '\\|');
   const lines = [
     '# CLI reference',
     '',
-    '<!-- Generated from `tracker commands --json` by the CLI test suite. Do not edit; run `pnpm vitest run --project cli -u`. -->',
+    '<!-- Generated from `poietic-issues commands --json` by the CLI test suite. Do not edit; run `pnpm vitest run --project cli -u`. -->',
     '',
     'See [cli.md](cli.md) for concepts, output formats and configuration.',
     '',

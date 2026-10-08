@@ -2,14 +2,14 @@
   "name": "@poietic-tech/issues",
   "version": "0.0.0",
   "private": true,
-  "description": "The tracker CLI: agent-friendly command line over the tracker API.",
+  "description": "The poietic-issues CLI: agent-friendly command line over the poietic-issues API.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p .",
-    "tracker": "node src/bin.ts"
+    "poietic-issues": "node src/bin.ts"
   },
   "dependencies": {
     "@poietic-tech/issues-client": "workspace:*",
@@ -21,6 +21,6 @@
     "zod": "^4.6.5"
   },
   "bin": {
-    "tracker": "./src/bin.ts"
+    "poietic-issues": "./src/bin.ts"
   }
 }

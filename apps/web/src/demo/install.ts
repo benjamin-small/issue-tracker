@@ -2,7 +2,7 @@
 // its `fetch` and `EventSource` calls to /api reach the real server code running in this page.
 import { type DemoBackend, startDemoBackend } from './backend.ts';
 
-const USER_KEY = 'tracker-demo-user';
+const USER_KEY = 'poietic-issues-demo-user';
 
 function storedUser(): string | null {
   try {

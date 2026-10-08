@@ -2,7 +2,7 @@
 declare global {
   interface ImportMetaEnv {
     /** True in the self-contained browser demo build (`pnpm build:demo`). */
-    readonly TRACKER_DEMO: boolean;
+    readonly POIETIC_ISSUES_DEMO: boolean;
   }
   namespace App {
     interface PageState {

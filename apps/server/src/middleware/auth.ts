@@ -7,7 +7,7 @@ import {
 import { newId } from '@poietic-tech/issues-schema';
 import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
-import { type AppEnv, type ResolvedDeps, SESSION_COOKIE } from '../env.ts';
+import { type AppEnv, LEGACY_SESSION_COOKIE, type ResolvedDeps, SESSION_COOKIE } from '../env.ts';
 import { problem } from '../problem.ts';
 
 const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -53,7 +53,7 @@ export function authenticate(deps: ResolvedDeps) {
         if (!actor) return problem(c, 'UNAUTHENTICATED', 'Invalid, expired or revoked token');
         via = 'bearer';
       } else {
-        const cookie = getCookie(c, SESSION_COOKIE);
+        const cookie = getCookie(c, SESSION_COOKIE) ?? getCookie(c, LEGACY_SESSION_COOKIE);
         if (cookie) {
           actor = await authenticateSession({ db, clock }, cookie);
           if (actor) {

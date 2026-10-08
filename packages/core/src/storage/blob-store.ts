@@ -172,22 +172,24 @@ export function blobStoreFromEnv(
   env: Record<string, string | undefined>,
   defaultDir = './data/blobs',
 ): BlobStore {
-  if ((env.TRACKER_BLOB_STORE ?? 'local') === 's3') {
+  if ((env.POIETIC_ISSUES_BLOB_STORE ?? 'local') === 's3') {
     const need = (name: string) => {
       const value = env[name];
-      if (!value) throw new Error(`${name} is required when TRACKER_BLOB_STORE=s3`);
+      if (!value) throw new Error(`${name} is required when POIETIC_ISSUES_BLOB_STORE=s3`);
       return value;
     };
     return new S3BlobStore({
-      endpoint: need('TRACKER_S3_ENDPOINT'),
-      bucket: need('TRACKER_S3_BUCKET'),
-      region: env.TRACKER_S3_REGION ?? 'us-east-1',
-      accessKeyId: need('TRACKER_S3_ACCESS_KEY_ID'),
-      secretAccessKey: need('TRACKER_S3_SECRET_ACCESS_KEY'),
-      forcePathStyle: env.TRACKER_S3_FORCE_PATH_STYLE !== 'false',
-      presign: !['0', 'false'].includes(env.TRACKER_S3_PRESIGN ?? ''),
-      ...(env.TRACKER_S3_PUBLIC_ENDPOINT && { publicEndpoint: env.TRACKER_S3_PUBLIC_ENDPOINT }),
+      endpoint: need('POIETIC_ISSUES_S3_ENDPOINT'),
+      bucket: need('POIETIC_ISSUES_S3_BUCKET'),
+      region: env.POIETIC_ISSUES_S3_REGION ?? 'us-east-1',
+      accessKeyId: need('POIETIC_ISSUES_S3_ACCESS_KEY_ID'),
+      secretAccessKey: need('POIETIC_ISSUES_S3_SECRET_ACCESS_KEY'),
+      forcePathStyle: env.POIETIC_ISSUES_S3_FORCE_PATH_STYLE !== 'false',
+      presign: !['0', 'false'].includes(env.POIETIC_ISSUES_S3_PRESIGN ?? ''),
+      ...(env.POIETIC_ISSUES_S3_PUBLIC_ENDPOINT && {
+        publicEndpoint: env.POIETIC_ISSUES_S3_PUBLIC_ENDPOINT,
+      }),
     });
   }
-  return new LocalDiskBlobStore(env.TRACKER_BLOB_DIR ?? defaultDir);
+  return new LocalDiskBlobStore(env.POIETIC_ISSUES_BLOB_DIR ?? defaultDir);
 }

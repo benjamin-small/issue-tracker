@@ -36,7 +36,7 @@ export async function recordEvent(
 }
 
 /** Postgres NOTIFY channel signalled whenever events are committed. */
-export const EVENTS_CHANNEL = 'tracker_events';
+export const EVENTS_CHANNEL = 'poietic_issues_events';
 
 /** Computes `{ field: { from, to } }` for fields whose JSON representation changed. */
 export function diff<T extends Record<string, unknown>>(

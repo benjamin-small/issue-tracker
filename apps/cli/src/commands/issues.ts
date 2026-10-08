@@ -332,7 +332,7 @@ export function issueCommand(io: CliIO): Command {
           'issue',
           data,
           (i) =>
-            `${String(i.key)} ${o.permanent ? 'permanently deleted' : 'moved to the trash (tracker issue restore to undo)'}\n`,
+            `${String(i.key)} ${o.permanent ? 'permanently deleted' : 'moved to the trash (poietic-issues issue restore to undo)'}\n`,
         );
       }),
     );

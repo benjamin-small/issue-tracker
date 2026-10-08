@@ -3,8 +3,8 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 
-const api = process.env.TRACKER_API_URL ?? 'http://127.0.0.1:3000';
-const demo = process.env.TRACKER_DEMO === '1';
+const api = process.env.POIETIC_ISSUES_API_URL ?? 'http://127.0.0.1:3000';
+const demo = process.env.POIETIC_ISSUES_DEMO === '1';
 const shim = (file: string) => fileURLToPath(new URL(`./src/demo/shims/${file}`, import.meta.url));
 
 /** Node-only modules the server code imports, mapped to browser stand-ins for the demo build. */
@@ -21,7 +21,7 @@ const demoAliases = [
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit()],
   resolve: demo ? { alias: demoAliases } : {},
-  define: { 'import.meta.env.TRACKER_DEMO': JSON.stringify(demo) },
+  define: { 'import.meta.env.POIETIC_ISSUES_DEMO': JSON.stringify(demo) },
   server: {
     // Bind IPv4 like the API; `localhost` resolves to ::1 only on macOS, so 127.0.0.1 links would miss Vite.
     host: '127.0.0.1',
