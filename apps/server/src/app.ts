@@ -13,7 +13,7 @@ import {
 import { authenticate, requestId, requireActor } from './middleware/auth.ts';
 import { idempotency } from './middleware/idempotency.ts';
 import { silentLogger } from './logger.ts';
-import { sql } from '@tracker/db';
+import { sql } from '@poietic-tech/issues-db';
 import { problem, problemFromError } from './problem.ts';
 import { registerAttachmentRoutes } from './routes/attachments.ts';
 import { registerAuthRoutes } from './routes/auth.ts';

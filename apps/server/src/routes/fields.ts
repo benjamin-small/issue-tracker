@@ -6,14 +6,14 @@ import {
   listCustomFields,
   updateCustomField,
   updateFieldOption,
-} from '@tracker/core';
+} from '@poietic-tech/issues-core';
 import {
   CreateCustomFieldInputSchema,
   CreateFieldOptionInputSchema,
   CustomFieldSchema,
   UpdateCustomFieldInputSchema,
   UpdateFieldOptionInputSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import type { TrackerApp } from '../env.ts';
 import { BooleanQuery, errorResponses, json, jsonBody, refParam } from './common.ts';
 

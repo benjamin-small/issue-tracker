@@ -1,4 +1,4 @@
-import { type Tx, toJson, withWriteTx } from '@tracker/db';
+import { type Tx, toJson, withWriteTx } from '@poietic-tech/issues-db';
 import {
   type CreateViewInput,
   CreateViewInputSchema,
@@ -7,7 +7,7 @@ import {
   type UpdateViewInput,
   UpdateViewInputSchema,
   type View,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { forbidden, notFound, parseInput } from '../errors.ts';
 import { toView } from '../mappers.ts';

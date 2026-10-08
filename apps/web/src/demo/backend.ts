@@ -8,9 +8,9 @@ import {
   seedDemoData,
   SYSTEM_ACTOR,
   WebhookRunner,
-} from '@tracker/core';
-import { createDb, type Db, migrateToLatest } from '@tracker/db';
-import { createApp } from '@tracker/server';
+} from '@poietic-tech/issues-core';
+import { createDb, type Db, migrateToLatest } from '@poietic-tech/issues-db';
+import { createApp } from '@poietic-tech/issues-server';
 import initSqlJs from 'sql.js/dist/sql-asm-memory-growth.js';
 import { configureSqlJs, currentDatabase } from './shims/better-sqlite3.ts';
 

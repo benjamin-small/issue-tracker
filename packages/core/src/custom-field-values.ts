@@ -1,5 +1,5 @@
-import { type Tx } from '@tracker/db';
-import type { CustomFieldValue } from '@tracker/schema';
+import { type Tx } from '@poietic-tech/issues-db';
+import type { CustomFieldValue } from '@poietic-tech/issues-schema';
 import { type ServiceContext, nowIso } from './context.ts';
 import { validationError } from './errors.ts';
 import { findUser } from './refs.ts';

@@ -15,8 +15,8 @@ process.env.TRACKER_DATABASE_URL = sqliteFile ? `sqlite:${resolve(root, sqliteFi
 process.env.TRACKER_BLOB_DIR = resolve(root, process.env.TRACKER_BLOB_DIR ?? 'data/blobs');
 
 const procs = [
-  { name: 'api', color: 36, cmd: 'pnpm', args: ['--filter', '@tracker/server', 'dev'] },
-  { name: 'web', color: 35, cmd: 'pnpm', args: ['--filter', '@tracker/web', 'dev'] },
+  { name: 'api', color: 36, cmd: 'pnpm', args: ['--filter', '@poietic-tech/issues-server', 'dev'] },
+  { name: 'web', color: 35, cmd: 'pnpm', args: ['--filter', '@poietic-tech/issues-web', 'dev'] },
 ].map(({ name, color, cmd, args }) => {
   const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], env: process.env });
   const prefix = `\x1b[${color}m${name.padEnd(3)}\x1b[0m │ `;

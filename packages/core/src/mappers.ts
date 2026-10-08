@@ -1,4 +1,4 @@
-import { type Database, fromJson, type Selectable, toBool } from '@tracker/db';
+import { type Database, fromJson, type Selectable, toBool } from '@poietic-tech/issues-db';
 import type {
   ApiToken,
   Comment,
@@ -9,8 +9,8 @@ import type {
   User,
   UserSummary,
   View,
-} from '@tracker/schema';
-import { migrateViewConfig } from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
+import { migrateViewConfig } from '@poietic-tech/issues-schema';
 
 type Row<T extends keyof Database> = Selectable<Database[T]>;
 

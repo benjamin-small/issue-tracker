@@ -105,7 +105,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @tracker/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @poietic-tech/issues-web exec playwright install --with-deps chromium
       - run: pnpm e2e
         env:
           CI: 'true'

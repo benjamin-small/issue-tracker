@@ -14,7 +14,7 @@ import {
   updateLabel,
   updateProject,
   updateStatus,
-} from '@tracker/core';
+} from '@poietic-tech/issues-core';
 import {
   CreateLabelInputSchema,
   CreateProjectInputSchema,
@@ -25,7 +25,7 @@ import {
   UpdateLabelInputSchema,
   UpdateProjectInputSchema,
   UpdateStatusInputSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import type { TrackerApp } from '../env.ts';
 import { BooleanQuery, errorResponses, json, jsonBody, refParam } from './common.ts';
 

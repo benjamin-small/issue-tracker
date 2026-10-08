@@ -1,11 +1,11 @@
-import { type Tx, withWriteTx } from '@tracker/db';
+import { type Tx, withWriteTx } from '@poietic-tech/issues-db';
 import {
   type CreateStatusInput,
   CreateStatusInputSchema,
   type Status,
   type UpdateStatusInput,
   UpdateStatusInputSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, isUniqueViolation, notFound, parseInput, validationError } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';

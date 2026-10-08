@@ -1,5 +1,5 @@
-import { createTestContext, type TestContext } from '@tracker/core/testing';
-import { testDialect } from '@tracker/db/testing';
+import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
+import { testDialect } from '@poietic-tech/issues-db/testing';
 import { pino } from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';

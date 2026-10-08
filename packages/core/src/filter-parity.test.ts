@@ -1,4 +1,4 @@
-import { testDialect } from '@tracker/db/testing';
+import { testDialect } from '@poietic-tech/issues-db/testing';
 import {
   compareIssues,
   type FilterCondition,
@@ -7,7 +7,7 @@ import {
   matchesFilter,
   type SortSpec,
   FieldRegistry,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   createCustomField,

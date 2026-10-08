@@ -1,5 +1,10 @@
-import { actorForUser, authenticateSession, authenticateToken, SYSTEM_ACTOR } from '@tracker/core';
-import { newId } from '@tracker/schema';
+import {
+  actorForUser,
+  authenticateSession,
+  authenticateToken,
+  SYSTEM_ACTOR,
+} from '@poietic-tech/issues-core';
+import { newId } from '@poietic-tech/issues-schema';
 import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
 import { type AppEnv, type ResolvedDeps, SESSION_COOKIE } from '../env.ts';

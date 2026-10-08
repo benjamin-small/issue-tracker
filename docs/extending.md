@@ -29,7 +29,7 @@ Most per-team fields don't need any of this. Use custom fields (`tracker field c
 ## Add an API route
 
 1. Implement the behaviour as a core service function that takes a `ServiceContext` and writes through `withWriteTx`.
-2. Declare the route in `apps/server/src/routes/*.ts` with `createRoute` and schemas from `@tracker/schema`, and list its error codes with `errorResponses(...)`.
+2. Declare the route in `apps/server/src/routes/*.ts` with `createRoute` and schemas from `@poietic-tech/issues-schema`, and list its error codes with `errorResponses(...)`.
 3. Run `pnpm openapi:gen`, then commit `docs/openapi.json` and the regenerated client.
 4. Add an `app.request()` test. It runs on both dialects.
 

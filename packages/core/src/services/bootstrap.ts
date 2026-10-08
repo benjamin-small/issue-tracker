@@ -1,6 +1,6 @@
-import { type Db, withWriteTx } from '@tracker/db';
+import { type Db, withWriteTx } from '@poietic-tech/issues-db';
 import { type Clock, SYSTEM_ACTOR, systemClock } from '../context.ts';
-import { newId, type User } from '@tracker/schema';
+import { newId, type User } from '@poietic-tech/issues-schema';
 import { conflict } from '../errors.ts';
 import { createToken } from './auth.ts';
 import { createUserUnchecked } from './users.ts';

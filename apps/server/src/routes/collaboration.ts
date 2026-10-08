@@ -14,7 +14,7 @@ import {
   listViews,
   updateComment,
   updateView,
-} from '@tracker/core';
+} from '@poietic-tech/issues-core';
 import {
   CommentSchema,
   CreateCommentInputSchema,
@@ -28,8 +28,8 @@ import {
   UpdateCommentInputSchema,
   UpdateViewInputSchema,
   ViewSchema,
-} from '@tracker/schema';
-import { getIssueRow, getProjectRow } from '@tracker/core';
+} from '@poietic-tech/issues-schema';
+import { getIssueRow, getProjectRow } from '@poietic-tech/issues-core';
 import type { TrackerApp } from '../env.ts';
 import { BooleanQuery, errorResponses, json, jsonBody, noContent, refParam } from './common.ts';
 

@@ -4,7 +4,7 @@ The REST API lives under `/api/v1`. The OpenAPI 3.1 document is the contract:
 
 - **Committed:** [`docs/openapi.json`](openapi.json), regenerated with `pnpm openapi:gen`. CI fails if it is stale.
 - **Served:** at `/api/v1/openapi.json`, with an interactive reference at **`/api/docs`**.
-- **Consumed:** `@tracker/client`, and through it the web app and the CLI, is generated from the same document.
+- **Consumed:** `@poietic-tech/issues-client`, and through it the web app and the CLI, is generated from the same document.
 
 ## Authentication
 

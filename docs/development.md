@@ -24,7 +24,7 @@ To run everything CI runs, locally:
 ```sh
 pnpm check                                                   # gates + tests on SQLite
 pnpm pg start && pnpm test:pg                                # tests on Postgres
-pnpm --filter @tracker/web exec playwright install chromium  # once, for the browser tests
+pnpm --filter @poietic-tech/issues-web exec playwright install chromium  # once, for the browser tests
 pnpm e2e                                                     # Playwright against the real server (SQLite)
 E2E_DATABASE_URL=$(pnpm --silent pg url) pnpm e2e                  # ...and on Postgres
 pnpm e2e:demo                                                # the static browser demo
@@ -71,14 +71,14 @@ pnpm test:pg
   - It resolves a relative SQLite path and the blob directory against the repo root, so the server and the CLI's local mode share `data/dev.db` and `data/blobs`.
 - **Production.** `pnpm build:web` writes `apps/web/build/`. The API server serves it when `TRACKER_WEB_DIR` points there, with an SPA fallback for deep links.
 - **Data layer.**
-  - The web app only talks to the API through `@tracker/client`.
+  - The web app only talks to the API through `@poietic-tech/issues-client`.
   - `src/lib/queries.ts` holds the query keys and fetchers.
   - `src/lib/issues.ts` holds mutations with optimistic cache updates and rollback.
   - A view's configuration (filters, sort, columns, card fields) lives in `?v=` while unsaved, so any view state can be shared by URL.
 - **Checks.** `pnpm typecheck` runs `svelte-check --fail-on-warnings` for the web package.
 - **End-to-end tests** (`apps/web/e2e`):
   - They run the built app against the real server on a fresh seeded SQLite database (`pnpm e2e`). Set `E2E_DATABASE_URL` to run against Postgres.
-  - They use the preinstalled Chromium at `/opt/pw-browsers/chromium` when present, and otherwise Playwright's own. Install that once with `pnpm --filter @tracker/web exec playwright install chromium`. Override the browser with `PLAYWRIGHT_CHROMIUM_PATH`.
+  - They use the preinstalled Chromium at `/opt/pw-browsers/chromium` when present, and otherwise Playwright's own. Install that once with `pnpm --filter @poietic-tech/issues-web exec playwright install chromium`. Override the browser with `PLAYWRIGHT_CHROMIUM_PATH`.
 
 ## Browser demo
 

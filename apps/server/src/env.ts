@@ -7,8 +7,8 @@ import type {
   IdGenerator,
   ServiceContext,
   WebhookPolicy,
-} from '@tracker/core';
-import type { Db } from '@tracker/db';
+} from '@poietic-tech/issues-core';
+import type { Db } from '@poietic-tech/issues-db';
 import type { Logger } from './logger.ts';
 import type { JwtVerifier } from './sso/jwt.ts';
 

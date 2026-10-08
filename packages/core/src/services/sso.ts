@@ -1,5 +1,5 @@
-import { withWriteTx } from '@tracker/db';
-import { CreateUserInputSchema, type User } from '@tracker/schema';
+import { withWriteTx } from '@poietic-tech/issues-db';
+import { CreateUserInputSchema, type User } from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { toUser } from '../mappers.ts';
 import { insertUser } from './users.ts';

@@ -9,8 +9,14 @@ import {
   seedDemoData,
   SYSTEM_ACTOR,
   WebhookRunner,
-} from '@tracker/core';
-import { createDb, type Db, migrateToLatest, migrationStatus, parseDatabaseUrl } from '@tracker/db';
+} from '@poietic-tech/issues-core';
+import {
+  createDb,
+  type Db,
+  migrateToLatest,
+  migrationStatus,
+  parseDatabaseUrl,
+} from '@poietic-tech/issues-db';
 import { createApp } from './app.ts';
 import { ssoOptionsFromConfig, type ServerConfig } from './config.ts';
 import type { AppExtension } from './env.ts';

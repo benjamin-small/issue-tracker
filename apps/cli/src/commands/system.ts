@@ -1,6 +1,6 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createClient, unwrap } from '@tracker/client';
+import { createClient, unwrap } from '@poietic-tech/issues-client';
 import {
   bootstrapAdmin,
   createContext,
@@ -8,8 +8,8 @@ import {
   inputSchema,
   seedDemoData,
   SYSTEM_ACTOR,
-} from '@tracker/core';
-import { latestMigrationName, migrateToLatest, migrationStatus } from '@tracker/db';
+} from '@poietic-tech/issues-core';
+import { latestMigrationName, migrateToLatest, migrationStatus } from '@poietic-tech/issues-db';
 import {
   CommentSchema,
   CreateCommentInputSchema,
@@ -27,7 +27,7 @@ import {
   ProjectSchema,
   UpdateIssueInputSchema,
   ViewConfigSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { Command, type Option } from 'commander';
 import { z } from 'zod';
 import {
@@ -299,7 +299,7 @@ export function serveCommand(io: CliIO): Command {
       const config = resolveConfig(flags, io);
       if (config.mode !== 'local')
         throw usage('serve runs against a database: pass --database (not --server)');
-      const { loadConfig, startServer } = await import('@tracker/server');
+      const { loadConfig, startServer } = await import('@poietic-tech/issues-server');
       const server = await startServer(
         loadConfig({
           ...io.env,

@@ -1,4 +1,4 @@
-import { fromJson, toJson, type Tx, withWriteTx } from '@tracker/db';
+import { fromJson, toJson, type Tx, withWriteTx } from '@poietic-tech/issues-db';
 import {
   type CreateCustomFieldInput,
   CreateCustomFieldInputSchema,
@@ -10,7 +10,7 @@ import {
   UpdateCustomFieldInputSchema,
   type UpdateFieldOptionInput,
   UpdateFieldOptionInputSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, isUniqueViolation, notFound, parseInput, validationError } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';

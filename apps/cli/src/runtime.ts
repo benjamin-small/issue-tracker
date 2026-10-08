@@ -1,4 +1,4 @@
-import { type ApiClient, unwrap } from '@tracker/client';
+import { type ApiClient, unwrap } from '@poietic-tech/issues-client';
 import type { Command } from 'commander';
 import { type GlobalFlags, resolveConfig, type ResolvedConfig } from './config.ts';
 import { CliError, usage } from './errors.ts';

@@ -1,4 +1,4 @@
-import { testDialect } from '@tracker/db/testing';
+import { testDialect } from '@poietic-tech/issues-db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   bulkUpdateIssues,

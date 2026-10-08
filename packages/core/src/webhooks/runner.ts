@@ -1,5 +1,5 @@
-import type { Db } from '@tracker/db';
-import { newId } from '@tracker/schema';
+import type { Db } from '@poietic-tech/issues-db';
+import { newId } from '@poietic-tech/issues-schema';
 import { type Clock, systemClock } from '../context.ts';
 import type { EventTailer } from '../events/tailer.ts';
 import {

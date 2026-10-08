@@ -1,4 +1,4 @@
-import { defaultViewConfig, migrateViewConfig, type ViewConfig } from '@tracker/schema';
+import { defaultViewConfig, migrateViewConfig, type ViewConfig } from '@poietic-tech/issues-schema';
 
 export type { ViewConfig };
 

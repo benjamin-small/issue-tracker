@@ -50,19 +50,19 @@ importers:
 
   apps/cli:
     dependencies:
-      '@tracker/client':
+      '@poietic-tech/issues-client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@tracker/core':
+      '@poietic-tech/issues-core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@tracker/db':
+      '@poietic-tech/issues-db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@tracker/schema':
+      '@poietic-tech/issues-schema':
         specifier: workspace:*
         version: link:../../packages/schema
-      '@tracker/server':
+      '@poietic-tech/issues-server':
         specifier: workspace:*
         version: link:../server
       commander:
@@ -80,18 +80,18 @@ importers:
       '@hono/zod-openapi':
         specifier: ^1.6.3
         version: 1.6.3(hono@4.13.9)(zod@4.6.5)
+      '@poietic-tech/issues-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@poietic-tech/issues-db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@poietic-tech/issues-schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
       '@scalar/hono-api-reference':
         specifier: ^0.12.6
         version: 0.12.6(hono@4.13.9)
-      '@tracker/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@tracker/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@tracker/schema':
-        specifier: workspace:*
-        version: link:../../packages/schema
       hono:
         specifier: ^4.13.9
         version: 4.13.9
@@ -117,24 +117,24 @@ importers:
       '@noble/hashes':
         specifier: ^2.4.0
         version: 2.4.0
+      '@poietic-tech/issues-client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@poietic-tech/issues-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@poietic-tech/issues-db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@poietic-tech/issues-schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      '@poietic-tech/issues-server':
+        specifier: workspace:*
+        version: link:../server
       '@tanstack/svelte-query':
         specifier: ^6.3.0
         version: 6.3.0(svelte@5.57.1(@typescript-eslint/types@8.70.1))
-      '@tracker/client':
-        specifier: workspace:*
-        version: link:../../packages/client
-      '@tracker/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@tracker/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@tracker/schema':
-        specifier: workspace:*
-        version: link:../../packages/schema
-      '@tracker/server':
-        specifier: workspace:*
-        version: link:../server
       bits-ui:
         specifier: ^2.19.3
         version: 2.19.3(@internationalized/date@3.12.4)(@sveltejs/kit@2.70.3(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.1(@typescript-eslint/types@8.70.1))(vite@8.3.1(@types/node@22.20.4)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1)))(svelte@5.57.1(@typescript-eslint/types@8.70.1))(typescript@6.0.3)(vite@8.3.1(@types/node@22.20.4)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1)))(svelte@5.57.1(@typescript-eslint/types@8.70.1))
@@ -215,7 +215,7 @@ importers:
 
   packages/client:
     dependencies:
-      '@tracker/schema':
+      '@poietic-tech/issues-schema':
         specifier: workspace:*
         version: link:../schema
       openapi-fetch:
@@ -228,10 +228,10 @@ importers:
 
   packages/core:
     dependencies:
-      '@tracker/db':
+      '@poietic-tech/issues-db':
         specifier: workspace:*
         version: link:../db
-      '@tracker/schema':
+      '@poietic-tech/issues-schema':
         specifier: workspace:*
         version: link:../schema
       aws4fetch:

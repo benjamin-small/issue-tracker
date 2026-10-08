@@ -10,7 +10,7 @@ import {
   moveIssue,
   restoreIssue,
   updateIssue,
-} from '@tracker/core';
+} from '@poietic-tech/issues-core';
 import {
   CreateIssueInputSchema,
   EventSchema,
@@ -20,7 +20,7 @@ import {
   pageOf,
   SortSpecSchema,
   UpdateIssueInputSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import type { TrackerApp } from '../env.ts';
 import { parseIssueQuery } from '../issue-query-params.ts';
 import {

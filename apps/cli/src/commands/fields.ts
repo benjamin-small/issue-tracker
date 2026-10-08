@@ -1,4 +1,4 @@
-import type { ApiClient, Schemas } from '@tracker/client';
+import type { ApiClient, Schemas } from '@poietic-tech/issues-client';
 import { Command } from 'commander';
 import { CliError, usage } from '../errors.ts';
 import type { CliIO } from '../io.ts';

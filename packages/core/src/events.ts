@@ -1,5 +1,5 @@
-import { sql, type Tx, toJson } from '@tracker/db';
-import type { EventType } from '@tracker/schema';
+import { sql, type Tx, toJson } from '@poietic-tech/issues-db';
+import type { EventType } from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from './context.ts';
 
 export interface RecordEventInput {

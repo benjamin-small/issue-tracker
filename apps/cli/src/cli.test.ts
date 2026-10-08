@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { createProject, LocalDiskBlobStore } from '@tracker/core';
-import { createTestContext, type TestContext } from '@tracker/core/testing';
-import { testDialect } from '@tracker/db/testing';
-import { createApp } from '@tracker/server';
+import { createProject, LocalDiskBlobStore } from '@poietic-tech/issues-core';
+import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
+import { testDialect } from '@poietic-tech/issues-db/testing';
+import { createApp } from '@poietic-tech/issues-server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { CliIO } from './io.ts';
 import { renderCliReference } from './reference.ts';
@@ -454,7 +454,7 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
   });
 
   it('talks to a real server with a token, and logs in', async () => {
-    const { loadConfig, startServer } = await import('@tracker/server');
+    const { loadConfig, startServer } = await import('@poietic-tech/issues-server');
     const server = await startServer(
       loadConfig({
         TRACKER_DATABASE_URL: `sqlite:${join(dir, 'remote.db')}`,
@@ -465,13 +465,13 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
     try {
       const token = (
         await (
-          await import('@tracker/core')
+          await import('@poietic-tech/issues-core')
         ).createToken(
           {
             ...t.ctx,
             db: server.db,
             actor: (await (
-              await import('@tracker/core')
+              await import('@poietic-tech/issues-core')
             ).actorForUser({ db: server.db, actor: t.admin }, 'ada'))!,
           },
           'ada',

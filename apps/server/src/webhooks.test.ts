@@ -1,8 +1,13 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createProject, createToken, verifyWebhook, WebhookRunner } from '@tracker/core';
-import { createTestContext, type TestContext } from '@tracker/core/testing';
-import { testDialect } from '@tracker/db/testing';
+import {
+  createProject,
+  createToken,
+  verifyWebhook,
+  WebhookRunner,
+} from '@poietic-tech/issues-core';
+import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
+import { testDialect } from '@poietic-tech/issues-db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp, generateOpenApiDocument } from './app.ts';
 

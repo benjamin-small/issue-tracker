@@ -1,6 +1,6 @@
-import { createToken } from '@tracker/core';
-import { createTestContext, type TestContext } from '@tracker/core/testing';
-import { testDialect } from '@tracker/db/testing';
+import { createToken } from '@poietic-tech/issues-core';
+import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
+import { testDialect } from '@poietic-tech/issues-db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
 

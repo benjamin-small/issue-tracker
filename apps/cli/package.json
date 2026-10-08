@@ -1,5 +1,5 @@
 {
-  "name": "@tracker/cli",
+  "name": "@poietic-tech/issues",
   "version": "0.0.0",
   "private": true,
   "description": "The tracker CLI: agent-friendly command line over the tracker API.",
@@ -12,11 +12,11 @@
     "tracker": "node src/bin.ts"
   },
   "dependencies": {
-    "@tracker/client": "workspace:*",
-    "@tracker/core": "workspace:*",
-    "@tracker/db": "workspace:*",
-    "@tracker/schema": "workspace:*",
-    "@tracker/server": "workspace:*",
+    "@poietic-tech/issues-client": "workspace:*",
+    "@poietic-tech/issues-core": "workspace:*",
+    "@poietic-tech/issues-db": "workspace:*",
+    "@poietic-tech/issues-schema": "workspace:*",
+    "@poietic-tech/issues-server": "workspace:*",
     "commander": "^15.0.0",
     "zod": "^4.6.5"
   },

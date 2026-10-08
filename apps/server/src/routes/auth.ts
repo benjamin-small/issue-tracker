@@ -9,8 +9,8 @@ import {
   listUsers,
   signInWithSso,
   SYSTEM_ACTOR,
-} from '@tracker/core';
-import { UserSchema, UserSummarySchema } from '@tracker/schema';
+} from '@poietic-tech/issues-core';
+import { UserSchema, UserSummarySchema } from '@poietic-tech/issues-schema';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Context } from 'hono';
 import { sameOrigin } from '../middleware/auth.ts';

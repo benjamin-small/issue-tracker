@@ -1,5 +1,5 @@
-import { ApiError } from '@tracker/client';
-import { ERROR_CODES, type ErrorCode } from '@tracker/schema';
+import { ApiError } from '@poietic-tech/issues-client';
+import { ERROR_CODES, type ErrorCode } from '@poietic-tech/issues-schema';
 
 /**
  * Documented exit codes (part of the CLI contract; see docs/cli.md).

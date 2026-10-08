@@ -1,4 +1,4 @@
-import { type Tx, withWriteTx } from '@tracker/db';
+import { type Tx, withWriteTx } from '@poietic-tech/issues-db';
 import {
   type CreateLinkInput,
   CreateLinkInputSchema,
@@ -6,7 +6,7 @@ import {
   isIdOf,
   type IssueLink,
   type LinkType,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, invalidRelation, isUniqueViolation, notFound, parseInput } from '../errors.ts';
 import { recordEvent } from '../events.ts';

@@ -1,4 +1,4 @@
-import type { Schemas } from '@tracker/client';
+import type { Schemas } from '@poietic-tech/issues-client';
 import { Command } from 'commander';
 import { usage } from '../errors.ts';
 import type { CliIO } from '../io.ts';

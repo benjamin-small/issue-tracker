@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
-import { type ApiClient, createClient } from '@tracker/client';
-import { blobStoreFromEnv, ensureBuiltins } from '@tracker/core';
+import { type ApiClient, createClient } from '@poietic-tech/issues-client';
+import { blobStoreFromEnv, ensureBuiltins } from '@poietic-tech/issues-core';
 import { dirname, join } from 'node:path';
-import { createDb, type Db, migrationStatus, parseDatabaseUrl } from '@tracker/db';
-import { createApp } from '@tracker/server';
+import { createDb, type Db, migrationStatus, parseDatabaseUrl } from '@poietic-tech/issues-db';
+import { createApp } from '@poietic-tech/issues-server';
 import type { ResolvedConfig } from './config.ts';
 import { CliError } from './errors.ts';
 import type { CliIO } from './io.ts';

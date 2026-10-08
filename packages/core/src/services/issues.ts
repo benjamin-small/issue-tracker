@@ -1,4 +1,4 @@
-import { type Tx, toJson, withWriteTx } from '@tracker/db';
+import { type Tx, toJson, withWriteTx } from '@poietic-tech/issues-db';
 import {
   type CreateIssueInput,
   CreateIssueInputSchema,
@@ -12,7 +12,7 @@ import {
   type TrackerEvent,
   type UpdateIssueInput,
   UpdateIssueInputSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
 import { nowIso, type ServiceContext } from '../context.ts';
 import {

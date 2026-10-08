@@ -1,5 +1,5 @@
-import type { Db } from '@tracker/db';
-import { type EntityKind, newId } from '@tracker/schema';
+import type { Db } from '@poietic-tech/issues-db';
+import { type EntityKind, newId } from '@poietic-tech/issues-schema';
 
 /** The authenticated principal performing an operation. Humans and agents are both actors. */
 export interface Actor {

@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
-import { ERROR_CODES, type ErrorCode, ProblemSchema } from '@tracker/schema';
+import { ERROR_CODES, type ErrorCode, ProblemSchema } from '@poietic-tech/issues-schema';
 import type { Context } from 'hono';
-import { DomainError } from '@tracker/core';
+import { DomainError } from '@poietic-tech/issues-core';
 
 /** OpenAPI response entries for the given error codes, grouped by status. */
 export function errorResponses(...codes: ErrorCode[]) {

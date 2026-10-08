@@ -127,7 +127,7 @@ function compare(a: unknown, b: unknown): number {
   return sa < sb ? -1 : sa > sb ? 1 : 0;
 }
 
-/** Evaluates one operator against a field value. Mirrors the SQL compiler in @tracker/core exactly. */
+/** Evaluates one operator against a field value. Mirrors the SQL compiler in @poietic-tech/issues-core exactly. */
 export function evaluateCondition(actual: unknown, op: FilterOp, value: unknown): boolean {
   if (Array.isArray(actual)) {
     // Set-valued fields (labels, multi-select): "has".

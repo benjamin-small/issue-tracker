@@ -1,5 +1,5 @@
-import { testDialect } from '@tracker/db/testing';
-import type { FilterCondition } from '@tracker/schema';
+import { testDialect } from '@poietic-tech/issues-db/testing';
+import type { FilterCondition } from '@poietic-tech/issues-schema';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   addFieldOption,

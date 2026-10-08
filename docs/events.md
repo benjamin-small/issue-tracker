@@ -140,7 +140,7 @@ function verify(secret: string, headers: Headers, rawBody: string): boolean {
 }
 ```
 
-`verifyWebhook(secret, headers, body)` from `@tracker/core` does the same. Rotating the secret (`tracker webhook rotate-secret`) takes effect on the next attempt.
+`verifyWebhook(secret, headers, body)` from `@poietic-tech/issues-core` does the same. Rotating the secret (`tracker webhook rotate-secret`) takes effect on the next attempt.
 
 ### Retries and failure handling
 

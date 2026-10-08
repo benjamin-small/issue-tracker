@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FieldRegistry } from '@tracker/schema';
+  import { FieldRegistry } from '@poietic-tech/issues-schema';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Plus from '@lucide/svelte/icons/plus';
   import { MediaQuery } from 'svelte/reactivity';

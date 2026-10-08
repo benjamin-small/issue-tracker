@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { testDialect } from '@tracker/db/testing';
+import { testDialect } from '@poietic-tech/issues-db/testing';
 import { afterAll, describe, expect, it } from 'vitest';
 import { loadConfig } from './config.ts';
 import { startServer } from './server.ts';

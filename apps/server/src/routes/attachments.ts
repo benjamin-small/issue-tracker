@@ -9,8 +9,8 @@ import {
   INLINE_SAFE_TYPES,
   listAttachments,
   uploadAttachment,
-} from '@tracker/core';
-import { AttachmentSchema } from '@tracker/schema';
+} from '@poietic-tech/issues-core';
+import { AttachmentSchema } from '@poietic-tech/issues-schema';
 import { bodyLimit } from 'hono/body-limit';
 import type { ResolvedDeps, TrackerApp } from '../env.ts';
 import { problem } from '../problem.ts';

@@ -1,7 +1,7 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { testDialect } from '@tracker/db/testing';
-import { webhookMatchesType } from '@tracker/schema';
+import { testDialect } from '@poietic-tech/issues-db/testing';
+import { webhookMatchesType } from '@poietic-tech/issues-schema';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   assertWebhookUrl,

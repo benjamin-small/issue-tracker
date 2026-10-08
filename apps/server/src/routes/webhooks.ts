@@ -11,7 +11,7 @@ import {
   testWebhook,
   updateWebhook,
   type WebhookPolicy,
-} from '@tracker/core';
+} from '@poietic-tech/issues-core';
 import {
   CreateWebhookInputSchema,
   EventSchema,
@@ -22,7 +22,7 @@ import {
   WebhookSchema,
   WebhookTestResultSchema,
   WebhookWithSecretSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import type { TrackerApp } from '../env.ts';
 import { CursorQuery, errorResponses, json, jsonBody, LimitQuery, refParam } from './common.ts';
 

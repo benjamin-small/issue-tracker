@@ -1,5 +1,5 @@
-import type { Kysely, Database, Selectable } from '@tracker/db';
-import { isIdOf, parseIssueKey } from '@tracker/schema';
+import type { Kysely, Database, Selectable } from '@poietic-tech/issues-db';
+import { isIdOf, parseIssueKey } from '@poietic-tech/issues-schema';
 import type { ServiceContext } from './context.ts';
 import { notFound } from './errors.ts';
 

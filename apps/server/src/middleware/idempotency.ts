@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { fromJson, toJson, withWriteTx } from '@tracker/db';
+import { fromJson, toJson, withWriteTx } from '@poietic-tech/issues-db';
 import { createMiddleware } from 'hono/factory';
 import type { AppEnv, ResolvedDeps } from '../env.ts';
 import { problem } from '../problem.ts';
