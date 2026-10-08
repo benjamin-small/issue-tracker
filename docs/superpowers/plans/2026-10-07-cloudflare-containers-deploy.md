@@ -688,12 +688,18 @@ git commit -m "docs: ADR 0019 and Cloudflare Containers deployment"
 
 Runs after the infra PR is applied, the secrets exist, the SSO plan has merged and Tasks 1–5 have merged.
 
-- [ ] **Step 1:** Merging to `main` triggers CI, then Deploy. Watch the Deploy run until the smoke check passes.
-- [ ] **Step 2:** Open `https://issues.poietic.tech`. The poietic admin account should land signed in as a tracker admin, through the automatic SSO attempt.
+- [x] **Step 1:** Merging to `main` triggers CI, then Deploy. Watch the Deploy run until the smoke check passes.
+      Result: Deploy run 37666099022 (`workflow_run`, 2026-10-07) succeeded, smoke check passed.
+- [x] **Step 2:** Open `https://issues.poietic.tech`. The poietic admin account should land signed in as a tracker admin, through the automatic SSO attempt.
+      Result: the owner signed in via poietic.tech SSO and reported it working; admin role not separately confirmed.
 - [ ] **Step 3:** Create a project and an issue, upload an attachment, and confirm the attachment downloads (a presigned R2 URL).
+      Not individually confirmed: the owner reported the site working, but did not confirm this step specifically.
 - [ ] **Step 4:** Open the issue list in two tabs, edit in one, and confirm the other updates live. This shows SSE streams through `Container.fetch`. If it doesn't, change the Worker to proxy through `this.ctx.container.getTcpPort(3000).fetch(...)` and redeploy.
-- [ ] **Step 5:** Trigger a restart and confirm the data is restored. The Containers API has a stop/restart call, which the cloudflare-devops agent runs via `cf api`; otherwise wait out `sleepAfter`.
-- [ ] **Step 5a: Rollout ordering (run before relying on a second deploy).** The spec's single-writer check: a `wrangler deploy` rollout must stop the old container, and let Litestream finish its final sync, before the new container restores. With a tab open on the live stream (the issue list), write something (create or edit an issue). Then trigger the Deploy workflow by `workflow_dispatch` on `main`. When the smoke check passes, reload and confirm the write survived. In the Worker's container logs (Workers Observability), confirm that the old container's `litestream shut down` line comes before the new container's `attempting restore before replication` / `restore completed`. If the write is lost, or the ordering is not guaranteed (overlap, or no `litestream shut down` before the restore), stop deploying: implement the spec's lease guard first (the Worker holds a lease in Durable Object storage that the entrypoint checks before restoring), and re-run this step.
+      Not individually confirmed: the owner reported the site working, but did not confirm this step specifically.
+- [x] **Step 5:** Trigger a restart and confirm the data is restored. The Containers API has a stop/restart call, which the cloudflare-devops agent runs via `cf api`; otherwise wait out `sleepAfter`.
+      Result: the container slept at 18:57:04Z (`litestream shut down`) and woke at 19:49:22Z with `restore completed` and no migrations.
+- [x] **Step 5a: Rollout ordering (run before relying on a second deploy).** The spec's single-writer check: a `wrangler deploy` rollout must stop the old container, and let Litestream finish its final sync, before the new container restores. With a tab open on the live stream (the issue list), write something (create or edit an issue). Then trigger the Deploy workflow by `workflow_dispatch` on `main`. When the smoke check passes, reload and confirm the write survived. In the Worker's container logs (Workers Observability), confirm that the old container's `litestream shut down` line comes before the new container's `attempting restore before replication` / `restore completed`. If the write is lost, or the ordering is not guaranteed (overlap, or no `litestream shut down` before the restore), stop deploying: implement the spec's lease guard first (the Worker holds a lease in Durable Object storage that the entrypoint checks before restoring), and re-run this step.
+      Result: run 37681019282 rolled v1→v2; old `litestream shut down` at 20:20:37.672Z, before the new instance's restore (20:20:41.886Z → 20:20:46.555Z, txid 0x0a). Stop-then-start, so no lease guard is needed (see ADR 0019).
 - [ ] **Step 6:** Create the Claude agent user and token:
 
 ```bash
@@ -702,3 +708,5 @@ tracker token create --user claude --name ci
 ```
 
 Run these with `TRACKER_SERVER=https://issues.poietic.tech` and the admin's token from the web UI.
+
+Step 6 result: not done yet.
