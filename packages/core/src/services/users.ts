@@ -1,11 +1,11 @@
-import { type Tx, withWriteTx } from '@tracker/db';
+import { type Tx, withWriteTx } from '@poietic-tech/issues-db';
 import {
   type CreateUserInput,
   CreateUserInputSchema,
   type UpdateUserInput,
   UpdateUserInputSchema,
   type User,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import type { z } from 'zod';
 import { type Actor, nowIso, type ServiceContext } from '../context.ts';
 import { conflict, forbidden, isUniqueViolation, parseInput } from '../errors.ts';

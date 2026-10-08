@@ -7,8 +7,8 @@ import type {
   IdGenerator,
   ServiceContext,
   WebhookPolicy,
-} from '@tracker/core';
-import type { Db } from '@tracker/db';
+} from '@poietic-tech/issues-core';
+import type { Db } from '@poietic-tech/issues-db';
 import type { Logger } from './logger.ts';
 import type { JwtVerifier } from './sso/jwt.ts';
 
@@ -89,5 +89,7 @@ export interface AppEnv {
 
 export type TrackerApp = OpenAPIHono<AppEnv>;
 
-export const SESSION_COOKIE = 'tracker_session';
+export const SESSION_COOKIE = 'poietic_issues_session';
+/** Pre-rename cookie name, still accepted for one release (ADR 0020). */
+export const LEGACY_SESSION_COOKIE = 'tracker_session';
 export const API_PREFIX = '/api/v1';

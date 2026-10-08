@@ -8,12 +8,13 @@ import {
   type AppDeps,
   type AppEnv,
   type ResolvedDeps,
+  SESSION_COOKIE,
   type TrackerApp,
 } from './env.ts';
 import { authenticate, requestId, requireActor } from './middleware/auth.ts';
 import { idempotency } from './middleware/idempotency.ts';
 import { silentLogger } from './logger.ts';
-import { sql } from '@tracker/db';
+import { sql } from '@poietic-tech/issues-db';
 import { problem, problemFromError } from './problem.ts';
 import { registerAttachmentRoutes } from './routes/attachments.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
@@ -78,12 +79,12 @@ function buildApi(resolved: ResolvedDeps): TrackerApp {
     type: 'http',
     scheme: 'bearer',
     description:
-      'API token (`trk_…`), created with `POST /users/{user}/tokens` or `tracker token create`.',
+      'API token (`trk_…`), created with `POST /users/{user}/tokens` or `poietic-issues token create`.',
   });
   api.openAPIRegistry.registerComponent('securitySchemes', 'sessionCookie', {
     type: 'apiKey',
     in: 'cookie',
-    name: 'tracker_session',
+    name: SESSION_COOKIE,
     description: 'Web session from `/auth/token-login` or `/auth/dev-login`.',
   });
 

@@ -1,5 +1,5 @@
-import { sql, type Tx, toJson } from '@tracker/db';
-import type { EventType } from '@tracker/schema';
+import { sql, type Tx, toJson } from '@poietic-tech/issues-db';
+import type { EventType } from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from './context.ts';
 
 export interface RecordEventInput {
@@ -36,7 +36,7 @@ export async function recordEvent(
 }
 
 /** Postgres NOTIFY channel signalled whenever events are committed. */
-export const EVENTS_CHANNEL = 'tracker_events';
+export const EVENTS_CHANNEL = 'poietic_issues_events';
 
 /** Computes `{ field: { from, to } }` for fields whose JSON representation changed. */
 export function diff<T extends Record<string, unknown>>(

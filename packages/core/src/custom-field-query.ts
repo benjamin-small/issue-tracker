@@ -1,11 +1,11 @@
-import { type Database, type Kysely, type RawBuilder, sql, toBool } from '@tracker/db';
+import { type Database, type Kysely, type RawBuilder, sql, toBool } from '@poietic-tech/issues-db';
 import {
   CUSTOM_FIELD_PREFIX,
   type CustomFieldLike,
   type CustomFieldValue,
   FieldRegistry,
   type FilterCondition,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { scalarCondition, setCondition } from './issue-query.ts';
 
 type Exec = Kysely<Database>;

@@ -148,7 +148,7 @@ export const sendWebhookRequest: WebhookSender = async (req) => {
           ...req.headers,
           'content-type': 'application/json',
           'content-length': Buffer.byteLength(req.body),
-          'user-agent': 'tracker-webhooks/1',
+          'user-agent': 'poietic-issues-webhooks/1',
         },
         timeout: timeoutMs,
         ...(!req.allowPrivate && { lookup: publicOnlyLookup }),

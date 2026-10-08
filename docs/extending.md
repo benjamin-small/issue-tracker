@@ -11,7 +11,7 @@ Short recipes for common changes. Each keeps the rules in [AGENTS.md](../AGENTS.
 5. **Regenerate** the API contract and client with `pnpm openapi:gen`.
 6. **Web.** Add a cell/card renderer in `IssueCard`/`IssueList` and an editor in `IssueProperties`.
 
-Most per-team fields don't need any of this. Use custom fields (`tracker field create`) instead.
+Most per-team fields don't need any of this. Use custom fields (`poietic-issues field create`) instead.
 
 ## Add a custom field type
 
@@ -29,7 +29,7 @@ Most per-team fields don't need any of this. Use custom fields (`tracker field c
 ## Add an API route
 
 1. Implement the behaviour as a core service function that takes a `ServiceContext` and writes through `withWriteTx`.
-2. Declare the route in `apps/server/src/routes/*.ts` with `createRoute` and schemas from `@tracker/schema`, and list its error codes with `errorResponses(...)`.
+2. Declare the route in `apps/server/src/routes/*.ts` with `createRoute` and schemas from `@poietic-tech/issues-schema`, and list its error codes with `errorResponses(...)`.
 3. Run `pnpm openapi:gen`, then commit `docs/openapi.json` and the regenerated client.
 4. Add an `app.request()` test. It runs on both dialects.
 

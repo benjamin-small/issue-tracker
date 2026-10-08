@@ -1,4 +1,4 @@
-import { type Tx, toJson, withWriteTx } from '@tracker/db';
+import { type Tx, toJson, withWriteTx } from '@poietic-tech/issues-db';
 import {
   type CreateProjectInput,
   CreateProjectInputSchema,
@@ -7,7 +7,7 @@ import {
   type StatusCategory,
   type UpdateProjectInput,
   UpdateProjectInputSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, isUniqueViolation, parseInput } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';

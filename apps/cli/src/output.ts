@@ -1,4 +1,4 @@
-import { type Issue, readField } from '@tracker/schema';
+import { type Issue, readField } from '@poietic-tech/issues-schema';
 import type { OutputFormat } from './config.ts';
 import type { CliIO } from './io.ts';
 

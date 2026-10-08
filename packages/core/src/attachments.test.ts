@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { testDialect } from '@tracker/db/testing';
+import { testDialect } from '@poietic-tech/issues-db/testing';
 import S3rver from 's3rver';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {

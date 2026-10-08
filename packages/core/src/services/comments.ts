@@ -1,4 +1,4 @@
-import { type Tx, withWriteTx } from '@tracker/db';
+import { type Tx, withWriteTx } from '@poietic-tech/issues-db';
 import {
   type Comment,
   type CreateCommentInput,
@@ -7,7 +7,7 @@ import {
   isIdOf,
   type UpdateCommentInput,
   UpdateCommentInputSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, forbidden, notFound, parseInput } from '../errors.ts';
 import { recordEvent } from '../events.ts';

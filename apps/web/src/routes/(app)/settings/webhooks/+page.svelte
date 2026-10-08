@@ -128,14 +128,14 @@
   };
 </script>
 
-<svelte:head><title>Webhooks · Tracker</title></svelte:head>
+<svelte:head><title>Webhooks · Issues</title></svelte:head>
 
 <div class="overflow-y-auto">
   <div class="mx-auto max-w-4xl space-y-6 px-6 py-6">
     <header>
       <h1 class="text-lg font-semibold">Webhooks</h1>
       <p class="mt-1 text-sm text-fg-muted">
-        Tracker POSTs each matching event as JSON, signed per
+        Issues POSTs each matching event as JSON, signed per
         <a class="underline" href="https://www.standardwebhooks.com" target="_blank" rel="noopener"
           >Standard Webhooks</a
         >. Failed deliveries are retried after 1m, 5m, 30m, 2h and 12h. A webhook is disabled after
@@ -312,7 +312,8 @@
       {:else}
         <li class="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-fg-subtle">
           No webhooks yet. Or register one from a terminal with
-          <code class="font-mono text-xs">tracker webhook create URL --events 'issue.*'</code>.
+          <code class="font-mono text-xs">poietic-issues webhook create URL --events 'issue.*'</code
+          >.
         </li>
       {/each}
     </ul>

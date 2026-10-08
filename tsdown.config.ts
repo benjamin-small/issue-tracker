@@ -8,7 +8,7 @@ import { defineConfig } from 'tsdown';
 export default defineConfig({
   entry: {
     server: 'apps/server/src/main.ts',
-    tracker: 'apps/cli/src/bin.ts',
+    'poietic-issues': 'apps/cli/src/bin.ts',
   },
   outDir: 'dist',
   format: 'esm',

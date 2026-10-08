@@ -8,13 +8,13 @@ import {
   seedDemoData,
   SYSTEM_ACTOR,
   WebhookRunner,
-} from '@tracker/core';
-import { createDb, type Db, migrateToLatest } from '@tracker/db';
-import { createApp } from '@tracker/server';
+} from '@poietic-tech/issues-core';
+import { createDb, type Db, migrateToLatest } from '@poietic-tech/issues-db';
+import { createApp } from '@poietic-tech/issues-server';
 import initSqlJs from 'sql.js/dist/sql-asm-memory-growth.js';
 import { configureSqlJs, currentDatabase } from './shims/better-sqlite3.ts';
 
-const STORAGE_KEY = 'tracker-demo-db-v1';
+const STORAGE_KEY = 'poietic-issues-demo-db-v1';
 
 /** Attachment bytes live in memory (and in the saved snapshot's side table below). */
 class MemoryBlobStore implements BlobStore {

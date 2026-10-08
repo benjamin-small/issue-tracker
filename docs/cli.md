@@ -1,14 +1,14 @@
-# The `tracker` CLI
+# The `poietic-issues` CLI
 
-`tracker` is the command-line interface to the tracker, built to be driven by AI agents as much as by people. Every command is listed in the generated [CLI reference](cli-reference.md).
+`poietic-issues` (npm: `@poietic-tech/issues`) is the command-line interface to the tracker, built to be driven by AI agents as much as by people. Every command is listed in the generated [CLI reference](cli-reference.md).
 
 ```sh
-pnpm tracker --help              # inside this repo (or link the bin: apps/cli/src/bin.ts)
-tracker issue create -t "Fix login" -p high -l bug --json
-tracker issue list --assignee me --status "In Progress"
-tracker issue edit ENG-42 --status Done --add-label shipped
-tracker comment add ENG-42 --body-file notes.md
-tracker link add ENG-42 blocked-by ENG-7
+pnpm poietic-issues --help              # inside this repo (or link the bin: apps/cli/src/bin.ts)
+poietic-issues issue create -t "Fix login" -p high -l bug --json
+poietic-issues issue list --assignee me --status "In Progress"
+poietic-issues issue edit ENG-42 --status Done --add-label shipped
+poietic-issues comment add ENG-42 --body-file notes.md
+poietic-issues link add ENG-42 blocked-by ENG-7
 ```
 
 ## Grammar
@@ -26,32 +26,32 @@ tracker link add ENG-42 blocked-by ENG-7
 
 ## Connecting: remote and local mode
 
-| Mode       | When                                                               | How it works                                                                                                                       |
-| ---------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **Remote** | a server URL is configured                                         | HTTPS to `TRACKER_SERVER` with the token `TRACKER_TOKEN`                                                                           |
-| **Local**  | only a database URL is configured (default `sqlite:./data/dev.db`) | Runs the same HTTP API in-process against the database file; no server needed. Acts as `TRACKER_ACTOR` (default: the first admin). |
+| Mode       | When                                                               | How it works                                                                                                                              |
+| ---------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Remote** | a server URL is configured                                         | HTTPS to `POIETIC_ISSUES_SERVER` with the token `POIETIC_ISSUES_TOKEN`                                                                    |
+| **Local**  | only a database URL is configured (default `sqlite:./data/dev.db`) | Runs the same HTTP API in-process against the database file; no server needed. Acts as `POIETIC_ISSUES_ACTOR` (default: the first admin). |
 
 Both modes execute the exact same API code, including validation, permissions, events and error codes ([ADR 0005](adr/0005-api-as-contract.md)).
 
 Configuration precedence (first wins):
 
 1. Flags: `--server`, `--token`, `--database`, `--actor`, `--project`, `--format`, `--fields`
-2. Environment: `TRACKER_SERVER`, `TRACKER_TOKEN`, `TRACKER_DATABASE_URL`, `TRACKER_ACTOR`, `TRACKER_PROJECT`, `TRACKER_FORMAT`, `TRACKER_FIELDS`
-3. `.tracker.json`, found by walking up from the current directory. Write it with `tracker init`. It holds `server` / `database`, `project` and `actor`, **never tokens**. Commit it to a repository so agents working there pick the right project.
-4. User config `$XDG_CONFIG_HOME/tracker/config.json` (mode 0600), which holds tokens per server. Write it with `tracker auth login --server <url> --with-token < token.txt`.
+2. Environment: `POIETIC_ISSUES_SERVER`, `POIETIC_ISSUES_TOKEN`, `POIETIC_ISSUES_DATABASE_URL`, `POIETIC_ISSUES_ACTOR`, `POIETIC_ISSUES_PROJECT`, `POIETIC_ISSUES_FORMAT`, `POIETIC_ISSUES_FIELDS`
+3. `.poietic-issues.json`, found by walking up from the current directory. Write it with `poietic-issues init`. It holds `server` / `database`, `project` and `actor`, **never tokens**. Commit it to a repository so agents working there pick the right project.
+4. User config `$XDG_CONFIG_HOME/poietic-issues/config.json` (mode 0600), which holds tokens per server. Write it with `poietic-issues auth login --server <url> --with-token < token.txt`.
 
-`tracker auth status` shows which mode, user and project are in effect, and where each setting came from.
+`poietic-issues auth status` shows which mode, user and project are in effect, and where each setting came from.
 
 ## Output contract
 
-| Format | Flag                        | Output                                                                              |
-| ------ | --------------------------- | ----------------------------------------------------------------------------------- |
-| table  | default                     | Aligned columns for humans. Hints go to stderr.                                     |
-| json   | `--json` or `--format json` | Exactly the API resource shape. Lists are `{ "data": [...], "nextCursor": … }`.     |
-| ndjson | `--format ndjson`           | One JSON object per line. Good for streaming and `jq -c`.                           |
-| ids    | `-q` / `--quiet`            | Only keys and ids, one per line (e.g. `tracker issue create … -q` prints `ENG-43`). |
+| Format | Flag                        | Output                                                                                     |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------------ |
+| table  | default                     | Aligned columns for humans. Hints go to stderr.                                            |
+| json   | `--json` or `--format json` | Exactly the API resource shape. Lists are `{ "data": [...], "nextCursor": … }`.            |
+| ndjson | `--format ndjson`           | One JSON object per line. Good for streaming and `jq -c`.                                  |
+| ids    | `-q` / `--quiet`            | Only keys and ids, one per line (e.g. `poietic-issues issue create … -q` prints `ENG-43`). |
 
-- `TRACKER_FORMAT=json` sets the default for a whole agent session.
+- `POIETIC_ISSUES_FORMAT=json` sets the default for a whole agent session.
 - The format never switches automatically based on TTY detection.
 - `--fields key,title,status,assignee.handle` projects output to those fields, for fewer tokens. Plain names are resource fields or field-registry keys (e.g. `statusCategory`). Dotted paths reach into objects.
 - `--all` fetches every page. `--limit` and `--cursor` page manually.
@@ -93,20 +93,20 @@ With `--json`, errors are written to stderr as a JSON object with a stable `code
 
 ## Discovery
 
-| Command                                                   | What it gives                                                                                                       |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `tracker commands --json`                                 | Every command, argument, option, exit code, error code and environment variable, in one call                        |
-| `tracker project schema`                                  | JSON Schema for issue create/update in the current project, with live enums: statuses, labels, users, custom fields |
-| `tracker schema <name>`                                   | JSON Schema of resources and inputs (`issue`, `issue-create`, `issue-filter`, `view-config`, …)                     |
-| `tracker api GET /issues/ENG-1`                           | Any endpoint, raw (like `gh api`)                                                                                   |
-| `tracker event list --after <seq>` / `tracker event tail` | What changed since a point in time (NDJSON with `tail`)                                                             |
+| Command                                                                 | What it gives                                                                                                       |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `poietic-issues commands --json`                                        | Every command, argument, option, exit code, error code and environment variable, in one call                        |
+| `poietic-issues project schema`                                         | JSON Schema for issue create/update in the current project, with live enums: statuses, labels, users, custom fields |
+| `poietic-issues schema <name>`                                          | JSON Schema of resources and inputs (`issue`, `issue-create`, `issue-filter`, `view-config`, …)                     |
+| `poietic-issues api GET /issues/ENG-1`                                  | Any endpoint, raw (like `gh api`)                                                                                   |
+| `poietic-issues event list --after <seq>` / `poietic-issues event tail` | What changed since a point in time (NDJSON with `tail`)                                                             |
 
 ## Administration (local mode)
 
 ```sh
-tracker --database sqlite:./data/dev.db db migrate    # apply migrations
-tracker db seed                                       # demo data + printed tokens (empty database only)
-tracker serve --port 3000                             # run the server on the local database
-tracker user create --handle builder-bot --name "Builder Bot" --kind agent
-tracker token create --user builder-bot --name ci -q  # prints the secret only
+poietic-issues --database sqlite:./data/dev.db db migrate    # apply migrations
+poietic-issues db seed                                       # demo data + printed tokens (empty database only)
+poietic-issues serve --port 3000                             # run the server on the local database
+poietic-issues user create --handle builder-bot --name "Builder Bot" --kind agent
+poietic-issues token create --user builder-bot --name ci -q  # prints the secret only
 ```

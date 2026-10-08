@@ -9,12 +9,12 @@
 #   scripts/pg.sh url      print the connection URL
 #
 # Tuned for speed, NOT durability (fsync=off). Never point this at data you care about.
-# Env overrides: TRACKER_PG_DIR (data dir), TRACKER_PG_PORT (default 54329),
-#   TRACKER_PG_BACKEND (native|docker; default: native when binaries exist, else docker).
+# Env overrides: POIETIC_ISSUES_PG_DIR (data dir), POIETIC_ISSUES_PG_PORT (default 54329),
+#   POIETIC_ISSUES_PG_BACKEND (native|docker; default: native when binaries exist, else docker).
 set -euo pipefail
 
-PGDATA_DIR="${TRACKER_PG_DIR:-/var/tmp/tracker-pg}"
-PORT="${TRACKER_PG_PORT:-54329}"
+PGDATA_DIR="${POIETIC_ISSUES_PG_DIR:-/var/tmp/tracker-pg}"
+PORT="${POIETIC_ISSUES_PG_PORT:-54329}"
 SOCKET_DIR="$(dirname "$PGDATA_DIR")"
 LOG_FILE="$PGDATA_DIR.log"
 DB_USER="tracker"
@@ -35,7 +35,7 @@ find_bin() {
   fi
 }
 
-BACKEND="${TRACKER_PG_BACKEND:-}"
+BACKEND="${POIETIC_ISSUES_PG_BACKEND:-}"
 PG_BIN="$(find_bin)"
 if [[ -z "$BACKEND" ]]; then
   if [[ -n "$PG_BIN" ]]; then

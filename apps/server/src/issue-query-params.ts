@@ -1,4 +1,4 @@
-import { DomainError } from '@tracker/core';
+import { DomainError } from '@poietic-tech/issues-core';
 import {
   FILTER_OPS,
   type FilterCondition,
@@ -7,7 +7,7 @@ import {
   IssueFilterSchema,
   SORTABLE_FIELDS,
   type SortSpec,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 
 /** Query parameters with a fixed meaning (everything else is a filter condition). */
 const RESERVED = new Set(['limit', 'cursor', 'sort', 'includeDeleted', 'filter', 'q']);

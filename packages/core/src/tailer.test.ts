@@ -1,6 +1,6 @@
-import { createDb } from '@tracker/db';
-import { testDialect } from '@tracker/db/testing';
-import type { TrackerEvent } from '@tracker/schema';
+import { createDb } from '@poietic-tech/issues-db';
+import { testDialect } from '@poietic-tech/issues-db/testing';
+import type { TrackerEvent } from '@poietic-tech/issues-schema';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { EventTailer } from './events/tailer.ts';
 import { createIssue, createProject } from './index.ts';

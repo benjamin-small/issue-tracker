@@ -1,4 +1,4 @@
-import { ApiError, createClient, type Schemas, unwrap } from '@tracker/client';
+import { ApiError, createClient, type Schemas, unwrap } from '@poietic-tech/issues-client';
 
 export type Issue = Schemas['Issue'];
 export type Status = Schemas['Status'];

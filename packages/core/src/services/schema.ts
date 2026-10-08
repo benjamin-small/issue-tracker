@@ -1,5 +1,5 @@
-import { fromJson } from '@tracker/db';
-import { CreateIssueInputSchema, UpdateIssueInputSchema } from '@tracker/schema';
+import { fromJson } from '@poietic-tech/issues-db';
+import { CreateIssueInputSchema, UpdateIssueInputSchema } from '@poietic-tech/issues-schema';
 import { z } from 'zod';
 import type { ServiceContext } from '../context.ts';
 import { getProjectRow } from '../refs.ts';

@@ -1,5 +1,5 @@
 {
-  "name": "@tracker/deploy-cloudflare",
+  "name": "@poietic-tech/issues-deploy-cloudflare",
   "version": "0.0.0",
   "private": true,
   "description": "Runs the tracker on Cloudflare Containers at issues.poietic.tech (SQLite replicated to R2 by Litestream).",

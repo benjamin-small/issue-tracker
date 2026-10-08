@@ -1,10 +1,10 @@
-# tracker
+# poietic-issues
 
 A custom issue tracker built for teams where **humans and AI agents work side by side**.
 
 - **An extensible domain model.** Projects, issues, comments, typed links, sub-issues, labels, custom fields, attachments and saved views sit on top of an append-only event log.
 - **A typesafe, documented API.** Zod schemas are the single source of truth, and the committed OpenAPI 3.1 contract is generated from them.
-- **An agent-grade CLI (`tracker`).** It has stable JSON output, documented exit codes and never prompts, and it can describe its own commands (`tracker commands --json`).
+- **An agent-grade CLI (`poietic-issues`).** It has stable JSON output, documented exit codes and never prompts, and it can describe its own commands (`poietic-issues commands --json`).
 - **A Svelte web UI** with a list view, a kanban board with customizable cards, and live updates over SSE.
 - **Integrations and storage:** signed webhooks, and file attachments on local disk or any S3-compatible store.
 - **SQLite for development, Postgres for production**, from one codebase. Every test suite runs against both. Production is a single Docker image.
@@ -29,7 +29,7 @@ To develop against Postgres instead (it uses local binaries if you have them, or
 
 ```sh
 pnpm pg start
-TRACKER_DATABASE_URL=$(pnpm --silent pg url) pnpm dev
+POIETIC_ISSUES_DATABASE_URL=$(pnpm --silent pg url) pnpm dev
 ```
 
 ## Use the CLI
@@ -37,9 +37,9 @@ TRACKER_DATABASE_URL=$(pnpm --silent pg url) pnpm dev
 Local mode needs no server. It runs the API in-process on the same `data/dev.db` that `pnpm dev` uses:
 
 ```sh
-pnpm tracker db migrate && pnpm tracker db seed      # not needed if `pnpm dev` has already run
-pnpm tracker issue list -P ENG
-pnpm tracker commands --json                         # the full command surface, for agents
+pnpm poietic-issues db migrate && pnpm poietic-issues db seed      # not needed if `pnpm dev` has already run
+pnpm poietic-issues issue list -P ENG
+pnpm poietic-issues commands --json                         # the full command surface, for agents
 ```
 
 The CLI can also talk to a running server; see [cli.md](docs/cli.md).
@@ -49,8 +49,8 @@ The CLI can also talk to a running server; see [cli.md](docs/cli.md).
 This runs the **production-shaped stack** (Postgres, S3-compatible storage and the tracker image built from this checkout) on http://localhost:3000:
 
 ```sh
-docker compose up -d --build --wait tracker
-docker compose exec tracker tracker db bootstrap --handle you --name "Your Name"   # prints an API token
+docker compose up -d --build --wait poietic-issues
+docker compose exec poietic-issues poietic-issues db bootstrap --handle you --name "Your Name"   # prints an API token
 ```
 
 Sign in with the printed token; production auth has no demo users. Stop the stack with `docker compose down`, or add `-v` to delete its data too. [deployment.md](docs/deployment.md) covers configuration and hardening.
@@ -83,16 +83,16 @@ CI also runs the tests on Postgres, the Playwright end-to-end suite on both data
 
 ## Repository layout
 
-| Path              | Purpose                                                                                  |
-| ----------------- | ---------------------------------------------------------------------------------------- |
-| `packages/schema` | Isomorphic Zod schemas and types shared by server, CLI and web                           |
-| `packages/db`     | Kysely database layer: dialect factory (SQLite/Postgres), migrations, write transactions |
-| `packages/core`   | Transport-agnostic domain services; all business rules live here                         |
-| `packages/client` | Typed API client generated from the OpenAPI document                                     |
-| `apps/server`     | Hono HTTP API (`/api/v1`), SSE, OpenAPI docs; serves the web app in production           |
-| `apps/cli`        | The `tracker` CLI, which talks to a server or runs in-process against a local database   |
-| `apps/web`        | SvelteKit single-page app (served by the API server in production)                       |
-| `docs/`           | Architecture, API/CLI guides, and [architecture decision records](docs/adr/)             |
+| Path              | Purpose                                                                                                                |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `packages/schema` | Isomorphic Zod schemas and types shared by server, CLI and web                                                         |
+| `packages/db`     | Kysely database layer: dialect factory (SQLite/Postgres), migrations, write transactions                               |
+| `packages/core`   | Transport-agnostic domain services; all business rules live here                                                       |
+| `packages/client` | Typed API client generated from the OpenAPI document                                                                   |
+| `apps/server`     | Hono HTTP API (`/api/v1`), SSE, OpenAPI docs; serves the web app in production                                         |
+| `apps/cli`        | The `poietic-issues` CLI (`@poietic-tech/issues`), which talks to a server or runs in-process against a local database |
+| `apps/web`        | SvelteKit single-page app (served by the API server in production)                                                     |
+| `docs/`           | Architecture, API/CLI guides, and [architecture decision records](docs/adr/)                                           |
 
 ## License
 

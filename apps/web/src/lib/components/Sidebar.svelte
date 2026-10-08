@@ -49,7 +49,7 @@
 >
   <div class="flex items-center gap-2 px-3 py-3">
     <img src={asset('/favicon.svg')} alt="" class="size-5" />
-    <span class="font-semibold">Tracker</span>
+    <span class="font-semibold">Issues</span>
     <span
       class="ml-auto inline-flex items-center gap-1.5 rounded-full px-1.5 py-0.5 text-[11px] {live.connected
         ? 'text-fg-subtle'

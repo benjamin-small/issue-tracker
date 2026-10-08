@@ -200,7 +200,7 @@
           onclick={() => (ui.sidebarOpen = true)}><Menu size={18} /></button
         >
         <span class="truncate text-sm font-medium"
-          >{projects.data?.find((p) => p.key === currentProject)?.name ?? 'Tracker'}</span
+          >{projects.data?.find((p) => p.key === currentProject)?.name ?? 'Issues'}</span
         >
         {#if currentProject}
           <button

@@ -1,4 +1,4 @@
-import { type Tx, withWriteTx } from '@tracker/db';
+import { type Tx, withWriteTx } from '@poietic-tech/issues-db';
 import {
   type CreateLabelInput,
   CreateLabelInputSchema,
@@ -6,7 +6,7 @@ import {
   type Label,
   type UpdateLabelInput,
   UpdateLabelInputSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, isUniqueViolation, notFound, parseInput } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';

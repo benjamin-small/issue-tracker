@@ -1,4 +1,4 @@
-import { type ApiClient, unwrap } from '@tracker/client';
+import { type ApiClient, unwrap } from '@poietic-tech/issues-client';
 import type { Command } from 'commander';
 import { type GlobalFlags, resolveConfig, type ResolvedConfig } from './config.ts';
 import { CliError, usage } from './errors.ts';
@@ -40,7 +40,7 @@ export class Runtime {
     const project = explicit ?? this.config.project;
     if (!project)
       throw usage(
-        'No project given: pass --project <KEY>, set TRACKER_PROJECT, or run `tracker init --project <KEY>`',
+        'No project given: pass --project <KEY>, set POIETIC_ISSUES_PROJECT, or run `poietic-issues init --project <KEY>`',
       );
     return project;
   }

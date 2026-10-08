@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { createProject, LocalDiskBlobStore } from '@tracker/core';
-import { createTestContext, type TestContext } from '@tracker/core/testing';
-import { testDialect } from '@tracker/db/testing';
-import { createApp } from '@tracker/server';
+import { createProject, LocalDiskBlobStore } from '@poietic-tech/issues-core';
+import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
+import { testDialect } from '@poietic-tech/issues-db/testing';
+import { createApp } from '@poietic-tech/issues-server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { CliIO } from './io.ts';
 import { renderCliReference } from './reference.ts';
@@ -27,7 +27,12 @@ async function cli(
   const io: CliIO = {
     stdout: (s) => (stdout += s),
     stderr: (s) => (stderr += s),
-    env: { HOME: dir, XDG_CONFIG_HOME: join(dir, 'config'), TRACKER_PROJECT: 'CLI', ...opts.env },
+    env: {
+      HOME: dir,
+      XDG_CONFIG_HOME: join(dir, 'config'),
+      POIETIC_ISSUES_PROJECT: 'CLI',
+      ...opts.env,
+    },
     cwd: dir,
     readStdin: async () => opts.stdin ?? '',
     isTTY: false,
@@ -177,7 +182,7 @@ describe(`tracker CLI (${testDialect()})`, () => {
     const unknown = await cli(['issue', 'frobnicate']);
     expect(unknown.code).toBe(2);
     expect((await cli(['--version'])).code).toBe(0);
-    expect((await cli(['issue', 'list'], { env: { TRACKER_PROJECT: '' } })).stderr).toMatch(
+    expect((await cli(['issue', 'list'], { env: { POIETIC_ISSUES_PROJECT: '' } })).stderr).toMatch(
       /No project given/,
     );
   });
@@ -412,14 +417,14 @@ describe(`tracker CLI (${testDialect()})`, () => {
 describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transports)', () => {
   it('runs in-process against a local SQLite file', async () => {
     const db = join(dir, 'local.db');
-    const env = { TRACKER_DATABASE_URL: `sqlite:${db}` };
+    const env = { POIETIC_ISSUES_DATABASE_URL: `sqlite:${db}` };
     const unmigrated = await cli(['issue', 'list'], { env, fetch: null });
     expect(unmigrated.code).toBe(6);
-    expect(unmigrated.stderr).toMatch(/tracker db migrate/);
+    expect(unmigrated.stderr).toMatch(/poietic-issues db migrate/);
     expect((await cli(['db', 'migrate'], { env, fetch: null })).stdout).toMatch(
       /Applied: 0001_init, 0002_webhook_delivery_details/,
     );
-    const fresh = { TRACKER_DATABASE_URL: `sqlite:${join(dir, 'fresh.db')}` };
+    const fresh = { POIETIC_ISSUES_DATABASE_URL: `sqlite:${join(dir, 'fresh.db')}` };
     const boot = await cli(['db', 'bootstrap', '--handle', 'root', '--name', 'Root', '--json'], {
       env: fresh,
       fetch: null,
@@ -440,45 +445,47 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
     });
     expect(list.stdout.trim().split('\n')[0]).toBe('ENG-1');
     const me = await cli(['whoami', '--json'], {
-      env: { ...env, TRACKER_ACTOR: 'claude' },
+      env: { ...env, POIETIC_ISSUES_ACTOR: 'claude' },
       fetch: null,
     });
     expect(me.json()).toMatchObject({ handle: 'claude', kind: 'agent' });
   });
 
   it('creates the SQLite file’s directory, like the server does', async () => {
-    const env = { TRACKER_DATABASE_URL: `sqlite:${join(dir, 'missing', 'nested', 'dev.db')}` };
+    const env = {
+      POIETIC_ISSUES_DATABASE_URL: `sqlite:${join(dir, 'missing', 'nested', 'dev.db')}`,
+    };
     const migrated = await cli(['db', 'migrate'], { env, fetch: null });
     expect(migrated.stderr).toBe('');
     expect(migrated.code).toBe(0);
   });
 
   it('talks to a real server with a token, and logs in', async () => {
-    const { loadConfig, startServer } = await import('@tracker/server');
+    const { loadConfig, startServer } = await import('@poietic-tech/issues-server');
     const server = await startServer(
       loadConfig({
-        TRACKER_DATABASE_URL: `sqlite:${join(dir, 'remote.db')}`,
-        TRACKER_PORT: '0',
-        TRACKER_SEED: '1',
+        POIETIC_ISSUES_DATABASE_URL: `sqlite:${join(dir, 'remote.db')}`,
+        POIETIC_ISSUES_PORT: '0',
+        POIETIC_ISSUES_SEED: '1',
       }),
     );
     try {
       const token = (
         await (
-          await import('@tracker/core')
+          await import('@poietic-tech/issues-core')
         ).createToken(
           {
             ...t.ctx,
             db: server.db,
             actor: (await (
-              await import('@tracker/core')
+              await import('@poietic-tech/issues-core')
             ).actorForUser({ db: server.db, actor: t.admin }, 'ada'))!,
           },
           'ada',
           { name: 'cli-test' },
         )
       ).token;
-      const env = { TRACKER_SERVER: server.url, TRACKER_TOKEN: token };
+      const env = { POIETIC_ISSUES_SERVER: server.url, POIETIC_ISSUES_TOKEN: token };
       const created = await cli(['issue', 'create', '-P', 'ENG', '-t', 'Over HTTP', '--json'], {
         env,
         fetch: null,
@@ -489,7 +496,7 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
       expect(
         (
           await cli(['whoami', '-q'], {
-            env: { TRACKER_SERVER: server.url, TRACKER_TOKEN: 'trk_bad' },
+            env: { POIETIC_ISSUES_SERVER: server.url, POIETIC_ISSUES_TOKEN: 'trk_bad' },
             fetch: null,
           })
         ).code,
@@ -506,7 +513,7 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
       await server.close();
     }
     const down = await cli(['whoami'], {
-      env: { TRACKER_SERVER: 'http://127.0.0.1:9', TRACKER_TOKEN: 'x' },
+      env: { POIETIC_ISSUES_SERVER: 'http://127.0.0.1:9', POIETIC_ISSUES_TOKEN: 'x' },
       fetch: null,
     });
     expect(down.code).toBe(6);
@@ -518,7 +525,11 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
     const version = await exec(process.execPath, [bin, '--version']);
     expect(version.stdout.trim()).toBe('0.1.0');
     const failure = await exec(process.execPath, [bin, 'issue', 'view', 'ENG-999', '--json'], {
-      env: { ...process.env, TRACKER_DATABASE_URL: `sqlite:${join(dir, 'local.db')}`, HOME: dir },
+      env: {
+        ...process.env,
+        POIETIC_ISSUES_DATABASE_URL: `sqlite:${join(dir, 'local.db')}`,
+        HOME: dir,
+      },
     }).catch((e: { code: number; stderr: string }) => e);
     expect(failure).toMatchObject({ code: 3 });
     expect(JSON.parse((failure as { stderr: string }).stderr).code).toBe('NOT_FOUND');

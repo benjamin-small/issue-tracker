@@ -6,7 +6,7 @@ import {
   toJson,
   type Tx,
   withWriteTx,
-} from '@tracker/db';
+} from '@poietic-tech/issues-db';
 import {
   type CreateWebhookInput,
   CreateWebhookInputSchema,
@@ -22,7 +22,7 @@ import {
   type WebhookTestResult,
   type WebhookWithSecret,
   webhookMatchesType,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { notFound, parseInput, validationError } from '../errors.ts';
 import { toUserSummary } from '../mappers.ts';
@@ -512,6 +512,9 @@ export async function deliverDueWebhooks(
                 Math.floor(attemptAt.getTime() / 1000),
                 JSON.stringify(event),
               ),
+              'x-poietic-issues-event': event.type,
+              'x-poietic-issues-event-seq': String(event.seq),
+              // Deprecated pre-rename names, sent for one more release (ADR 0020).
               'x-tracker-event': event.type,
               'x-tracker-event-seq': String(event.seq),
             },

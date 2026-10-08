@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FieldRegistry, SORTABLE_FIELDS } from '@tracker/schema';
+  import { FieldRegistry, SORTABLE_FIELDS } from '@poietic-tech/issues-schema';
   import { Popover } from 'bits-ui';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import type { ProjectData } from '../project-data.svelte.ts';

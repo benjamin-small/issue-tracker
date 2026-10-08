@@ -105,7 +105,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @tracker/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @poietic-tech/issues-web exec playwright install --with-deps chromium
       - run: pnpm e2e
         env:
           CI: 'true'
@@ -126,17 +126,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Start the stack (Postgres + S3 storage)
-        run: docker compose up -d --build --wait tracker
+        run: docker compose up -d --build --wait poietic-issues
       - name: Bootstrap an admin and use the API through the CLI
         run: |
-          token=$(docker compose exec -T tracker tracker db bootstrap --handle ci --name CI --json | jq -r .token)
-          docker compose exec -T -e TRACKER_SERVER=http://127.0.0.1:3000 -e TRACKER_TOKEN="$token" tracker \
-            sh -c 'tracker project create -k CI --name CI -q && tracker issue create -t "From CI" --project CI -q'
+          token=$(docker compose exec -T poietic-issues poietic-issues db bootstrap --handle ci --name CI --json | jq -r .token)
+          docker compose exec -T -e POIETIC_ISSUES_SERVER=http://127.0.0.1:3000 -e POIETIC_ISSUES_TOKEN="$token" poietic-issues \
+            sh -c 'poietic-issues project create -k CI --name CI -q && poietic-issues issue create -t "From CI" --project CI -q'
           curl -sf http://localhost:3000/readyz
           curl -sf http://localhost:3000/ | grep -q '<!doctype html>'
       - name: Graceful shutdown
         run: |
-          docker compose stop -t 20 tracker
-          test "$(docker inspect "$(docker compose ps -aq tracker)" --format '{{.State.ExitCode}}')" = 0
+          docker compose stop -t 20 poietic-issues
+          test "$(docker inspect "$(docker compose ps -aq poietic-issues)" --format '{{.State.ExitCode}}')" = 0
       - if: failure()
         run: docker compose logs

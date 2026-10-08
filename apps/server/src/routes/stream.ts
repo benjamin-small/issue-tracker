@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
-import { type EventTailer, getProjectRow, listEvents } from '@tracker/core';
-import type { TrackerEvent } from '@tracker/schema';
+import { type EventTailer, getProjectRow, listEvents } from '@poietic-tech/issues-core';
+import type { TrackerEvent } from '@poietic-tech/issues-schema';
 import { streamSSE } from 'hono/streaming';
 import type { ResolvedDeps, TrackerApp } from '../env.ts';
 import { problem } from '../problem.ts';

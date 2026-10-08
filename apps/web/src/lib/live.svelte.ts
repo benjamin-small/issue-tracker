@@ -5,7 +5,7 @@ import {
   type IssueFilter,
   matchesFilter,
   type SortSpec,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { type Issue, ownRequestIds, type TrackerEvent, type User } from './api.ts';
 import { projectKeyOf } from './issues.ts';
 import { type IssueListQuery, keys } from './queries.ts';

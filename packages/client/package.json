@@ -1,5 +1,5 @@
 {
-  "name": "@tracker/client",
+  "name": "@poietic-tech/issues-client",
   "version": "0.0.0",
   "private": true,
   "description": "Typed API client generated from the OpenAPI document.",
@@ -12,7 +12,7 @@
     "gen": "openapi-typescript ../../docs/openapi.json -o src/generated/openapi.d.ts --root-types --root-types-no-schema-prefix --default-non-nullable false"
   },
   "dependencies": {
-    "@tracker/schema": "workspace:*",
+    "@poietic-tech/issues-schema": "workspace:*",
     "openapi-fetch": "^0.17.0"
   },
   "devDependencies": {

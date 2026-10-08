@@ -22,16 +22,16 @@ RUN mkdir -p /out \
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production \
     NODE_OPTIONS=--enable-source-maps \
-    TRACKER_HOST=0.0.0.0 \
-    TRACKER_PORT=3000 \
-    TRACKER_WEB_DIR=/app/web \
-    TRACKER_DATABASE_URL=sqlite:/data/tracker.db \
-    TRACKER_BLOB_DIR=/data/blobs \
-    TRACKER_AUTO_MIGRATE=1
+    POIETIC_ISSUES_HOST=0.0.0.0 \
+    POIETIC_ISSUES_PORT=3000 \
+    POIETIC_ISSUES_WEB_DIR=/app/web \
+    POIETIC_ISSUES_DATABASE_URL=sqlite:/data/tracker.db \
+    POIETIC_ISSUES_BLOB_DIR=/data/blobs \
+    POIETIC_ISSUES_AUTO_MIGRATE=1
 WORKDIR /app
 COPY --from=build /out /app
-RUN printf '#!/bin/sh\nexec node /app/dist/tracker.mjs "$@"\n' > /usr/local/bin/tracker \
-  && chmod +x /usr/local/bin/tracker \
+RUN printf '#!/bin/sh\nexec node /app/dist/poietic-issues.mjs "$@"\n' > /usr/local/bin/poietic-issues \
+  && chmod +x /usr/local/bin/poietic-issues \
   && mkdir -p /data && chown node:node /data
 USER node
 VOLUME /data

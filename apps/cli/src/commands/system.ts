@@ -1,6 +1,6 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createClient, unwrap } from '@tracker/client';
+import { createClient, unwrap } from '@poietic-tech/issues-client';
 import {
   bootstrapAdmin,
   createContext,
@@ -8,8 +8,8 @@ import {
   inputSchema,
   seedDemoData,
   SYSTEM_ACTOR,
-} from '@tracker/core';
-import { latestMigrationName, migrateToLatest, migrationStatus } from '@tracker/db';
+} from '@poietic-tech/issues-core';
+import { latestMigrationName, migrateToLatest, migrationStatus } from '@poietic-tech/issues-db';
 import {
   CommentSchema,
   CreateCommentInputSchema,
@@ -27,7 +27,7 @@ import {
   ProjectSchema,
   UpdateIssueInputSchema,
   ViewConfigSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { Command, type Option } from 'commander';
 import { z } from 'zod';
 import {
@@ -46,7 +46,7 @@ type Opts = Record<string, unknown>;
 const actFor = (io: CliIO) => (fn: (rt: Runtime, args: unknown[], o: Opts) => Promise<void>) =>
   makeAction(io, fn);
 
-/** Schemas exposed by `tracker schema <name>` (JSON Schema, draft 2020-12). */
+/** Schemas exposed by `poietic-issues schema <name>` (JSON Schema, draft 2020-12). */
 const SCHEMAS: Record<string, { schema: z.ZodType; io: 'input' | 'output' }> = {
   issue: { schema: IssueSchema, io: 'output' },
   'issue-create': { schema: CreateIssueInputSchema, io: 'input' },
@@ -145,8 +145,8 @@ export function authCommand(io: CliIO): Command {
           [
             `Mode:      ${status.mode} — ${status.transport}`,
             `Acting as: @${me.handle} (${me.kind}, ${me.role})`,
-            `Project:   ${status.project ?? '— (set with --project, TRACKER_PROJECT or tracker init)'}`,
-            `Config:    ${status.projectConfig ?? 'no .tracker.json'}`,
+            `Project:   ${status.project ?? '— (set with --project, POIETIC_ISSUES_PROJECT or poietic-issues init)'}`,
+            `Config:    ${status.projectConfig ?? 'no .poietic-issues.json'}`,
             '',
           ].join('\n'),
         );
@@ -194,7 +194,7 @@ export function dbCommand(io: CliIO): Command {
     const config = resolveConfig(flags, io);
     if (config.mode !== 'local' || !config.database)
       throw usage(
-        'db commands need a local database: set --database or TRACKER_DATABASE_URL (not --server)',
+        'db commands need a local database: set --database or POIETIC_ISSUES_DATABASE_URL (not --server)',
       );
     return { config, db: await openLocalDatabase(config.database, false) };
   };
@@ -299,13 +299,13 @@ export function serveCommand(io: CliIO): Command {
       const config = resolveConfig(flags, io);
       if (config.mode !== 'local')
         throw usage('serve runs against a database: pass --database (not --server)');
-      const { loadConfig, startServer } = await import('@tracker/server');
+      const { loadConfig, startServer } = await import('@poietic-tech/issues-server');
       const server = await startServer(
         loadConfig({
           ...io.env,
-          TRACKER_DATABASE_URL: config.database,
-          TRACKER_PORT: String(o.port),
-          TRACKER_HOST: String(o.host),
+          POIETIC_ISSUES_DATABASE_URL: config.database,
+          POIETIC_ISSUES_PORT: String(o.port),
+          POIETIC_ISSUES_HOST: String(o.host),
         }),
       );
       io.stderr(`Tracker listening on ${server.url} (API docs at /api/docs). Ctrl-C to stop.\n`);
@@ -445,13 +445,13 @@ export function describeCommands(program: Command): {
       Object.entries(ERROR_CODES).map(([k, v]) => [k, { status: v.status, exit: v.exit }]),
     ),
     environment: {
-      TRACKER_SERVER: 'Server URL (remote mode)',
-      TRACKER_TOKEN: 'API token for the server',
-      TRACKER_DATABASE_URL: 'Database URL (local mode), e.g. sqlite:./data/dev.db',
-      TRACKER_ACTOR: 'Local mode: user handle to act as',
-      TRACKER_PROJECT: 'Default project key',
-      TRACKER_FORMAT: 'Default output format: table|json|ndjson|ids',
-      TRACKER_FIELDS: 'Default --fields projection',
+      POIETIC_ISSUES_SERVER: 'Server URL (remote mode)',
+      POIETIC_ISSUES_TOKEN: 'API token for the server',
+      POIETIC_ISSUES_DATABASE_URL: 'Database URL (local mode), e.g. sqlite:./data/dev.db',
+      POIETIC_ISSUES_ACTOR: 'Local mode: user handle to act as',
+      POIETIC_ISSUES_PROJECT: 'Default project key',
+      POIETIC_ISSUES_FORMAT: 'Default output format: table|json|ndjson|ids',
+      POIETIC_ISSUES_FIELDS: 'Default --fields projection',
     },
   };
 }
@@ -462,7 +462,7 @@ export function commandsCommand(io: CliIO, program: () => Command): Command {
     .action(async (_o: Opts, command: Command) => {
       const info = describeCommands(program());
       const flags = command.optsWithGlobals();
-      if (flags.json || flags.format === 'json' || io.env.TRACKER_FORMAT === 'json') {
+      if (flags.json || flags.format === 'json' || io.env.POIETIC_ISSUES_FORMAT === 'json') {
         io.stdout(`${JSON.stringify(info, null, 2)}\n`);
         return;
       }

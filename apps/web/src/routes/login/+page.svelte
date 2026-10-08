@@ -3,7 +3,7 @@
   import { asset } from '$app/paths';
   import { current, navigate, shareUrl } from '$lib/nav.ts';
 
-  const DEMO = import.meta.env.TRACKER_DEMO;
+  const DEMO = import.meta.env.POIETIC_ISSUES_DEMO;
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { api, call, errorMessage } from '$lib/api.ts';
   import { fetchers, keys } from '$lib/queries.ts';
@@ -103,13 +103,13 @@
   });
 </script>
 
-<svelte:head><title>Sign in · Tracker</title></svelte:head>
+<svelte:head><title>Sign in · Issues</title></svelte:head>
 
 <main class="flex min-h-screen items-center justify-center bg-bg-subtle p-6">
   <div class="w-full max-w-sm rounded-xl border border-border bg-bg p-6 shadow-sm">
     <div class="mb-6 flex items-center gap-2">
       <img src={asset('/favicon.svg')} alt="" class="size-7" />
-      <h1 class="text-lg font-semibold">Sign in to Tracker</h1>
+      <h1 class="text-lg font-semibold">Sign in to Issues</h1>
     </div>
 
     {#if pending}
@@ -118,7 +118,7 @@
         <p class="mt-1 text-sm text-fg-muted">{pending}</p>
         <p class="mt-2 text-xs text-fg-subtle">
           An admin can approve you with
-          <code class="font-mono">tracker user edit &lt;handle&gt; --reactivate</code>.
+          <code class="font-mono">poietic-issues user edit &lt;handle&gt; --reactivate</code>.
         </p>
       </div>
     {:else if config.data?.sso}
@@ -131,8 +131,8 @@
       <p class="mb-1 text-sm font-medium">{DEMO ? 'Explore as…' : 'Continue as…'}</p>
       {#if !DEMO}
         <p class="mb-2 text-xs text-fg-subtle">
-          This server runs with <code class="font-mono">TRACKER_AUTH_MODE=dev</code>, so anyone can
-          pick a user. Use <code class="font-mono">standard</code> in production.
+          This server runs with <code class="font-mono">POIETIC_ISSUES_AUTH_MODE=dev</code>, so
+          anyone can pick a user. Use <code class="font-mono">standard</code> in production.
         </p>
       {/if}
       <ul class="mb-6 space-y-1" data-testid="dev-users">
@@ -184,7 +184,7 @@
         >
         <p class="text-xs text-fg-subtle">
           Ask an admin for a token, or create one with
-          <code class="font-mono">tracker token create --name web</code>.
+          <code class="font-mono">poietic-issues token create --name web</code>.
         </p>
       </form>
     {/if}

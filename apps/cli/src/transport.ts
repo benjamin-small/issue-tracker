@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
-import { type ApiClient, createClient } from '@tracker/client';
-import { blobStoreFromEnv, ensureBuiltins } from '@tracker/core';
+import { type ApiClient, createClient } from '@poietic-tech/issues-client';
+import { blobStoreFromEnv, ensureBuiltins } from '@poietic-tech/issues-core';
 import { dirname, join } from 'node:path';
-import { createDb, type Db, migrationStatus, parseDatabaseUrl } from '@tracker/db';
-import { createApp } from '@tracker/server';
+import { createDb, type Db, migrationStatus, parseDatabaseUrl } from '@poietic-tech/issues-db';
+import { createApp } from '@poietic-tech/issues-server';
 import type { ResolvedConfig } from './config.ts';
 import { CliError } from './errors.ts';
 import type { CliIO } from './io.ts';
@@ -74,7 +74,9 @@ export async function openTransport(config: ResolvedConfig, io: CliIO): Promise<
     db,
     auth: { mode: 'trusted', actor },
     blobStore,
-    webhooks: { allowPrivate: ['1', 'true'].includes(io.env.TRACKER_WEBHOOK_ALLOW_PRIVATE ?? '') },
+    webhooks: {
+      allowPrivate: ['1', 'true'].includes(io.env.POIETIC_ISSUES_WEBHOOK_ALLOW_PRIVATE ?? ''),
+    },
   });
   return {
     client: createClient({
@@ -103,7 +105,7 @@ export async function openLocalDatabase(url: string, requireMigrated: boolean): 
       await db.destroy();
       throw new CliError(
         'UNAVAILABLE',
-        `Database ${url} is not migrated (pending: ${status.pending.join(', ')}). Run \`tracker db migrate\`.`,
+        `Database ${url} is not migrated (pending: ${status.pending.join(', ')}). Run \`poietic-issues db migrate\`.`,
       );
     }
     await ensureBuiltins(db);
@@ -111,7 +113,7 @@ export async function openLocalDatabase(url: string, requireMigrated: boolean): 
   return db;
 }
 
-/** Local mode acts as TRACKER_ACTOR, or else the first admin human. */
+/** Local mode acts as POIETIC_ISSUES_ACTOR, or else the first admin human. */
 async function defaultLocalActor(db: Db): Promise<string> {
   const row = await db.kysely
     .selectFrom('users')
@@ -124,7 +126,7 @@ async function defaultLocalActor(db: Db): Promise<string> {
   if (!row)
     throw new CliError(
       'UNAUTHENTICATED',
-      'No admin user in the local database. Run `tracker db seed`, or `tracker user create` with TRACKER_ACTOR set.',
+      'No admin user in the local database. Run `poietic-issues db seed`, or `poietic-issues user create` with POIETIC_ISSUES_ACTOR set.',
     );
   return row.handle;
 }

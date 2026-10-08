@@ -1,5 +1,5 @@
-import { fromJson, sql, type Tx } from '@tracker/db';
-import type { EventType, Page, TrackerEvent } from '@tracker/schema';
+import { fromJson, sql, type Tx } from '@poietic-tech/issues-db';
+import type { EventType, Page, TrackerEvent } from '@poietic-tech/issues-schema';
 import type { ServiceContext } from '../context.ts';
 import { validationError } from '../errors.ts';
 

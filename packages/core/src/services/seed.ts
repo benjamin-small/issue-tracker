@@ -9,7 +9,7 @@ import { createProject } from './projects.ts';
 import { createUserUnchecked, toActor } from './users.ts';
 
 export interface SeedResult {
-  /** API token for the `claude` agent user (dev convenience; printed by `tracker db seed`). */
+  /** API token for the `claude` agent user (dev convenience; printed by `poietic-issues db seed`). */
   agentToken: string;
   /** API token for the `ada` admin user. */
   adminToken: string;

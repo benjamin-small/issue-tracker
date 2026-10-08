@@ -1,4 +1,4 @@
-import type { Schemas } from '@tracker/client';
+import type { Schemas } from '@poietic-tech/issues-client';
 import { Command } from 'commander';
 import { usage } from '../errors.ts';
 import type { CliIO } from '../io.ts';
@@ -332,7 +332,7 @@ export function issueCommand(io: CliIO): Command {
           'issue',
           data,
           (i) =>
-            `${String(i.key)} ${o.permanent ? 'permanently deleted' : 'moved to the trash (tracker issue restore to undo)'}\n`,
+            `${String(i.key)} ${o.permanent ? 'permanently deleted' : 'moved to the trash (poietic-issues issue restore to undo)'}\n`,
         );
       }),
     );

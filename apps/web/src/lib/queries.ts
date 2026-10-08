@@ -1,4 +1,4 @@
-import type { IssueFilter, SortSpec } from '@tracker/schema';
+import type { IssueFilter, SortSpec } from '@poietic-tech/issues-schema';
 import { api, call, type Issue } from './api.ts';
 
 /** Query keys. Issues are cached by key (`ENG-42`), lists by project + query. */

@@ -1,5 +1,5 @@
-import { withWriteTx } from '@tracker/db';
-import { CreateUserInputSchema, type User } from '@tracker/schema';
+import { withWriteTx } from '@poietic-tech/issues-db';
+import { CreateUserInputSchema, type User } from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { toUser } from '../mappers.ts';
 import { insertUser } from './users.ts';
@@ -38,7 +38,7 @@ export function handleFromName(name: string): string {
 }
 
 /**
- * Maps an SSO identity to its tracker user, creating one on first sign-in. Role and name are fixed at creation:
+ * Maps an SSO identity to its poietic-issues user, creating one on first sign-in. Role and name are fixed at creation:
  * later sign-ins never re-derive privilege from the token. New non-admin users start deactivated (pending).
  */
 export async function signInWithSso(

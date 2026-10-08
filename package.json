@@ -1,5 +1,5 @@
 {
-  "name": "tracker",
+  "name": "poietic-issues",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -17,17 +17,17 @@
     "test:watch": "vitest",
     "test:pg": "TEST_DB=postgres vitest run",
     "pg": "bash scripts/pg.sh",
-    "openapi:gen": "pnpm --filter @tracker/server openapi:gen && pnpm --filter @tracker/client gen",
-    "openapi:check": "pnpm --filter @tracker/server openapi:check && pnpm --filter @tracker/client gen && git diff --exit-code -- packages/client/src/generated",
-    "dev:server": "pnpm --filter @tracker/server dev",
-    "tracker": "node apps/cli/src/bin.ts",
+    "openapi:gen": "pnpm --filter @poietic-tech/issues-server openapi:gen && pnpm --filter @poietic-tech/issues-client gen",
+    "openapi:check": "pnpm --filter @poietic-tech/issues-server openapi:check && pnpm --filter @poietic-tech/issues-client gen && git diff --exit-code -- packages/client/src/generated",
+    "dev:server": "pnpm --filter @poietic-tech/issues-server dev",
+    "poietic-issues": "node apps/cli/src/bin.ts",
     "dev": "node scripts/dev.ts",
-    "build:web": "pnpm --filter @tracker/web build",
+    "build:web": "pnpm --filter @poietic-tech/issues-web build",
     "build": "pnpm build:web && tsdown",
     "start": "node dist/server.mjs",
-    "e2e": "pnpm build:web && pnpm --filter @tracker/web e2e",
-    "build:demo": "pnpm --filter @tracker/web build:demo",
-    "e2e:demo": "pnpm build:demo && pnpm --filter @tracker/web e2e:demo"
+    "e2e": "pnpm build:web && pnpm --filter @poietic-tech/issues-web e2e",
+    "build:demo": "pnpm --filter @poietic-tech/issues-web build:demo",
+    "e2e:demo": "pnpm build:demo && pnpm --filter @poietic-tech/issues-web e2e:demo"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { useQueryClient } from '@tanstack/svelte-query';
-  import { compareIssues } from '@tracker/schema';
+  import { compareIssues } from '@poietic-tech/issues-schema';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import ChevronsLeftRight from '@lucide/svelte/icons/chevrons-left-right';

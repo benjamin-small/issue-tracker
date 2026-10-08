@@ -1,5 +1,5 @@
-import { createTestDb, type TestDb } from '@tracker/db/testing';
-import { newId } from '@tracker/schema';
+import { createTestDb, type TestDb } from '@poietic-tech/issues-db/testing';
+import { newId } from '@poietic-tech/issues-schema';
 import { type Actor, type Clock, type ServiceContext, SYSTEM_ACTOR, withActor } from './context.ts';
 import { ensureBuiltins } from './services/bootstrap.ts';
 import { createUserUnchecked, toActor } from './services/users.ts';

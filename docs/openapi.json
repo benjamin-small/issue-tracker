@@ -23,12 +23,12 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "API token (`trk_…`), created with `POST /users/{user}/tokens` or `tracker token create`."
+        "description": "API token (`trk_…`), created with `POST /users/{user}/tokens` or `poietic-issues token create`."
       },
       "sessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "tracker_session",
+        "name": "poietic_issues_session",
         "description": "Web session from `/auth/token-login` or `/auth/dev-login`."
       }
     },
@@ -3035,7 +3035,7 @@
         ],
         "security": [],
         "summary": "Sign in as any user (development only)",
-        "description": "Only available when the server runs with `TRACKER_AUTH_MODE=dev`.",
+        "description": "Only available when the server runs with `POIETIC_ISSUES_AUTH_MODE=dev`.",
         "requestBody": {
           "required": true,
           "content": {
@@ -8660,7 +8660,7 @@
               "example": "issue.updated"
             },
             "required": true,
-            "name": "x-tracker-event",
+            "name": "x-poietic-issues-event",
             "in": "header"
           },
           {
@@ -8669,6 +8669,28 @@
               "example": "1042"
             },
             "required": true,
+            "name": "x-poietic-issues-event-seq",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Deprecated: same as `x-poietic-issues-event`.",
+              "deprecated": true
+            },
+            "required": true,
+            "description": "Deprecated: same as `x-poietic-issues-event`.",
+            "name": "x-tracker-event",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Deprecated: same as `x-poietic-issues-event-seq`.",
+              "deprecated": true
+            },
+            "required": true,
+            "description": "Deprecated: same as `x-poietic-issues-event-seq`.",
             "name": "x-tracker-event-seq",
             "in": "header"
           }

@@ -1,5 +1,9 @@
+import { applyLegacyEnv, legacyEnvWarning } from '@poietic-tech/issues-core';
 import { loadConfig } from './config.ts';
 import { startServer } from './server.ts';
+
+const legacyWarning = legacyEnvWarning(applyLegacyEnv(process.env));
+if (legacyWarning) console.warn(legacyWarning);
 
 let config;
 try {
@@ -9,7 +13,7 @@ try {
   process.exit(2);
 }
 const server = await startServer(config).catch((error: unknown) => {
-  console.error(`Tracker failed to start: ${(error as Error).message}`);
+  console.error(`poietic-issues failed to start: ${(error as Error).message}`);
   process.exit(1);
 });
 

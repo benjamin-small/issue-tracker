@@ -9,14 +9,19 @@ const envFile = resolve(root, '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 // pnpm runs the server from apps/server, so resolve relative paths against the repo root, where the CLI's
 // local mode looks: both then share data/dev.db and data/blobs.
-const dbUrl = process.env.TRACKER_DATABASE_URL ?? 'sqlite:./data/dev.db';
+const dbUrl = process.env.POIETIC_ISSUES_DATABASE_URL ?? 'sqlite:./data/dev.db';
 const sqliteFile = /^sqlite:(?!:memory:)(.+)$/.exec(dbUrl)?.[1];
-process.env.TRACKER_DATABASE_URL = sqliteFile ? `sqlite:${resolve(root, sqliteFile)}` : dbUrl;
-process.env.TRACKER_BLOB_DIR = resolve(root, process.env.TRACKER_BLOB_DIR ?? 'data/blobs');
+process.env.POIETIC_ISSUES_DATABASE_URL = sqliteFile
+  ? `sqlite:${resolve(root, sqliteFile)}`
+  : dbUrl;
+process.env.POIETIC_ISSUES_BLOB_DIR = resolve(
+  root,
+  process.env.POIETIC_ISSUES_BLOB_DIR ?? 'data/blobs',
+);
 
 const procs = [
-  { name: 'api', color: 36, cmd: 'pnpm', args: ['--filter', '@tracker/server', 'dev'] },
-  { name: 'web', color: 35, cmd: 'pnpm', args: ['--filter', '@tracker/web', 'dev'] },
+  { name: 'api', color: 36, cmd: 'pnpm', args: ['--filter', '@poietic-tech/issues-server', 'dev'] },
+  { name: 'web', color: 35, cmd: 'pnpm', args: ['--filter', '@poietic-tech/issues-web', 'dev'] },
 ].map(({ name, color, cmd, args }) => {
   const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], env: process.env });
   const prefix = `\x1b[${color}m${name.padEnd(3)}\x1b[0m │ `;

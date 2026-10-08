@@ -1,5 +1,10 @@
-import { DomainError, zodIssuesToFieldErrors } from '@tracker/core';
-import { ERROR_CODES, type ErrorCode, type FieldError, type Problem } from '@tracker/schema';
+import { DomainError, zodIssuesToFieldErrors } from '@poietic-tech/issues-core';
+import {
+  ERROR_CODES,
+  type ErrorCode,
+  type FieldError,
+  type Problem,
+} from '@poietic-tech/issues-schema';
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ZodError } from 'zod';

@@ -1,11 +1,11 @@
-import { type Db, withWriteTx } from '@tracker/db';
+import { type Db, withWriteTx } from '@poietic-tech/issues-db';
 import { type Clock, SYSTEM_ACTOR, systemClock } from '../context.ts';
-import { newId, type User } from '@tracker/schema';
+import { newId, type User } from '@poietic-tech/issues-schema';
 import { conflict } from '../errors.ts';
 import { createToken } from './auth.ts';
 import { createUserUnchecked } from './users.ts';
 
-/** Built-in link types. Keys are part of the API contract (`tracker link add ENG-1 blocks ENG-2`). */
+/** Built-in link types. Keys are part of the API contract (`poietic-issues link add ENG-1 blocks ENG-2`). */
 export const BUILTIN_LINK_TYPES = [
   { key: 'blocks', name: 'Blocks', outward: 'blocks', inward: 'is blocked by', symmetric: false },
   { key: 'relates', name: 'Relates', outward: 'relates to', inward: 'relates to', symmetric: true },

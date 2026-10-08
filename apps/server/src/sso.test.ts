@@ -1,5 +1,5 @@
-import { createTestContext, type TestContext } from '@tracker/core/testing';
-import { testDialect } from '@tracker/db/testing';
+import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
+import { testDialect } from '@poietic-tech/issues-db/testing';
 import { pino } from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
@@ -68,9 +68,25 @@ describe(`SSO sign-in (${testDialect()})`, () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ role: 'admin', name: 'Person admin-1' });
     const session = res.headers.get('set-cookie')!.split(';')[0]!;
-    expect(session).toMatch(/^tracker_session=/);
+    expect(session).toMatch(/^poietic_issues_session=/);
     const me = await app.request(`${BASE}/api/v1/me`, { headers: { cookie: session } });
     expect(((await me.json()) as { name: string }).name).toBe('Person admin-1');
+  });
+
+  it('still accepts the pre-rename tracker_session cookie, and logout clears it', async () => {
+    const app = createApp({ db: t.db, auth: { mode: 'standard', sso: sso() } });
+    const res = await post(app, 'admin-legacy');
+    const value = res.headers.get('set-cookie')!.split(';')[0]!.split('=')[1]!;
+    const legacy = { cookie: `tracker_session=${value}` };
+    const me = await app.request(`${BASE}/api/v1/me`, { headers: legacy });
+    expect(me.status).toBe(200);
+    const out = await app.request(`${BASE}/api/v1/auth/logout`, {
+      method: 'POST',
+      headers: { ...legacy, origin: BASE },
+    });
+    expect(out.status).toBe(204);
+    expect(out.headers.get('set-cookie')).toMatch(/^tracker_session=;/);
+    expect((await app.request(`${BASE}/api/v1/me`, { headers: legacy })).status).toBe(401);
   });
 
   it('answers PENDING_APPROVAL for a new non-admin identity, without a session', async () => {

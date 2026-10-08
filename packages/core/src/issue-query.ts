@@ -6,7 +6,7 @@ import {
   likeContains,
   type RawBuilder,
   sql,
-} from '@tracker/db';
+} from '@poietic-tech/issues-db';
 import {
   type FieldRegistry,
   formatIssueKey,
@@ -18,7 +18,7 @@ import {
   SORT_SENTINELS,
   SORTABLE_FIELDS,
   type SortSpec,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import type { ServiceContext } from './context.ts';
 import { validationError } from './errors.ts';
 import { findIssue } from './refs.ts';
@@ -177,7 +177,7 @@ export async function loadIssue(db: Exec, id: string): Promise<Issue> {
 }
 
 // ---------------------------------------------------------------------------
-// Filter compilation (must mirror `evaluateCondition` in @tracker/schema exactly)
+// Filter compilation (must mirror `evaluateCondition` in @poietic-tech/issues-schema exactly)
 // ---------------------------------------------------------------------------
 
 type Value = string | number | boolean | null;
@@ -304,7 +304,7 @@ export function compileFilter(filter: IssueFilter, registry: FieldRegistry): Boo
 // Sorting & keyset pagination
 // ---------------------------------------------------------------------------
 
-/** SQL sort expression per field; must match `sortKey` in @tracker/schema. */
+/** SQL sort expression per field; must match `sortKey` in @poietic-tech/issues-schema. */
 export function sortExpression(field: string, dialect: Dialect): RawBuilder<unknown> {
   switch (field) {
     case 'priority':

@@ -1,5 +1,5 @@
-import type { Db } from '@tracker/db';
-import type { TrackerEvent } from '@tracker/schema';
+import type { Db } from '@poietic-tech/issues-db';
+import type { TrackerEvent } from '@poietic-tech/issues-schema';
 import type { ServiceContext } from '../context.ts';
 import { EVENTS_CHANNEL } from '../events.ts';
 import { latestEventSeq, listEvents } from '../services/events.ts';

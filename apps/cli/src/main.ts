@@ -7,14 +7,14 @@ export const CLI_VERSION = '0.1.0';
 
 /** Builds the command tree. Pure: no I/O until an action runs. */
 export function buildProgram(io: CliIO): Command {
-  const program = new Command('tracker')
+  const program = new Command('poietic-issues')
     .description(
-      'Command-line interface to the tracker — designed for humans and AI agents.\n\n' +
-        'Machine use: add --json (or set TRACKER_FORMAT=json); errors go to stderr as problem JSON with stable\n' +
-        'codes; exit codes are documented (`tracker commands --json`). Nothing ever prompts.',
+      'Command-line interface to poietic-issues — designed for humans and AI agents.\n\n' +
+        'Machine use: add --json (or set POIETIC_ISSUES_FORMAT=json); errors go to stderr as problem JSON with stable\n' +
+        'codes; exit codes are documented (`poietic-issues commands --json`). Nothing ever prompts.',
     )
     .version(CLI_VERSION, '-V, --version')
-    .addOption(new Option('--server <url>', 'tracker server URL (remote mode)'))
+    .addOption(new Option('--server <url>', 'poietic-issues server URL (remote mode)'))
     .addOption(new Option('--token <token>', 'API token (remote mode)'))
     .addOption(
       new Option('--database <url>', 'database URL (local mode), e.g. sqlite:./data/dev.db'),
@@ -23,7 +23,7 @@ export function buildProgram(io: CliIO): Command {
     .addOption(
       new Option(
         '-P, --project <key>',
-        'project key (default from TRACKER_PROJECT or .tracker.json)',
+        'project key (default from POIETIC_ISSUES_PROJECT or .poietic-issues.json)',
       ),
     )
     .addOption(
@@ -62,7 +62,7 @@ export async function run(argv: string[], io: CliIO): Promise<number> {
   const wantsJson =
     argv.includes('--json') ||
     argv.includes('--format=json') ||
-    io.env.TRACKER_FORMAT === 'json' ||
+    io.env.POIETIC_ISSUES_FORMAT === 'json' ||
     argv.some((a, i) => a === '--format' && ['json', 'ndjson'].includes(argv[i + 1] ?? ''));
   try {
     await program.parseAsync(argv, { from: 'user' });

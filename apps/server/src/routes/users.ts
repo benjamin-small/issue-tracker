@@ -7,7 +7,7 @@ import {
   listUsers,
   revokeToken,
   updateUser,
-} from '@tracker/core';
+} from '@poietic-tech/issues-core';
 import {
   ApiTokenSchema,
   CreatedApiTokenSchema,
@@ -15,7 +15,7 @@ import {
   CreateUserInputSchema,
   UpdateUserInputSchema,
   UserSchema,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import type { TrackerApp } from '../env.ts';
 import { BooleanQuery, errorResponses, json, jsonBody, refParam } from './common.ts';
 

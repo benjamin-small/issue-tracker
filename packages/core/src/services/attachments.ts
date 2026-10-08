@@ -1,5 +1,5 @@
-import { type Tx, withWriteTx } from '@tracker/db';
-import { type Attachment, formatIssueKey, isIdOf } from '@tracker/schema';
+import { type Tx, withWriteTx } from '@poietic-tech/issues-db';
+import { type Attachment, formatIssueKey, isIdOf } from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, DomainError, forbidden, notFound } from '../errors.ts';
 import { recordEvent } from '../events.ts';

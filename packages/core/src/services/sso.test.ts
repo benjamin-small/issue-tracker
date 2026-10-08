@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { testDialect } from '@tracker/db/testing';
+import { testDialect } from '@poietic-tech/issues-db/testing';
 import { SYSTEM_ACTOR, withActor } from '../context.ts';
 import { createTestContext, type TestContext } from '../testing.ts';
 import { handleFromName, signInWithSso } from './sso.ts';

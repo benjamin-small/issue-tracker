@@ -2,10 +2,10 @@ import adapter from '@sveltejs/adapter-static';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 /**
- * TRACKER_DEMO=1 builds the self-contained browser demo (see src/demo/): hash routing, so it works from any
+ * POIETIC_ISSUES_DEMO=1 builds the self-contained browser demo (see src/demo/): hash routing, so it works from any
  * URL a static host gives it, and one JS and one CSS file.
  */
-const demo = process.env.TRACKER_DEMO === '1';
+const demo = process.env.POIETIC_ISSUES_DEMO === '1';
 
 /** @type {import('@sveltejs/kit').Config} */
 export default {

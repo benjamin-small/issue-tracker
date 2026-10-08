@@ -14,7 +14,7 @@ flowchart LR
   db[(packages/db<br/>SQLite / Postgres)]
   schema[packages/schema<br/>Zod contracts]
 
-  web -- "@tracker/client (HTTP)" --> http
+  web -- "@poietic-tech/issues-client (HTTP)" --> http
   ext -- HTTP + bearer --> http
   cli -- "remote: HTTP" --> http
   cli -. "local: app.fetch in-process" .-> http

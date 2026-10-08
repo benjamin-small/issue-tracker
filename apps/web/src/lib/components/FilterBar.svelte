@@ -1,7 +1,7 @@
 <script lang="ts">
   import Search from '@lucide/svelte/icons/search';
   import X from '@lucide/svelte/icons/x';
-  import { FieldRegistry, type IssueFilter } from '@tracker/schema';
+  import { FieldRegistry, type IssueFilter } from '@poietic-tech/issues-schema';
   import { PRIORITY_LABELS, PRIORITY_ORDER } from '../format.ts';
   import type { ProjectData } from '../project-data.svelte.ts';
   import Avatar from './Avatar.svelte';

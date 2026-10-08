@@ -1,12 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { toJson, withWriteTx } from '@tracker/db';
+import { toJson, withWriteTx } from '@poietic-tech/issues-db';
 import {
   type ApiToken,
   type CreatedApiToken,
   type CreateTokenInput,
   CreateTokenInputSchema,
   type User,
-} from '@tracker/schema';
+} from '@poietic-tech/issues-schema';
 import { type Actor, nowIso, type ServiceContext } from '../context.ts';
 import { forbidden, notFound, parseInput } from '../errors.ts';
 import { toApiToken, toUser } from '../mappers.ts';

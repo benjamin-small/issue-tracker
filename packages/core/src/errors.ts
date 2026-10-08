@@ -1,4 +1,4 @@
-import { ERROR_CODES, type ErrorCode, type FieldError } from '@tracker/schema';
+import { ERROR_CODES, type ErrorCode, type FieldError } from '@poietic-tech/issues-schema';
 import type { z } from 'zod';
 
 /**

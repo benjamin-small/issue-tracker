@@ -5,11 +5,11 @@
 - **Actors.** Every actor is a user: `human`, `agent` or the internal `system`. Roles are `admin` and `member` (see [api.md](api.md#authentication) for what each can do). Give every automated worker its own `agent` user, so history, events and webhooks attribute its changes.
 - **API tokens** (`trk_…`, 40 random base62 characters) are shown once and stored only as SHA-256 hashes. They can expire (`expiresAt`) and be revoked (`DELETE /tokens/{id}`). `last_used_at` is updated with throttling.
 - **Browser sessions** come from `POST /auth/token-login`: a random cookie, stored hashed, valid for 30 days, `HttpOnly`, `SameSite=Lax`, and `Secure` in production. `POST /auth/logout` deletes the session.
-- **SSO sessions** (when `TRACKER_SSO_ISSUER` is set) come from `POST /auth/sso`, which verifies the issuer's JWT cookie (ES256, `iss`/`aud`/`exp`/`iat` claims) against the issuer's JWKS. The user's SSO role determines initial access: matching `TRACKER_SSO_ADMIN_ROLE` creates the user as an active admin; anyone else is created deactivated (answered with the `PENDING_APPROVAL` error) until an admin approves them. Signing out of the SSO provider does not end the tracker session (30 days).
-- **CSRF.** Cookie-authenticated `POST`/`PATCH`/`PUT`/`DELETE` requests must come from the server's own origin or one listed in `TRACKER_ALLOWED_ORIGINS`. Bearer-token requests carry no ambient credentials and are exempt.
-- **Dev login.** `TRACKER_AUTH_MODE=dev` lets anyone sign in as any user, for local development only. The server refuses it when `NODE_ENV=production`.
+- **SSO sessions** (when `POIETIC_ISSUES_SSO_ISSUER` is set) come from `POST /auth/sso`, which verifies the issuer's JWT cookie (ES256, `iss`/`aud`/`exp`/`iat` claims) against the issuer's JWKS. The user's SSO role determines initial access: matching `POIETIC_ISSUES_SSO_ADMIN_ROLE` creates the user as an active admin; anyone else is created deactivated (answered with the `PENDING_APPROVAL` error) until an admin approves them. Signing out of the SSO provider does not end the tracker session (30 days).
+- **CSRF.** Cookie-authenticated `POST`/`PATCH`/`PUT`/`DELETE` requests must come from the server's own origin or one listed in `POIETIC_ISSUES_ALLOWED_ORIGINS`. Bearer-token requests carry no ambient credentials and are exempt.
+- **Dev login.** `POIETIC_ISSUES_AUTH_MODE=dev` lets anyone sign in as any user, for local development only. The server refuses it when `NODE_ENV=production`.
 - **Trusted mode** is the CLI's local mode. It acts as a configured user without credentials, and only runs in-process: it can never be selected for a listening server. Anyone who can open the database file or connection can do this anyway.
-- **First admin.** `tracker db bootstrap` creates it, and works only while no human admin exists.
+- **First admin.** `poietic-issues db bootstrap` creates it, and works only while no human admin exists.
 
 ## Attachments
 
@@ -19,7 +19,7 @@ Uploaded files are untrusted content served from the app's origin, so:
 - **Inline display.** Only PNG, JPEG, GIF and WebP are served `inline`. Everything else downloads (`Content-Disposition: attachment`).
 - **Response headers.** Every download carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; sandbox`.
 - **Filenames** are sanitized. Storage keys are random, so the filename never becomes a path.
-- **Size.** `TRACKER_MAX_UPLOAD_MB` limits uploads, and the body is rejected while streaming.
+- **Size.** `POIETIC_ISSUES_MAX_UPLOAD_MB` limits uploads, and the body is rejected while streaming.
 - **S3 presigned URLs** expire after 5 minutes and come from a different origin than the app.
 
 ## Webhooks
@@ -31,7 +31,7 @@ Uploaded files are untrusted content served from the app's origin, so:
   - every resolved address must be public, and the connection is pinned to it;
   - no redirects, a 10 s timeout, and a 64 KB response cap.
 
-  `TRACKER_WEBHOOK_ALLOW_PRIVATE` lifts this for development and is refused in production.
+  `POIETIC_ISSUES_WEBHOOK_ALLOW_PRIVATE` lifts this for development and is refused in production.
 
 ## Data handling
 
