@@ -35,6 +35,17 @@ Containers have no persistent disk, Cloudflare offers no hosted Postgres, and D1
   is needed. Re-check this if `max_instances`, the rollout policy or the scheduling policy changes. If it ever stops
   holding, the fallback is the spec's lease guard: the Worker holds a lease in Durable Object storage that the
   entrypoint checks before restoring.
+- The Worker and the container image do not switch atomically. `wrangler deploy` makes the new Worker live before the
+  container rollout replaces the image, so a sleeping container woken in between starts on the old image with the new
+  Worker's environment. Seen live on 2026-10-08 in the rename deploy (Deploy run 37838113244, ADR 0020): the new
+  Worker went live at 20:16:41Z and the rollout (2cc07f24…, `rolling`, `full_auto`) ran 20:16:59–20:17:33Z. From
+  20:17:00.95Z to 20:17:19.03Z, about 18 seconds, the old image ran under the new Worker. It read only `TRACKER_*`
+  while the Worker sent only `POIETIC_ISSUES_*`, so SSO, S3 attachment storage and allowed origins were briefly unset.
+  No writes happened and no data was lost. Litestream was still stop-then-start: the old instance shut down at
+  20:17:19.032Z and the new one's restore completed at 20:17:40.637Z at the latest replica txid (0x13). Rule: any
+  change to the container's environment contract (`deploy/cloudflare/src/container-env.ts`) must work with both the
+  previous and the new image for one deploy. For example, send both the old and the new variable names for a release,
+  then drop the old ones.
 - Sleep and wake restore from the replica: on 2026-10-07 the container slept at 18:57:04Z (`litestream shut down`)
   and woke at 19:49:22Z with `restore completed` and no migrations to run.
 - Restore fails closed: if the replica cannot be read (bad credentials, endpoint down), the container exits instead
