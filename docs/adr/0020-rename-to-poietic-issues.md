@@ -5,7 +5,7 @@
 
 ## Context
 
-The project grew up under the working name "tracker". It now runs as part of poietic.tech at `issues.poietic.tech`, and its CLI may later be published to npm, where a bare `tracker` name would clash with other tools. The GitHub repository was renamed from `benjamin-small/issue-tracker` to `benjamin-small/poietic-issues` on the same day.
+The project grew up under the working name "tracker". It now runs as part of poietic.tech at `issues.poietic.tech`, and its CLI may later be published to npm, where a bare `tracker` name would clash with other tools. The GitHub repository was renamed from `benjamin-small/issue-tracker` to `poietic-issues` on the same day and then moved into the poietic-tech organization, as `poietic-tech/poietic-issues`.
 
 ## Decision
 

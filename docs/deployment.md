@@ -177,7 +177,7 @@ Store the file somewhere other than R2. Copy the attachments bucket at the same 
 
 - `CLOUDFLARE_API_TOKEN`: Cloudflare API token with **Workers Scripts Write** and **Workers Containers Write**. It needs no R2 permission.
 - `CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID.
-- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`: the separate R2 S3 credential used by Litestream and attachments (minted by poietic-dot-tech's infra/api scripts for this repository, benjamin-small/issue-tracker).
+- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`: the separate R2 S3 credential used by Litestream and attachments (minted by poietic-dot-tech's infra/api scripts for this repository, poietic-tech/poietic-issues).
 
 The workflow sets the R2 credentials as Worker secrets, deploys, and smoke-checks `/readyz` for up to about 10 minutes (a cold start includes the restore).
 
