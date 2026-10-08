@@ -160,10 +160,10 @@ Committed in `docs/openapi.json` (regenerated with `pnpm openapi:gen`).
 
 Goldens and `docs/cli-reference.md` are refreshed with `pnpm vitest run --project cli -u`.
 
-- `tracker project create|edit … --visibility public|private`
-- `tracker project members list <project>` and `tracker project members add|set <project> <user> --role viewer|editor|manager`, plus `tracker project members remove <project> <user>`
-- `tracker project repo list|add|remove <project> [owner/name|url|id]`
-- `tracker issue create|edit … --repo owner/name` (`--repo ''` clears it)
+- `poietic-issues project create|edit … --visibility public|private`
+- `poietic-issues project members list <project>` and `poietic-issues project members add|set <project> <user> --role viewer|editor|manager`, plus `poietic-issues project members remove <project> <user>`
+- `poietic-issues project repo list|add|remove <project> [owner/name|url|id]`
+- `poietic-issues issue create|edit … --repo owner/name` (`--repo ''` clears it)
 
 ### Web
 
@@ -195,7 +195,7 @@ Every database test runs under both `TEST_DB=sqlite` and `TEST_DB=postgres`.
 
 ## 6. Docs
 
-- **ADR 0020, "Project visibility and roles":** supersedes ADR 0009's sentence that every member can act on every project. It records the levels, the 404-for-private rule and enforcement in core.
+- **ADR 0021, "Project visibility and roles":** supersedes ADR 0009's sentence that every member can act on every project. It records the levels, the 404-for-private rule and enforcement in core.
 - `docs/agents.md`: agents need project memberships.
 - `docs/deployment.md`: public projects are readable without signing in, and what the upgrade migration does.
 
@@ -203,9 +203,9 @@ Every database test runs under both `TEST_DB=sqlite` and `TEST_DB=postgres`.
 
 One implementation plan. Each PR keeps `pnpm check` green:
 
-1. **Access core:** migration, `ANONYMOUS_ACTOR`, access resolution, levels on the shared lookups and every call site, cross-project filtering, the stream, and ADR 0020.
+1. **Access core:** migration, `ANONYMOUS_ACTOR`, access resolution, levels on the shared lookups and every call site, cross-project filtering, the stream, and ADR 0021.
 2. **Repo links:** table, services, the `repo` issue field and filter.
 3. **API and CLI:** endpoints, OpenAPI, CLI commands and goldens.
 4. **Web and demo:** settings UI, anonymous browsing, repo field, demo seed, end-to-end tests.
 
-**Rollout on issues.poietic.tech:** after deploying, every project is still private and every current member is an editor, so nothing visible changes until someone makes a project public or changes roles.
+**Rollout on issues.poietic.tech:** after deploying, every project is still private and every current member is an editor, so nothing visible changes until someone makes a project public or changes roles. Users created after the upgrade, including agent users such as `claude`, start with no memberships and must be added to each private project they work in.
