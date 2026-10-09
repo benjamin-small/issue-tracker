@@ -2151,7 +2151,7 @@
     {
       "name": "db seed",
       "aliases": [],
-      "description": "Create demo users (ada, grace, claude), project ENG and sample issues; prints API tokens",
+      "description": "Create demo users (ada admin, grace, margaret, claude agent), public ENG with a linked repo, private OPS and sample issues; prints API tokens",
       "arguments": [],
       "options": []
     },

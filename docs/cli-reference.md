@@ -910,7 +910,7 @@ Create the first admin of a fresh installation (migrating if needed) and print t
 
 ### `tracker db seed`
 
-Create demo users (ada, grace, claude), project ENG and sample issues; prints API tokens
+Create demo users (ada admin, grace, margaret, claude agent), public ENG with a linked repo, private OPS and sample issues; prints API tokens
 
 ### `tracker serve`
 

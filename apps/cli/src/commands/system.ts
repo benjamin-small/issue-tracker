@@ -291,7 +291,7 @@ export function dbCommand(io: CliIO): Command {
   cmd
     .command('seed')
     .description(
-      'Create demo users (ada, grace, claude), project ENG and sample issues; prints API tokens',
+      'Create demo users (ada admin, grace, margaret, claude agent), public ENG with a linked repo, private OPS and sample issues; prints API tokens',
     )
     .action(async (_o: Opts, command: Command) => {
       const { config, db } = await localDb(command.optsWithGlobals());

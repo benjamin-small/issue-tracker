@@ -58,7 +58,7 @@ export async function prepareDatabase(
       const seeded = await seedDemoData(createContext(db, SYSTEM_ACTOR));
       logger.info(
         { adminToken: seeded.adminToken, agentToken: seeded.agentToken },
-        'seeded demo data (users: ada [admin], grace, claude [agent]; project ENG)',
+        'seeded demo data (users: ada [admin], grace, margaret, claude [agent]; public ENG with a linked repo, private OPS)',
       );
     }
   }
