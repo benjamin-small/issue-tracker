@@ -15,7 +15,7 @@ The REST API lives under `/api/v1`. The OpenAPI 3.1 document is the contract:
 
 Every actor is a user. Create one `agent` user per automated worker (`POST /users` with `kind: "agent"`) so its changes are attributed in history, events and webhooks.
 
-Roles: `admin` can manage users, other users' tokens, webhooks, project creation and archiving, and permanent deletes. `member` can do everything else.
+Roles: `admin` can manage users, other users' tokens, webhooks, project creation and archiving, and permanent deletes, and has full access to every project. `member` acts on a project according to its role there (`viewer`, `editor` or `manager`) and sees private projects only as a member. Requests without credentials are allowed for `GET` and `HEAD` and read public projects only; anything else returns `UNAUTHENTICATED`. See [ADR 0021](adr/0021-project-visibility-and-roles.md).
 
 Cookie-authenticated `POST`/`PATCH`/`DELETE` requests must be same-origin (CSRF protection). Bearer requests are exempt.
 

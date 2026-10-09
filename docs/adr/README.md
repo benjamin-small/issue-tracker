@@ -24,3 +24,4 @@ Short records of decisions that constrain future work. Copy `0000-template.md`, 
 | [0018](0018-sso-via-shared-cookie-jwt.md)             | SSO via a parent-domain cookie JWT                                     | Accepted |
 | [0019](0019-cloudflare-containers-with-litestream.md) | Cloudflare Containers with Litestream for issues.poietic.tech          | Accepted |
 | [0020](0020-rename-to-poietic-issues.md)              | Rename to poietic-issues                                               | Accepted |
+| [0021](0021-project-visibility-and-roles.md)          | Project visibility, per-project roles and anonymous read access        | Accepted |

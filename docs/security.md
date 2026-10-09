@@ -11,6 +11,18 @@
 - **Trusted mode** is the CLI's local mode. It acts as a configured user without credentials, and only runs in-process: it can never be selected for a listening server. Anyone who can open the database file or connection can do this anyway.
 - **First admin.** `poietic-issues db bootstrap` creates it, and works only while no human admin exists.
 
+## Project access
+
+See [ADR 0021](adr/0021-project-visibility-and-roles.md).
+
+- **Public projects are readable by anyone**, including visitors who are not signed in. That covers issues, comments, activity, attachment downloads and the live event stream. Make a project public only if everything in it, history included, may be seen by the whole internet. Webhooks are not affected.
+- **Private projects return 404** (the same response as an unknown project) to everyone except their members and global admins. Errors, search and filter-name resolution never confirm that a hidden project, issue or name exists.
+- **Anonymous requests are `GET` and `HEAD` only.** Everything else needs sign-in and returns 401. `/me` answers `{ anonymous: true }`. `/users`, `/users/{user}` and the token endpoints need sign-in.
+- **Emails** are visible only to admins and to the user themself, including in `user.*` events. Anonymous readers see handles and names only where they are embedded in public resources, such as authors and assignees.
+- **Links** into projects the viewer cannot read, and the events that create them, are hidden.
+- **Live streams keep the access they connected with.** A demoted admin or deactivated user keeps their access on an already open `GET /events/stream` until it reconnects.
+- **Roles** (`viewer`, `editor`, `manager`) are per project. Global admins always have `manage`, and no guard stops the last manager from leaving.
+
 ## Attachments
 
 Uploaded files are untrusted content served from the app's origin, so:
