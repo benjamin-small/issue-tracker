@@ -4,15 +4,17 @@
   import Lock from '@lucide/svelte/icons/lock';
   import EmptyState from '$components/EmptyState.svelte';
   import { page } from '$app/state';
-  import { useQueryClient } from '@tanstack/svelte-query';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import { api, call, errorMessage, type Label, type Status } from '$lib/api.ts';
   import { useProjectData } from '$lib/project-data.svelte.ts';
-  import { keys } from '$lib/queries.ts';
+  import { fetchers, isSignedIn, keys } from '$lib/queries.ts';
   import { toast } from '$lib/toast.svelte.ts';
   import { confirmAction } from '$lib/confirm.svelte.ts';
   import CustomFieldsSettings from '$components/CustomFieldsSettings.svelte';
+  import ProjectAccessSettings from '$components/ProjectAccessSettings.svelte';
   import ProjectGeneralSettings from '$components/ProjectGeneralSettings.svelte';
+  import ProjectReposSettings from '$components/ProjectReposSettings.svelte';
   import ColorInput from '$components/ColorInput.svelte';
   import Select from '$components/Select.svelte';
   import SortableList from '$components/SortableList.svelte';
@@ -22,6 +24,11 @@
   const key = $derived(page.params.key!.toUpperCase());
   const project = useProjectData(() => key);
   const qc = useQueryClient();
+  const me = createQuery(() => ({ queryKey: keys.me, queryFn: fetchers.me, staleTime: 300_000 }));
+  /** Signed-in readers who cannot manage see the members read-only; signed-out visitors get a dead end. */
+  const readerOnly = $derived(
+    project.access !== undefined && !project.canManage && me.isSuccess && isSignedIn(me.data),
+  );
   const CATEGORY_ITEMS = [
     { value: 'backlog', label: 'Backlog', hint: 'not planned yet' },
     { value: 'unstarted', label: 'Unstarted', hint: 'planned' },
@@ -142,8 +149,8 @@
 
 <svelte:head><title>{key} · Settings</title></svelte:head>
 
-{#if project.notFound || (project.access !== undefined && !project.canManage)}
-  <!-- The settings link is shown to managers only; this covers typed or shared URLs. -->
+{#if project.notFound || (project.access !== undefined && !project.canManage && me.isSuccess && !readerOnly)}
+  <!-- The settings link is shown to managers only; this covers typed or shared URLs of signed-out visitors. -->
   <EmptyState
     icon={Lock}
     title={project.notFound ? `Project ${key} not found` : 'Project settings are for managers'}
@@ -151,17 +158,31 @@
   >
     {project.notFound
       ? 'It may not exist, or it may be private to its members.'
-      : 'Ask a project manager or an admin to change the workflow, labels or fields.'}
+      : 'Sign in to see who can work in this project.'}
     {#snippet actions()}
       {#if !project.notFound}
         <a href={href(`/p/${key}`)} class={btn.primary}>Back to {key} issues</a>
       {/if}
     {/snippet}
   </EmptyState>
-{:else if project.access !== undefined}
+{:else if readerOnly}
+  <div class="overflow-y-auto">
+    <div class="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+      <h1 class="text-lg font-semibold">Project settings</h1>
+      <p class="text-sm text-fg-muted" data-testid="settings-readonly">
+        Only project managers can change these settings.
+      </p>
+      <ProjectAccessSettings projectKey={key} readonly />
+    </div>
+  </div>
+{:else if project.canManage}
   <div class="overflow-y-auto">
     <div class="mx-auto max-w-3xl space-y-10 px-4 py-6 sm:px-6 sm:py-8">
       <h1 class="text-lg font-semibold">Project settings</h1>
+
+      <ProjectAccessSettings projectKey={key} />
+
+      <ProjectReposSettings projectKey={key} />
 
       <ProjectGeneralSettings projectKey={key} />
 

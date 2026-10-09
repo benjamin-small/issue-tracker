@@ -23,6 +23,7 @@ export const keys = {
   statuses: (key: string) => ['statuses', key] as const,
   labels: (key: string) => ['labels', key] as const,
   views: (key: string) => ['views', key] as const,
+  members: (key: string) => ['members', key] as const,
   users: ['users'] as const,
   linkTypes: ['link-types'] as const,
   fields: (key: string) => ['fields', key] as const,
@@ -50,6 +51,9 @@ export const fetchers = {
   projects: async () => (await call(api.GET('/projects', { params: { query: {} } }))).data,
   project: (key: string) =>
     call(api.GET('/projects/{project}', { params: { path: { project: key } } })),
+  members: async (key: string) =>
+    (await call(api.GET('/projects/{project}/members', { params: { path: { project: key } } })))
+      .data,
   statuses: async (key: string) =>
     (await call(api.GET('/projects/{project}/statuses', { params: { path: { project: key } } })))
       .data,

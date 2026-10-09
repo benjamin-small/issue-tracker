@@ -122,3 +122,93 @@ test('signed out, grouping by a person field keeps every issue on the board', as
   await expect(column('No Owner').locator(`[data-key="${unowned.key}"]`)).toBeVisible();
   await anon.close();
 });
+
+test('a manager makes a project public, adds a repo and a member', async ({ page }) => {
+  const key = unique('CF');
+  await post(page.request, '/projects', { key, name: 'Config' });
+  await page.goto(`/p/${key}/settings`);
+  await page
+    .getByTestId('settings-access')
+    .getByRole('radio', { name: /Public/ })
+    .check();
+  await expect(page.getByText('Saved')).toBeVisible();
+  await page
+    .getByTestId('settings-repos')
+    .getByPlaceholder('owner/name or GitHub URL')
+    .fill('acme/app');
+  await page.getByTestId('settings-repos').getByRole('button', { name: 'Link repository' }).click();
+  await expect(
+    page.getByTestId('settings-repos').getByRole('link', { name: 'acme/app' }),
+  ).toHaveAttribute('href', 'https://github.com/acme/app');
+  await page.getByTestId('settings-access').getByPlaceholder('@handle').fill('@member');
+  await page.getByTestId('settings-access').getByRole('button', { name: 'Add member' }).click();
+  await expect(page.getByTestId('settings-access').getByText('@member')).toBeVisible();
+});
+
+test('a manager changes a role, then removes a member', async ({ page }) => {
+  const key = unique('RL');
+  await post(page.request, '/projects', { key, name: 'Roles' });
+  await post(page.request, `/projects/${key}/members`, { user: 'member', role: 'viewer' });
+  await page.goto(`/p/${key}/settings`);
+  const access = page.getByTestId('settings-access');
+  const row = access.locator('[data-member="member"]');
+  await expect(row).toBeVisible();
+  await choose(row, 'Role of @member', 'Editor');
+  await expect(page.getByText('@member is now editor')).toBeVisible();
+  await expect(row.getByLabel('Role of @member')).toContainText('Editor');
+  await row.getByRole('button', { name: 'Remove @member' }).click();
+  await page.getByTestId('confirm-ok').click();
+  await expect(row).toHaveCount(0);
+});
+
+test('a manager who demotes themselves drops to read-only settings after confirming', async ({
+  page,
+  browser,
+}) => {
+  const key = unique('SD');
+  await post(page.request, '/projects', { key, name: 'Self' });
+  await post(page.request, `/projects/${key}/members`, { user: 'grace', role: 'manager' });
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  await p.goto(`${origin}/p/${key}/settings`);
+  const row = p.getByTestId('settings-access').locator('[data-member="grace"]');
+  await choose(row, 'Role of @grace', 'Viewer');
+  await p.getByTestId('confirm-ok').click();
+  await expect(p.getByTestId('settings-readonly')).toBeVisible();
+  await expect(p.getByTestId('settings-repos')).toHaveCount(0);
+  await ctx.close();
+});
+
+test('viewers see the members read-only and signed-out visitors cannot open settings', async ({
+  page,
+  browser,
+}) => {
+  const key = unique('RO');
+  await post(page.request, '/projects', { key, name: 'Readonly', visibility: 'public' });
+  await post(page.request, `/projects/${key}/members`, { user: 'grace', role: 'viewer' });
+
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  await p.goto(`${origin}/p/${key}/settings`);
+  await expect(p.getByText('Only project managers can change these settings.')).toBeVisible();
+  await expect(p.getByTestId('settings-access').getByText('@grace')).toBeVisible();
+  await expect(p.getByRole('button', { name: 'Add member' })).toHaveCount(0);
+  await expect(p.getByRole('radio')).toHaveCount(0);
+  await expect(p.getByTestId('settings-statuses')).toHaveCount(0);
+  await ctx.close();
+
+  const anon = await browser.newContext();
+  const a = await anon.newPage();
+  await a.goto(`${origin}/p/${key}/settings`);
+  await expect(a.getByTestId('settings-forbidden')).toBeVisible();
+  await expect(a.getByTestId('settings-access')).toHaveCount(0);
+  await anon.close();
+});

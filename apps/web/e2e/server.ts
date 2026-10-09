@@ -23,3 +23,20 @@ const server = await startServer(
   }),
 );
 console.log(`e2e server on ${server.url}`);
+
+// A second non-admin user besides `grace`, who has no project memberships: visibility specs add her as needed.
+const login = await fetch(`${server.url}/api/v1/auth/dev-login`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ user: 'ada' }),
+});
+const cookie = login.headers
+  .getSetCookie()
+  .map((c) => c.split(';')[0])
+  .join('; ');
+const created = await fetch(`${server.url}/api/v1/users`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', origin: server.url, cookie },
+  body: JSON.stringify({ handle: 'member', name: 'Mia Member', email: 'member@example.com' }),
+});
+if (!created.ok) throw new Error(`could not seed the e2e member user: ${await created.text()}`);
