@@ -1,3 +1,10 @@
+export {
+  atLeast,
+  type AccessLevel,
+  projectLevel,
+  readableProjectIds,
+  requireLevel,
+} from './access.ts';
 export * from './context.ts';
 export * from './errors.ts';
 export { diff, EVENTS_CHANNEL, recordEvent } from './events.ts';

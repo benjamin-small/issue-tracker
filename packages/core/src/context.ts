@@ -6,7 +6,7 @@ export interface Actor {
   id: string;
   handle: string;
   name: string;
-  kind: 'human' | 'agent' | 'system';
+  kind: 'human' | 'agent' | 'system' | 'anonymous';
   role: 'admin' | 'member';
 }
 
@@ -41,6 +41,22 @@ export const SYSTEM_ACTOR: Actor = {
   kind: 'system',
   role: 'admin',
 };
+
+/**
+ * The actor for requests without credentials (or with a pending or deactivated user's). It can read
+ * public projects and nothing else (ADR 0021). `role: 'member'` keeps every existing admin check closed.
+ */
+export const ANONYMOUS_ACTOR: Actor = {
+  id: 'usr_anonymous',
+  handle: 'anonymous',
+  name: 'Anonymous',
+  kind: 'anonymous',
+  role: 'member',
+};
+
+export function isAnonymous(ctx: Pick<ServiceContext, 'actor'>): boolean {
+  return ctx.actor.kind === 'anonymous';
+}
 
 export function createContext(
   db: Db,

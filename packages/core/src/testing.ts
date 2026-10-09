@@ -51,3 +51,31 @@ export async function createTestContext(): Promise<TestContext> {
     destroy: () => db.destroy(),
   };
 }
+
+/** Test helper: gives `who` a role on a project, writing directly (no permission check, no event). */
+export async function grant(
+  t: TestContext,
+  projectRef: string,
+  who: ServiceContext,
+  role: 'viewer' | 'editor' | 'manager',
+): Promise<void> {
+  const project = await t.db.kysely
+    .selectFrom('projects')
+    .select('id')
+    .where((eb) => eb.or([eb('id', '=', projectRef), eb('key', '=', projectRef.toUpperCase())]))
+    .executeTakeFirstOrThrow();
+  const now = t.ctx.clock.now().toISOString();
+  await t.db.kysely
+    .insertInto('project_members')
+    .values({
+      project_id: project.id,
+      user_id: who.actor.id,
+      role,
+      created_at: now,
+      updated_at: now,
+    })
+    .onConflict((oc) =>
+      oc.columns(['project_id', 'user_id']).doUpdateSet({ role, updated_at: now }),
+    )
+    .execute();
+}
