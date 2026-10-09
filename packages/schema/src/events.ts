@@ -8,6 +8,7 @@ import {
   IssueSchema,
   LabelSchema,
   ProjectMemberSchema,
+  ProjectRepoSchema,
   ProjectRoleSchema,
   ProjectSchema,
   StatusSchema,
@@ -34,6 +35,8 @@ export const EVENT_TYPES = [
   'project.member_added',
   'project.member_changed',
   'project.member_removed',
+  'project.repo_added',
+  'project.repo_removed',
   'status.created',
   'status.updated',
   'status.deleted',
@@ -82,6 +85,9 @@ export const LinkEventDataSchema = z
 export const ProjectEventDataSchema = z
   .object({ ...base, project: ProjectSchema, changes: ChangesSchema.optional() })
   .meta({ id: 'ProjectEventData' });
+export const ProjectRepoEventDataSchema = z
+  .object({ ...base, repo: ProjectRepoSchema })
+  .meta({ id: 'ProjectRepoEventData' });
 export const ProjectMemberEventDataSchema = z
   .object({ ...base, member: ProjectMemberSchema, previousRole: ProjectRoleSchema.optional() })
   .meta({ id: 'ProjectMemberEventData' });
@@ -116,6 +122,8 @@ export const EVENT_DATA_SCHEMAS = {
   'project.member_added': ProjectMemberEventDataSchema,
   'project.member_changed': ProjectMemberEventDataSchema,
   'project.member_removed': ProjectMemberEventDataSchema,
+  'project.repo_added': ProjectRepoEventDataSchema,
+  'project.repo_removed': ProjectRepoEventDataSchema,
   'status.created': StatusEventDataSchema,
   'status.updated': StatusEventDataSchema,
   'status.deleted': StatusEventDataSchema,

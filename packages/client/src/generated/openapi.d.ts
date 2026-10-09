@@ -3553,7 +3553,7 @@ export interface paths {
                     project?: string;
                     /** @description Issue key or id. */
                     issue?: string;
-                    /** @description Comma-separated event types: issue.created, issue.updated, issue.deleted, issue.restored, comment.created, comment.updated, comment.deleted, link.created, link.deleted, project.created, project.updated, project.member_added, project.member_changed, project.member_removed, status.created, status.updated, status.deleted, label.created, label.updated, label.deleted, user.created, user.updated, field.created, field.updated, field.deleted, attachment.created, attachment.deleted. */
+                    /** @description Comma-separated event types: issue.created, issue.updated, issue.deleted, issue.restored, comment.created, comment.updated, comment.deleted, link.created, link.deleted, project.created, project.updated, project.member_added, project.member_changed, project.member_removed, project.repo_added, project.repo_removed, status.created, status.updated, status.deleted, label.created, label.updated, label.deleted, user.created, user.updated, field.created, field.updated, field.deleted, attachment.created, attachment.deleted. */
                     types?: string;
                 };
                 header?: never;
@@ -5198,7 +5198,7 @@ export interface components {
             seq: number;
             id: string;
             /** @enum {string} */
-            type: "issue.created" | "issue.updated" | "issue.deleted" | "issue.restored" | "comment.created" | "comment.updated" | "comment.deleted" | "link.created" | "link.deleted" | "project.created" | "project.updated" | "project.member_added" | "project.member_changed" | "project.member_removed" | "status.created" | "status.updated" | "status.deleted" | "label.created" | "label.updated" | "label.deleted" | "user.created" | "user.updated" | "field.created" | "field.updated" | "field.deleted" | "attachment.created" | "attachment.deleted";
+            type: "issue.created" | "issue.updated" | "issue.deleted" | "issue.restored" | "comment.created" | "comment.updated" | "comment.deleted" | "link.created" | "link.deleted" | "project.created" | "project.updated" | "project.member_added" | "project.member_changed" | "project.member_removed" | "project.repo_added" | "project.repo_removed" | "status.created" | "status.updated" | "status.deleted" | "label.created" | "label.updated" | "label.deleted" | "user.created" | "user.updated" | "field.created" | "field.updated" | "field.deleted" | "attachment.created" | "attachment.deleted";
             actorId: string | null;
             actor: components["schemas"]["UserSummary"] | null;
             projectId: string | null;
@@ -5432,6 +5432,7 @@ export interface components {
             name: string;
             description: string;
             visibility: components["schemas"]["ProjectVisibility"];
+            repos: components["schemas"]["ProjectRepo"][];
             /**
              * Format: date-time
              * @description ISO-8601 UTC timestamp.
@@ -5461,6 +5462,24 @@ export interface components {
          * @enum {string}
          */
         ProjectVisibility: "public" | "private";
+        ProjectRepo: {
+            /** @example rpo_01h455vb4pex5vsknk084sn02q */
+            id: string;
+            /** @example acme */
+            owner: string;
+            /** @example app */
+            name: string;
+            /** @example acme/app */
+            fullName: string;
+            /** @example https://github.com/acme/app */
+            url: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            createdAt: string;
+        };
         CreateProjectInput: {
             /** @example ENG */
             key: string;
@@ -6495,6 +6514,7 @@ export type CreatedApiToken = components['schemas']['CreatedApiToken'];
 export type CreateTokenInput = components['schemas']['CreateTokenInput'];
 export type ProjectWithAccess = components['schemas']['ProjectWithAccess'];
 export type ProjectVisibility = components['schemas']['ProjectVisibility'];
+export type ProjectRepo = components['schemas']['ProjectRepo'];
 export type CreateProjectInput = components['schemas']['CreateProjectInput'];
 export type UpdateProjectInput = components['schemas']['UpdateProjectInput'];
 export type JsonSchema = components['schemas']['JsonSchema'];

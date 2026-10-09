@@ -5,6 +5,7 @@ import type {
   Label,
   LinkType,
   Project,
+  ProjectRepo,
   Status,
   User,
   UserSummary,
@@ -49,13 +50,14 @@ export function toApiToken(r: Row<'api_tokens'>): ApiToken {
   };
 }
 
-export function toProject(r: Row<'projects'>): Project {
+export function toProject(r: Row<'projects'>, repos: ProjectRepo[] = []): Project {
   return {
     id: r.id,
     key: r.key,
     name: r.name,
     description: r.description,
     visibility: r.visibility,
+    repos,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     archivedAt: r.archived_at,

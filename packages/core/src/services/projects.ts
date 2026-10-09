@@ -10,6 +10,7 @@ import {
   type CreateProjectInput,
   CreateProjectInputSchema,
   defaultViewConfig,
+  type ProjectRepo,
   type ProjectWithAccess,
   type StatusCategory,
   type UpdateProjectInput,
@@ -22,6 +23,7 @@ import { diff, recordEvent } from '../events.ts';
 import { toProject, toStatus } from '../mappers.ts';
 import { requireAdmin } from '../permissions.ts';
 import { getProjectRow } from '../refs.ts';
+import { reposOf } from './repos.ts';
 
 /** Workflow every new project starts with. Statuses are fully editable afterwards. */
 export const DEFAULT_STATUSES: ReadonlyArray<{
@@ -44,9 +46,11 @@ async function withAccess(
   ctx: ServiceContext,
   db: Exec,
   row: Selectable<Database['projects']>,
+  repos?: ProjectRepo[],
 ): Promise<ProjectWithAccess> {
   const level = await projectLevel(ctx, db, row);
-  return { ...toProject(row), myAccess: level === 'none' ? 'read' : level };
+  const linked = repos ?? (await reposOf(db, [row.id])).get(row.id) ?? [];
+  return { ...toProject(row, linked), myAccess: level === 'none' ? 'read' : level };
 }
 
 export async function listProjects(
@@ -57,7 +61,11 @@ export async function listProjects(
   if (!opts.includeArchived) q = q.where('archived_at', 'is', null);
   q = await whereReadable(ctx, ctx.db.kysely, q, 'id');
   const rows = await q.execute();
-  return Promise.all(rows.map((r) => withAccess(ctx, ctx.db.kysely, r)));
+  const repos = await reposOf(
+    ctx.db.kysely,
+    rows.map((r) => r.id),
+  );
+  return Promise.all(rows.map((r) => withAccess(ctx, ctx.db.kysely, r, repos.get(r.id) ?? [])));
 }
 
 export async function getProject(ctx: ServiceContext, ref: string): Promise<ProjectWithAccess> {
@@ -92,7 +100,7 @@ export async function createProject(
       const project = toProject(row);
       await recordEvent(tx, ctx, 'project.created', { projectId: project.id, data: { project } });
       await createDefaults(tx, ctx, project.id);
-      return withAccess(ctx, tx, row);
+      return withAccess(ctx, tx, row, project.repos);
     });
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict(`A project with key "${data.key}" already exists`);
@@ -152,7 +160,8 @@ export async function updateProject(
     const needsManage =
       patch.name !== undefined || patch.description !== undefined || patch.visibility !== undefined;
     const row = await getProjectRow(ctx, tx, ref, needsManage ? 'manage' : 'write');
-    const before = toProject(row);
+    const repos = (await reposOf(tx, [row.id])).get(row.id) ?? [];
+    const before = toProject(row, repos);
     const now = nowIso(ctx);
     const updated = await tx
       .updateTable('projects')
@@ -168,13 +177,13 @@ export async function updateProject(
       .where('id', '=', row.id)
       .returningAll()
       .executeTakeFirstOrThrow();
-    const project = toProject(updated);
+    const project = toProject(updated, repos);
     const changes = diff(before, project, ['name', 'description', 'visibility', 'archivedAt']);
     if (Object.keys(changes).length > 0)
       await recordEvent(tx, ctx, 'project.updated', {
         projectId: project.id,
         data: { project, changes },
       });
-    return withAccess(ctx, tx, updated);
+    return withAccess(ctx, tx, updated, repos);
   });
 }

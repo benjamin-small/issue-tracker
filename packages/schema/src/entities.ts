@@ -136,6 +136,27 @@ export const ProjectAccessSchema = z
   .meta({ id: 'ProjectAccess' });
 export type ProjectAccess = z.infer<typeof ProjectAccessSchema>;
 
+export const ProjectRepoSchema = z
+  .object({
+    id: z.string().meta({ example: 'rpo_01h455vb4pex5vsknk084sn02q' }),
+    owner: z.string().meta({ example: 'acme' }),
+    name: z.string().meta({ example: 'app' }),
+    fullName: z.string().meta({ example: 'acme/app' }),
+    url: z.string().meta({ example: 'https://github.com/acme/app' }),
+    createdAt: TimestampSchema,
+  })
+  .meta({ id: 'ProjectRepo' });
+export type ProjectRepo = z.infer<typeof ProjectRepoSchema>;
+
+export const AddProjectRepoInputSchema = z
+  .object({
+    repo: z
+      .string()
+      .meta({ description: '`owner/name` or a github.com URL.', example: 'acme/app' }),
+  })
+  .meta({ id: 'AddProjectRepoInput' });
+export type AddProjectRepoInput = z.input<typeof AddProjectRepoInputSchema>;
+
 export const ProjectSchema = z
   .object({
     id: z.string(),
@@ -143,6 +164,7 @@ export const ProjectSchema = z
     name: z.string(),
     description: z.string(),
     visibility: ProjectVisibilitySchema,
+    repos: z.array(ProjectRepoSchema),
     createdAt: TimestampSchema,
     updatedAt: TimestampSchema,
     archivedAt: TimestampSchema.nullable(),

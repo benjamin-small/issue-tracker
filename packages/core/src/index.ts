@@ -22,6 +22,7 @@ export * from './services/labels.ts';
 export * from './services/links.ts';
 export * from './services/members.ts';
 export * from './services/projects.ts';
+export * from './services/repos.ts';
 export * from './services/seed.ts';
 export * from './services/sso.ts';
 export * from './services/statuses.ts';
