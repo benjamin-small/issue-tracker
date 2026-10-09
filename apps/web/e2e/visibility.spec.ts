@@ -1,5 +1,5 @@
 import type { APIRequestContext } from '@playwright/test';
-import { expect, test } from './fixtures.ts';
+import { choose, expect, test } from './fixtures.ts';
 
 const origin = `http://127.0.0.1:${process.env.E2E_PORT ?? 3100}`;
 /** Project keys unique per run, so retries and repeats don't collide with projects made earlier. */
@@ -90,4 +90,35 @@ test('read-only members see issues without editing controls', async ({ page, bro
   await expect(p.getByTestId('comment-input')).toHaveCount(0);
   await expect(p.getByTestId('delete-issue')).toHaveCount(0);
   await ctx.close();
+});
+
+test('signed out, grouping by a person field keeps every issue on the board', async ({
+  page,
+  browser,
+}) => {
+  const key = unique('PF');
+  await post(page.request, '/projects', { key, name: 'People', visibility: 'public' });
+  await post(page.request, `/projects/${key}/fields`, {
+    key: 'owner',
+    name: 'Owner',
+    type: 'user',
+  });
+  const owned = await post(page.request, `/projects/${key}/issues`, {
+    title: 'Owned by Grace',
+    customFields: { owner: 'grace' },
+  });
+  const unowned = await post(page.request, `/projects/${key}/issues`, { title: 'Owned by nobody' });
+
+  const anon = await browser.newContext();
+  const p = await anon.newPage();
+  await p.goto(`/p/${key}/board`);
+  await p.getByTestId('display-options').click();
+  await choose(p, 'Group by', 'Owner');
+  await p.keyboard.press('Escape');
+  // Signed out, the user directory is unavailable, so Grace is an unnamed column; nothing drops out.
+  const column = (name: RegExp | string) =>
+    p.locator('[data-testid="board-column"]').filter({ has: p.getByText(name) });
+  await expect(column(/Unknown user/).locator(`[data-key="${owned.key}"]`)).toBeVisible();
+  await expect(column('No Owner').locator(`[data-key="${unowned.key}"]`)).toBeVisible();
+  await anon.close();
 });

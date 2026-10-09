@@ -26,8 +26,10 @@ function group(id: string, header: GroupHeaderSpec, match: (i: Issue) => boolean
 }
 
 /**
- * One group per user: the project's users, plus anyone the issues mention that the directory lacks (signed-out
- * visitors cannot list users, so they only know people from the issues themselves).
+ * One group per user: the project's users, plus anyone the issues mention that the directory lacks. Signed-out
+ * visitors cannot list users, so they know people only from the issues themselves (`user` reads the embedded
+ * summary); a value no one describes (a user-type custom field, a deactivated user) still gets its own group,
+ * so no issue ever drops out of the list or board.
  */
 function userGroups(
   project: ProjectData,
@@ -41,9 +43,25 @@ function userGroups(
       const u = user(issue);
       if (u && !users.has(u.id)) users.set(u.id, u);
     }
-  return [...users.values()]
+  const known = [...users.values()]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((u) => group(u.id, { kind: 'user', label: u.name, user: u }, (i) => value(i) === u.id));
+  const unknown = [
+    ...new Set(
+      issues
+        .map(value)
+        .filter((v): v is string => typeof v === 'string' && v !== '' && !users.has(v)),
+    ),
+  ]
+    .sort()
+    .map((id) =>
+      group(
+        id,
+        { kind: 'user', label: `Unknown user (${id.slice(-4)})`, user: null },
+        (i) => value(i) === id,
+      ),
+    );
+  return [...known, ...unknown];
 }
 
 function customFieldGroups(issues: Issue[], key: string, project: ProjectData): GroupSpec[] {

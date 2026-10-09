@@ -8,6 +8,7 @@
   import { PRIORITY_LABELS } from '$lib/format.ts';
   import { bulkUpdate, cachedIssues, deleteIssues } from '$lib/issues.ts';
   import { navigate, signInPath } from '$lib/nav.ts';
+  import { attemptSso, markSilentSsoDone, silentSsoAllowed } from '$lib/session.ts';
   import { clearSelection, moveFocus, selection, toggleSelected } from '$lib/selection.svelte.ts';
   import CommandMenu from '$components/CommandMenu.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
@@ -23,6 +24,37 @@
 
   const me = createQuery(() => ({ queryKey: keys.me, queryFn: fetchers.me, staleTime: 300_000 }));
   const projects = createQuery(() => ({ queryKey: keys.projects, queryFn: fetchers.projects }));
+
+  const qc = useQueryClient();
+
+  // A signed-out visitor may still be signed in to the SSO issuer: make one silent attempt per browser session
+  // (never after signing out), as the login page's automatic attempt does. The page waits for it, so a private
+  // project doesn't flash "not found" before the visitor is signed in; if it fails they browse anonymously.
+  let silentSso = $state<'pending' | 'running' | 'done'>(silentSsoAllowed() ? 'pending' : 'done');
+  const anonymous = $derived(!!me.data && !isSignedIn(me.data));
+  const authConfig = createQuery(() => ({
+    queryKey: keys.authConfig,
+    queryFn: fetchers.authConfig,
+    enabled: anonymous && silentSso === 'pending',
+  }));
+  $effect(() => {
+    if (!anonymous || silentSso !== 'pending') return;
+    const { isError, data } = authConfig;
+    if (!isError && !data) return;
+    markSilentSsoDone();
+    const sso = data?.sso;
+    if (!sso) {
+      silentSso = 'done';
+      return;
+    }
+    silentSso = 'running';
+    void attemptSso(sso)
+      // Signed in: drop everything cached for the anonymous visitor and fetch it again as the user.
+      .then((result) => (result.ok ? qc.resetQueries() : undefined))
+      .catch(() => undefined)
+      .finally(() => (silentSso = 'done'));
+  });
+  const waitingForSso = $derived(anonymous && silentSso !== 'done');
 
   /** Current project from the URL (`/p/ENG…` or `/i/ENG-42`), else the first project. */
   const currentProject = $derived(
@@ -49,11 +81,10 @@
     ui.sidebarOpen = false;
   });
 
-  const qc = useQueryClient();
   // One live event stream for the project in view; reconnects when the project changes. Signed-out visitors
   // get one too: the server sends each viewer only what they may read.
   $effect(() => {
-    if (!me.data || !currentProject) return;
+    if (!me.data || waitingForSso || !currentProject) return;
     return connectLive(qc, currentProject);
   });
 
@@ -193,7 +224,7 @@
 
 <svelte:window {onkeydown} />
 
-{#if me.data}
+{#if me.data && !waitingForSso}
   <div class="flex h-dvh overflow-hidden">
     <Sidebar me={me.data} projects={projects.data ?? []} {currentProject} onsignin={signIn} />
     {#if ui.sidebarOpen}

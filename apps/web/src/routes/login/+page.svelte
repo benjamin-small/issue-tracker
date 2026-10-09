@@ -7,6 +7,7 @@
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { api, call, errorMessage } from '$lib/api.ts';
   import { fetchers, keys } from '$lib/queries.ts';
+  import { attemptSso } from '$lib/session.ts';
   import Avatar from '$components/Avatar.svelte';
 
   const qc = useQueryClient();
@@ -62,25 +63,19 @@
     busy = true;
     error = '';
     try {
-      // Renew a lapsed SSO cookie (its tokens are short-lived); failures just mean "not signed in".
-      if (sso.refreshUrl)
-        await fetch(sso.refreshUrl, { credentials: 'include' }).catch(() => undefined);
-      const { error: problem, response } = await api.POST('/auth/sso');
-      if (response.ok) return await finish();
-      const code = (problem as { code?: string; detail?: string } | undefined)?.code;
-      if (code === 'PENDING_APPROVAL') {
-        pending =
-          (problem as { detail?: string }).detail ?? 'Your account is waiting for approval.';
-      } else if (response.status === 401) {
+      const result = await attemptSso(sso);
+      if (result.ok) return await finish();
+      const { problem, status } = result;
+      if (problem?.code === 'PENDING_APPROVAL') {
+        pending = problem.detail ?? 'Your account is waiting for approval.';
+      } else if (status === 401) {
         if (interactive) {
           const url = new URL(sso.loginUrl);
           url.searchParams.set('redirect', ssoRedirectTarget());
           location.assign(url.href);
         }
       } else if (interactive) {
-        error =
-          (problem as { detail?: string } | undefined)?.detail ??
-          `Sign-in failed (${response.status})`;
+        error = problem?.detail ?? `Sign-in failed (${status})`;
       }
     } catch (e) {
       // A network failure on the silent attempt just leaves the button for the user to press.

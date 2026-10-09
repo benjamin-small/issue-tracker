@@ -3,12 +3,13 @@
   import { Command, Dialog } from 'bits-ui';
   import Check from '@lucide/svelte/icons/check';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-  import { api, type Issue } from '../api.ts';
+  import type { Issue } from '../api.ts';
   import { PRIORITY_LABELS, PRIORITY_ORDER } from '../format.ts';
   import { bulkUpdate, cachedIssues, deleteIssues, projectKeyOf, toggleLabel } from '../issues.ts';
   import { navigate, shareUrl, signInPath } from '../nav.ts';
   import { useProjectData } from '../project-data.svelte.ts';
   import { canManage, canWrite, fetchers, isSignedIn, keys } from '../queries.ts';
+  import { signOut } from '../session.ts';
   import { clearSelection } from '../selection.svelte.ts';
   import { applyTheme } from '../theme.ts';
   import { toast } from '../toast.svelte.ts';
@@ -338,12 +339,7 @@
                     class={item}
                     value="Sign out"
                     keywords={['log out']}
-                    onSelect={() =>
-                      run(async () => {
-                        await api.POST('/auth/logout');
-                        qc.clear();
-                        await navigate('/login?signedout=1');
-                      })}>Sign out</Command.Item
+                    onSelect={() => run(() => signOut(qc))}>Sign out</Command.Item
                   >
                 {:else}
                   <Command.Item

@@ -11,10 +11,11 @@
   import Sun from '@lucide/svelte/icons/sun';
   import { MediaQuery } from 'svelte/reactivity';
   import Webhook from '@lucide/svelte/icons/webhook';
-  import { api, type Project } from '../api.ts';
+  import type { Project } from '../api.ts';
   import { live } from '../live.svelte.ts';
-  import { current, href, navigate } from '../nav.ts';
+  import { current, href } from '../nav.ts';
   import { canManage, canWrite, isSignedIn, type Me } from '../queries.ts';
+  import { signOut } from '../session.ts';
   import { applyTheme } from '../theme.ts';
   import { openCreateIssue, ui } from '../ui.svelte.ts';
   import Avatar from './Avatar.svelte';
@@ -33,11 +34,7 @@
     applyTheme(dark ? 'dark' : 'light');
   }
 
-  async function logout() {
-    await api.POST('/auth/logout');
-    qc.clear();
-    await navigate('/login?signedout=1');
-  }
+  const logout = () => signOut(qc);
 
   const path = $derived(current().path);
   const wide = new MediaQuery('min-width: 768px');
