@@ -8,6 +8,7 @@
   import Avatar from './Avatar.svelte';
   import DateInput from './DateInput.svelte';
   import LabelPicker from './LabelPicker.svelte';
+  import RepoPicker from './RepoPicker.svelte';
   import PriorityPicker from './PriorityPicker.svelte';
   import StatusPicker from './StatusPicker.svelte';
   import type { Snippet } from 'svelte';
@@ -41,6 +42,7 @@
   {#snippet priority()}<PriorityPicker {issue} {readonly} />{/snippet}
   {#snippet assignee()}<AssigneePicker {issue} users={project.users} {readonly} />{/snippet}
   {#snippet labels()}<LabelPicker {issue} labels={project.labels} {readonly} />{/snippet}
+  {#snippet repo()}<RepoPicker {issue} repos={project.repos} {readonly} />{/snippet}
   {#snippet estimate()}
     {#if readonly}
       <span class="px-1.5 {issue.estimate === null ? 'text-fg-subtle' : ''}"
@@ -81,6 +83,7 @@
   {@render row('Priority', priority)}
   {@render row('Assignee', assignee)}
   {@render row('Labels', labels)}
+  {#if project.repos.length || issue.repo}{@render row('Repository', repo)}{/if}
   {@render row('Estimate', estimate)}
   {@render row('Due date', due)}
   {@render extra?.()}

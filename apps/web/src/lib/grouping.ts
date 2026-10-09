@@ -154,6 +154,16 @@ export function groupIssues(
       (i) => i.creatorId,
       (i) => i.creator,
     );
+  } else if (groupBy === 'repo') {
+    const names = new Set(project.repos.map((r) => r.fullName));
+    // Repos the project no longer links can still appear on a stale snapshot; keep those issues visible.
+    for (const issue of issues) if (issue.repo) names.add(issue.repo);
+    groups = [
+      group(NONE, { kind: 'plain', label: 'No repository' }, (i) => i.repo === null),
+      ...[...names]
+        .sort((a, b) => a.localeCompare(b))
+        .map((n) => group(n, { kind: 'plain', label: n }, (i) => i.repo === n)),
+    ];
   } else if (groupBy.startsWith('cf:')) {
     groups = customFieldGroups(issues, groupBy.slice(3), project);
   } else {

@@ -3,7 +3,7 @@
   import GitBranch from '@lucide/svelte/icons/git-branch';
   import MessageSquare from '@lucide/svelte/icons/message-square';
   import type { Issue } from '../api.ts';
-  import { isOverdue, relativeTime, shortDate } from '../format.ts';
+  import { isOverdue, relativeTime, repoUrl, shortDate } from '../format.ts';
   import type { ProjectData } from '../project-data.svelte.ts';
   import AssigneePicker from './AssigneePicker.svelte';
   import CustomFieldValue from './CustomFieldValue.svelte';
@@ -56,6 +56,15 @@
   {#if issue.labels.length}<span
       class="flex min-w-0 gap-1 {nowrap ? 'overflow-hidden' : 'flex-wrap'}"
       >{#each issue.labels as l (l.id)}<LabelChip label={l} />{/each}</span
+    >{/if}
+{:else if field === 'repo'}
+  {#if issue.repo}<a
+      href={repoUrl(project.repos, issue.repo)}
+      target="_blank"
+      rel="noreferrer"
+      onclick={(e) => e.stopPropagation()}
+      class="truncate text-xs text-fg-muted hover:text-fg hover:underline"
+      title="Open on GitHub">{issue.repo}</a
     >{/if}
 {:else if field === 'estimate'}
   {#if issue.estimate !== null}<span

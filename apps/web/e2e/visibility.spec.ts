@@ -212,3 +212,64 @@ test('viewers see the members read-only and signed-out visitors cannot open sett
   await expect(a.getByTestId('settings-access')).toHaveCount(0);
   await anon.close();
 });
+
+test('an issue can be linked to one of the project repos and filtered by it', async ({ page }) => {
+  const key = unique('RP');
+  await post(page.request, '/projects', { key, name: 'Repos' });
+  await post(page.request, `/projects/${key}/repos`, { repo: 'acme/app' });
+  await post(page.request, `/projects/${key}/repos`, { repo: 'acme/docs' });
+  await post(page.request, `/projects/${key}/issues`, { title: 'Needs a repo' });
+  await post(page.request, `/projects/${key}/issues`, { title: 'Other issue' });
+
+  await page.goto(`/i/${key}-1`);
+  await page.getByRole('button', { name: 'Repository' }).click();
+  await page.getByRole('option', { name: 'acme/app' }).click();
+  await expect(page.getByRole('link', { name: 'acme/app' })).toHaveAttribute(
+    'href',
+    'https://github.com/acme/app',
+  );
+  await expect(page.getByRole('link', { name: 'acme/app' })).toHaveAttribute('target', '_blank');
+
+  // Filter the list by repository, then clear the link again.
+  await page.goto(`/p/${key}`);
+  await expect(page.getByTestId('issue-row')).toHaveCount(2);
+  await page.getByTestId('filter-repo').click();
+  await page.getByRole('option', { name: 'acme/app' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('issue-row')).toHaveCount(1);
+  await expect(page.getByTestId('issue-row')).toContainText('Needs a repo');
+
+  await page.goto(`/i/${key}-1`);
+  await page.getByRole('button', { name: 'Repository' }).click();
+  await page.getByRole('option', { name: 'No repository' }).click();
+  await expect(page.getByRole('link', { name: 'acme/app' })).toHaveCount(0);
+});
+
+test('the create dialog offers the project repos and projects without repos hide the row', async ({
+  page,
+}) => {
+  const key = unique('RC');
+  const bare = unique('RB');
+  await post(page.request, '/projects', { key, name: 'With repos' });
+  await post(page.request, `/projects/${key}/repos`, { repo: 'acme/app' });
+  await post(page.request, '/projects', { key: bare, name: 'No repos' });
+  await post(page.request, `/projects/${bare}/issues`, { title: 'Plain' });
+
+  await page.goto(`/i/${bare}-1`);
+  await expect(page.getByTestId('issue-properties')).toBeVisible();
+  await expect(page.getByText('Repository', { exact: true })).toHaveCount(0);
+
+  await page.goto(`/p/${key}`);
+  await expect(page.getByTestId('filter-bar')).toBeVisible();
+  await page.keyboard.press('c');
+  await expect(page.getByTestId('create-issue-dialog')).toBeVisible();
+  await page.getByTestId('create-title').fill('Born with a repo');
+  await page
+    .getByTestId('create-issue-dialog')
+    .getByRole('button', { name: 'Repository', exact: true })
+    .click();
+  await page.getByRole('option', { name: 'acme/app' }).click();
+  await page.getByTestId('create-submit').click();
+  await page.goto(`/i/${key}-1`);
+  await expect(page.getByRole('link', { name: 'acme/app' })).toBeVisible();
+});

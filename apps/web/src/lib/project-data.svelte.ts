@@ -3,6 +3,7 @@ import {
   ApiError,
   type CustomField,
   type Label,
+  type Project,
   type Status,
   type User,
   type View,
@@ -14,6 +15,8 @@ export interface ProjectData {
   readonly statuses: Status[];
   readonly labels: Label[];
   readonly users: User[];
+  /** GitHub repositories linked to the project: the values an issue's `repo` can take. */
+  readonly repos: Project['repos'];
   readonly views: View[];
   /** Active custom field definitions (they also feed the field registry). */
   readonly customFields: CustomField[];
@@ -81,6 +84,9 @@ export function useProjectData(key: () => string): ProjectData {
     },
     get users() {
       return users.data ?? [];
+    },
+    get repos() {
+      return project.data?.repos ?? [];
     },
     get views() {
       return views.data ?? [];
