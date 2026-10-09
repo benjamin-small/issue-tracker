@@ -23,6 +23,7 @@ import { readableProjectIds, whereReadable } from './access.ts';
 import type { ServiceContext } from './context.ts';
 import { DomainError, validationError } from './errors.ts';
 import { getIssueRow } from './refs.ts';
+import { parseRepoRef } from './services/repos.ts';
 import {
   customFieldSql,
   loadCustomFieldValues,
@@ -58,6 +59,7 @@ export async function loadIssues(db: Exec, ids: string[]): Promise<Issue[]> {
       .leftJoin('users as a', 'a.id', 'i.assignee_id')
       .leftJoin('issues as pi', 'pi.id', 'i.parent_id')
       .leftJoin('projects as pp', 'pp.id', 'pi.project_id')
+      .leftJoin('project_repos as rp', 'rp.id', 'i.repo_id')
       .selectAll('i')
       .select([
         'p.key as project_key',
@@ -75,6 +77,8 @@ export async function loadIssues(db: Exec, ids: string[]): Promise<Issue[]> {
         'pi.number as parent_number',
         'pi.title as parent_title',
         'pp.key as parent_project_key',
+        'rp.owner as repo_owner',
+        'rp.name as repo_name',
       ])
       .select((eb) => [
         eb
@@ -149,6 +153,7 @@ export async function loadIssues(db: Exec, ids: string[]): Promise<Issue[]> {
                 title: r.parent_title!,
               }
             : null,
+        repo: r.repo_owner ? `${r.repo_owner}/${r.repo_name}` : null,
         labelIds: labels.map((l) => l.id),
         labels,
         estimate: r.estimate,
@@ -263,6 +268,7 @@ const SCALAR_COLUMNS: Record<string, RawBuilder<unknown>> = {
   assignee: sql.ref('i.assignee_id'),
   creator: sql.ref('i.creator_id'),
   parent: sql.ref('i.parent_id'),
+  repo: sql.ref('i.repo_id'),
   estimate: sql.ref('i.estimate'),
   dueDate: sql.ref('i.due_date'),
   createdAt: sql.ref('i.created_at'),
@@ -451,6 +457,20 @@ export async function resolveFilterRefs(
               throw validationError(`Unknown issue "${v}"`);
             throw error;
           }
+        }
+        case 'repo': {
+          if (isIdOf('projectRepo', v)) return [v];
+          const { owner, name } = parseRepoRef(v);
+          let q = db
+            .selectFrom('project_repos')
+            .select('id')
+            .where(sql`lower(owner)`, '=', owner.toLowerCase())
+            .where(sql`lower(name)`, '=', name.toLowerCase());
+          if (projectId) q = q.where('project_id', '=', projectId);
+          else q = readableOnly(q);
+          const ids = (await q.execute()).map((r) => r.id);
+          if (!ids.length) throw validationError(`Unknown repository "${v}"`);
+          return ids;
         }
         default:
           return [v];

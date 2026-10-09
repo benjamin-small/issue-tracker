@@ -5634,6 +5634,11 @@ export interface components {
             creator: components["schemas"]["UserSummary"];
             parentId: string | null;
             parent: components["schemas"]["IssueRef"] | null;
+            /**
+             * @description Linked GitHub repository (`owner/name`), one of the project's repos.
+             * @example acme/app
+             */
+            repo: string | null;
             labelIds: string[];
             labels: components["schemas"]["LabelSummary"][];
             estimate: number | null;
@@ -5808,6 +5813,8 @@ export interface components {
              * @example ENG-1
              */
             parent?: string | null;
+            /** @description One of the project's repos (`owner/name`, URL or id), or null. */
+            repo?: string | null;
             /**
              * @description Label ids or names; replaces the full set.
              * @default []
@@ -5861,6 +5868,8 @@ export interface components {
              * @example ENG-1
              */
             parent?: string | null;
+            /** @description One of the project's repos (`owner/name`, URL or id), or null. */
+            repo?: string | null;
             /** @description Label ids or names; replaces the full set. */
             labels?: string[];
             estimate?: number | null;
@@ -5930,6 +5939,8 @@ export interface components {
                  * @example ENG-1
                  */
                 parent?: string | null;
+                /** @description One of the project's repos (`owner/name`, URL or id), or null. */
+                repo?: string | null;
                 /** @description Label ids or names; replaces the full set. */
                 labels?: string[];
                 estimate?: number | null;

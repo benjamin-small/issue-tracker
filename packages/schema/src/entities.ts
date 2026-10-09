@@ -349,6 +349,10 @@ export const IssueSchema = z
     creator: UserSummarySchema,
     parentId: z.string().nullable(),
     parent: nullableRef(IssueRefSchema),
+    repo: z.string().nullable().meta({
+      description: "Linked GitHub repository (`owner/name`), one of the project's repos.",
+      example: 'acme/app',
+    }),
     labelIds: z.array(z.string()),
     labels: z.array(LabelSummarySchema),
     estimate: z.number().nullable(),
@@ -391,6 +395,10 @@ const issueWritable = {
     .string()
     .nullable()
     .meta({ description: 'Parent issue key or id, or null.', example: 'ENG-1' }),
+  repo: z
+    .string()
+    .nullable()
+    .meta({ description: "One of the project's repos (`owner/name`, URL or id), or null." }),
   labels: z.array(z.string()).meta({ description: 'Label ids or names; replaces the full set.' }),
   estimate: z.number().min(0).nullable(),
   dueDate: DateOnlySchema.nullable(),
@@ -410,6 +418,7 @@ export const CreateIssueInputSchema = z
       .meta({ description: 'Defaults to the first backlog/unstarted status.' }),
     assignee: issueWritable.assignee.optional(),
     parent: issueWritable.parent.optional(),
+    repo: issueWritable.repo.optional(),
     labels: issueWritable.labels.default([]),
     estimate: issueWritable.estimate.optional(),
     dueDate: issueWritable.dueDate.optional(),

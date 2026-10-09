@@ -26,6 +26,7 @@ import { loadIssue, queryIssues } from '../issue-query.ts';
 import { requireAdmin } from '../permissions.ts';
 import { getIssueRow, getProjectRow, getStatusRow, getUserRow } from '../refs.ts';
 import { listEvents } from './events.ts';
+import { findRepo } from './repos.ts';
 
 /** Fields compared to build `changes` in `issue.updated` events. */
 const TRACKED_FIELDS = [
@@ -35,6 +36,7 @@ const TRACKED_FIELDS = [
   'priority',
   'assignee',
   'parent',
+  'repo',
   'labels',
   'estimate',
   'dueDate',
@@ -255,6 +257,42 @@ async function resolveParent(
   return parent.id;
 }
 
+/** Resolves a repo ref (`rpo_` id, `owner/name` or URL) to one of the project's linked repos. */
+async function resolveRepoId(
+  tx: Tx,
+  project: { id: string; key: string },
+  ref: string | null,
+): Promise<string | null> {
+  if (ref === null) return null;
+  const repo = await findRepo(tx, project.id, ref);
+  if (!repo) throw invalidRelation(`"${ref}" is not linked to project ${project.key}`);
+  return repo.id;
+}
+
+/**
+ * Clears an issue's repo (used when its repo is unlinked), recording `issue.updated`. Trashed issues
+ * can't go through a normal update, so they are cleared directly with the same event.
+ */
+export async function clearIssueRepo(ctx: ServiceContext, tx: Tx, issueId: string): Promise<void> {
+  const row = await getIssueRow(ctx, tx, issueId, 'write');
+  if (!row.deleted_at) {
+    await updateIssueInTx(tx, ctx, issueId, { repo: null });
+    return;
+  }
+  const before = await loadIssue(tx, row.id);
+  await tx
+    .updateTable('issues')
+    .set({ repo_id: null, version: row.version + 1, updated_at: nowIso(ctx) })
+    .where('id', '=', row.id)
+    .execute();
+  const issue = await loadIssue(tx, row.id);
+  await recordEvent(tx, ctx, 'issue.updated', {
+    projectId: row.project_id,
+    issueId: row.id,
+    data: { issue, changes: diff(before, issue, TRACKED_FIELDS) },
+  });
+}
+
 async function setLabels(tx: Tx, ctx: ServiceContext, issueId: string, labelIds: string[]) {
   await tx.deleteFrom('issue_labels').where('issue_id', '=', issueId).execute();
   if (labelIds.length)
@@ -293,6 +331,7 @@ export async function createIssue(
       : await defaultStatus(tx, project.id);
     const assigneeId = await resolveAssignee(ctx, tx, data.assignee ?? null);
     const parentId = await resolveParent(ctx, tx, { projectId: project.id }, data.parent ?? null);
+    const repoId = await resolveRepoId(tx, project, data.repo ?? null);
     const labelIds = await resolveLabelIds(tx, project.id, data.labels);
     const customValues = await resolveCustomFieldValues(tx, ctx, project.id, data.customFields);
     const { next_issue_number } = await tx
@@ -319,6 +358,7 @@ export async function createIssue(
         assignee_id: assigneeId,
         creator_id: ctx.actor.id,
         parent_id: parentId,
+        repo_id: repoId,
         estimate: data.estimate ?? null,
         due_date: data.dueDate ?? null,
         rank,
@@ -396,6 +436,11 @@ export async function updateIssueInTx(
       patch.parent,
     );
     if (parentId !== row.parent_id) set.parent_id = parentId;
+  }
+  if (patch.repo !== undefined) {
+    const project = await getProjectRow(ctx, tx, row.project_id, 'read');
+    const repoId = await resolveRepoId(tx, project, patch.repo);
+    if (repoId !== row.repo_id) set.repo_id = repoId;
   }
 
   let labelIds: string[] | undefined;

@@ -9,6 +9,7 @@ import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, isUniqueViolation, notFound, parseInput, validationError } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { getProjectRow } from '../refs.ts';
+import { clearIssueRepo } from './issues.ts';
 
 type Exec = Kysely<Database>;
 const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
@@ -122,7 +123,7 @@ export async function removeRepo(
     const issueIds = (
       await tx.selectFrom('issues').select('id').where('repo_id', '=', row.id).execute()
     ).map((r) => r.id);
-    // Clear through the issue update path so each change records issue.updated (Task 11 adds `repo`).
+    // Clear through the issue update path so each change records issue.updated.
     for (const id of issueIds) await clearIssueRepo(ctx, tx, id);
     await tx.deleteFrom('project_repos').where('id', '=', row.id).execute();
     await recordEvent(tx, ctx, 'project.repo_removed', {
@@ -130,13 +131,4 @@ export async function removeRepo(
       data: { repo: toRepo(row) },
     });
   });
-}
-
-/** Temporary: a direct update. Task 11 replaces it with the issue-service version that records events. */
-async function clearIssueRepo(ctx: ServiceContext, tx: Exec, issueId: string): Promise<void> {
-  await tx
-    .updateTable('issues')
-    .set({ repo_id: null, version: sql`version + 1`, updated_at: nowIso(ctx) })
-    .where('id', '=', issueId)
-    .execute();
 }

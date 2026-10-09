@@ -2,7 +2,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { addRepo, parseRepoRef, removeRepo } from './repos.ts';
 import { createProject, getProject } from './projects.ts';
-import { createIssue } from './issues.ts';
+import {
+  createIssue,
+  deleteIssue,
+  getIssue,
+  listIssueActivity,
+  listIssues,
+  moveIssue,
+} from './issues.ts';
 import { createTestContext, type TestContext } from '../testing.ts';
 
 describe('parseRepoRef', () => {
@@ -45,21 +52,47 @@ describe(`repo links (${testDialect()})`, () => {
     });
   });
 
-  it('clears a removed repo from issues that used it (temporary direct check until Task 11)', async () => {
+  it('removing a repo clears it from issues that used it', async () => {
     const repo = await addRepo(t.ctx, 'ENG', { repo: 'acme/clear-me' });
-    const issue = await createIssue(t.ctx, 'ENG', { title: 'linked' });
-    const db = t.ctx.db.kysely;
-    await db.updateTable('issues').set({ repo_id: repo.id }).where('id', '=', issue.id).execute();
+    const issue = await createIssue(t.ctx, 'ENG', { title: 'linked', repo: 'ACME/clear-me' });
+    expect(issue.repo).toBe('acme/clear-me');
     await removeRepo(t.ctx, 'ENG', repo.id);
-    const row = await db
-      .selectFrom('issues')
-      .select(['repo_id', 'version'])
-      .where('id', '=', issue.id)
-      .executeTakeFirstOrThrow();
-    expect(row.repo_id).toBeNull();
-    expect(Number(row.version)).toBe(issue.version + 1);
+    const after = await getIssue(t.ctx, issue.key);
+    expect(after.repo).toBeNull();
+    expect(after.version).toBe(issue.version + 1);
+    const events = await listIssueActivity(t.ctx, issue.key);
+    const last = events.data.find((e) => e.type === 'issue.updated');
+    expect(last?.data).toMatchObject({ changes: { repo: { from: 'acme/clear-me', to: null } } });
   });
 
-  // Needs the issue `repo` field (Task 11): restore the issue assertions then.
-  it.todo('removing a repo clears it from issues that used it');
+  it('clears a removed repo from trashed issues too', async () => {
+    const repo = await addRepo(t.ctx, 'ENG', { repo: 'acme/trashed' });
+    const issue = await createIssue(t.ctx, 'ENG', { title: 'to trash', repo: repo.id });
+    await deleteIssue(t.ctx, issue.key);
+    await removeRepo(t.ctx, 'ENG', 'acme/trashed');
+    const after = await getIssue(t.ctx, issue.key);
+    expect(after.deletedAt).not.toBeNull();
+    expect(after.repo).toBeNull();
+  });
+
+  it('filters by repo, rejects unlinked repos, and keeps the repo on a board move', async () => {
+    await addRepo(t.ctx, 'ENG', { repo: 'acme/web' });
+    await createIssue(t.ctx, 'ENG', { title: 'web bug', repo: 'acme/web' });
+    const found = await listIssues(t.ctx, {
+      project: 'ENG',
+      filter: { conditions: [{ field: 'repo', op: 'eq', value: 'acme/web' }] },
+    });
+    expect(found.data.map((i) => i.title)).toEqual(['web bug']);
+    await expect(
+      createIssue(t.ctx, 'ENG', { title: 'bad', repo: 'other/repo' }),
+    ).rejects.toMatchObject({ code: 'INVALID_RELATION' });
+    // Issues cannot change projects (moveIssue only reorders/changes status), so the repo stays.
+    const moved = await moveIssue(t.ctx, found.data[0]!.key, { position: 'bottom' });
+    expect(moved.repo).toBe('acme/web');
+    const none = await listIssues(t.ctx, {
+      project: 'ENG',
+      filter: { conditions: [{ field: 'repo', op: 'isNull', value: true }] },
+    });
+    expect(none.data.map((i) => i.title)).not.toContain('web bug');
+  });
 });

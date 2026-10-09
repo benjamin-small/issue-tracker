@@ -1150,6 +1150,14 @@
               }
             ]
           },
+          "repo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Linked GitHub repository (`owner/name`), one of the project's repos.",
+            "example": "acme/app"
+          },
           "labelIds": {
             "type": "array",
             "items": {
@@ -1271,6 +1279,7 @@
           "creator",
           "parentId",
           "parent",
+          "repo",
           "labelIds",
           "labels",
           "estimate",
@@ -1576,6 +1585,13 @@
             "description": "Parent issue key or id, or null.",
             "example": "ENG-1"
           },
+          "repo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One of the project's repos (`owner/name`, URL or id), or null."
+          },
           "labels": {
             "type": "array",
             "items": {
@@ -1661,6 +1677,13 @@
             ],
             "description": "Parent issue key or id, or null.",
             "example": "ENG-1"
+          },
+          "repo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One of the project's repos (`owner/name`, URL or id), or null."
           },
           "labels": {
             "type": "array",
@@ -1805,6 +1828,13 @@
                 ],
                 "description": "Parent issue key or id, or null.",
                 "example": "ENG-1"
+              },
+              "repo": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "One of the project's repos (`owner/name`, URL or id), or null."
               },
               "labels": {
                 "type": "array",
