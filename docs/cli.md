@@ -82,7 +82,7 @@ With `--json`, errors are written to stderr as a JSON object with a stable `code
 - **Structured input:** `--input <json | @file | ->` passes a full request payload (`CreateIssueInput` / `UpdateIssueInput`). Flags override its fields.
 - **Custom fields:** `--set severity=high --set points=3`. Values are parsed as JSON when possible, so `--set tags='["a","b"]'` works.
 - **Metadata:** `--meta github.pr=https://…` merges into the issue's `metadata`, a place for agent and integration bookkeeping.
-- **Clearing a field:** `none` clears it, e.g. `--assignee none`, `--parent none`, `--due none`.
+- **Clearing a field:** `none` clears it, e.g. `--assignee none`, `--parent none`, `--due none`, `--repo none` (an empty `--repo ''` does too).
 
 ## Safety for automation
 
@@ -90,6 +90,19 @@ With `--json`, errors are written to stderr as a JSON object with a stable `code
 - **Optimistic concurrency.** `--if-version N` (from the issue's `version`) makes `edit`, `move` and `delete` fail with exit 4 instead of overwriting a concurrent change.
 - **Deletes are restorable.** `issue delete` moves the issue to the trash, and `issue restore` brings it back. `--permanent` is admin-only.
 - **Atomic multi-issue edits.** `issue edit ENG-1 ENG-2 …` updates several issues atomically.
+
+## Project access
+
+Projects are `private` (members and admins) or `public` (anyone can read). Members have a role: `viewer`, `editor` or `manager`. Changing any of this needs `manage` on the project. These commands take the project from `-P`, `POIETIC_ISSUES_PROJECT` or `.poietic-issues.json`, like the rest of the CLI.
+
+```sh
+poietic-issues project edit ENG --visibility public
+poietic-issues project members add @ada --role editor -P ENG
+poietic-issues project members set @ada --role manager -P ENG
+poietic-issues project members list -P ENG
+poietic-issues project repo add https://github.com/acme/app -P ENG   # or acme/app
+poietic-issues issue edit ENG-42 --repo acme/app                      # one of the project's linked repos
+```
 
 ## Discovery
 

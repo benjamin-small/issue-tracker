@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { CliError, usage } from '../errors.ts';
 import type { CliIO } from '../io.ts';
 import { makeAction, readJsonArg, type Runtime } from '../runtime.ts';
+import { membersCommand, repoCommand, visibilityOption } from './members.ts';
 
 type Opts = Record<string, unknown>;
 const pick = (o: Opts, keys: string[]) =>
@@ -99,6 +100,7 @@ export function projectCommand(io: CliIO): Command {
     .requiredOption('-k, --key <KEY>', 'issue key prefix, e.g. ENG (immutable)')
     .requiredOption('-n, --name <name>', 'name')
     .option('--description <text>', 'description')
+    .addOption(visibilityOption('public: anyone can read; private (default): members and admins'))
     .action(
       act(async (rt, _a, o) => {
         const api = await rt.api();
@@ -106,7 +108,12 @@ export function projectCommand(io: CliIO): Command {
           'project',
           await rt.call(
             api.POST('/projects', {
-              body: pick(o, ['key', 'name', 'description']) as Schemas['CreateProjectInput'],
+              body: pick(o, [
+                'key',
+                'name',
+                'description',
+                'visibility',
+              ]) as Schemas['CreateProjectInput'],
             }),
           ),
         );
@@ -118,12 +125,13 @@ export function projectCommand(io: CliIO): Command {
     .argument('[project]', 'project key or id')
     .option('-n, --name <name>', 'name')
     .option('--description <text>', 'description')
+    .addOption(visibilityOption('public: anyone can read; private: members and admins'))
     .option('--archive', 'archive the project (admin)')
     .option('--unarchive', 'unarchive the project (admin)')
     .action(
       act(async (rt, [ref], o) => {
         const api = await rt.api();
-        const body: Schemas['UpdateProjectInput'] = pick(o, ['name', 'description']);
+        const body: Schemas['UpdateProjectInput'] = pick(o, ['name', 'description', 'visibility']);
         if (o.archive) body.archived = true;
         if (o.unarchive) body.archived = false;
         rt.out.item(
@@ -154,6 +162,8 @@ export function projectCommand(io: CliIO): Command {
         rt.io.stdout(`${JSON.stringify(data, null, 2)}\n`);
       }),
     );
+  cmd.addCommand(membersCommand(io));
+  cmd.addCommand(repoCommand(io));
   return cmd;
 }
 

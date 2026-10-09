@@ -11,6 +11,8 @@ export type Kind =
   | 'webhookDelivery'
   | 'linkType'
   | 'project'
+  | 'member'
+  | 'repo'
   | 'status'
   | 'label'
   | 'view'
@@ -85,8 +87,19 @@ const COLUMNS: Record<Exclude<Kind, 'raw'>, Column[]> = {
   project: [
     ['KEY', (r) => r.key],
     ['NAME', (r) => r.name],
+    ['VISIBILITY', (r) => r.visibility],
     ['ARCHIVED', (r) => (r.archivedAt ? date(r.archivedAt) : '')],
     ['ID', (r) => r.id],
+  ],
+  member: [
+    ['USER', (r) => handle(r.user)],
+    ['ROLE', (r) => r.role],
+    ['SINCE', (r) => date(r.createdAt)],
+  ],
+  repo: [
+    ['ID', (r) => r.id],
+    ['REPO', (r) => r.fullName],
+    ['URL', (r) => r.url],
   ],
   status: [
     ['POS', (r) => r.position],
@@ -150,6 +163,7 @@ function identifier(kind: Kind, row: Row): string {
   if (kind === 'issue' || kind === 'project' || kind === 'linkType')
     return String(row.key ?? row.id);
   if (kind === 'event') return String(row.seq);
+  if (kind === 'member') return String((row.user as { handle: string }).handle);
   return String(row.id ?? '');
 }
 

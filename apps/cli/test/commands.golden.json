@@ -210,6 +210,13 @@
           "takesValue": true
         },
         {
+          "flags": "--repo <owner/name>",
+          "name": "repo",
+          "description": "one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it",
+          "required": false,
+          "takesValue": true
+        },
+        {
           "flags": "--set <field=value>",
           "name": "set",
           "description": "custom field (repeatable), e.g. --set severity=high --set points=3",
@@ -314,6 +321,13 @@
           "flags": "--due <date>",
           "name": "due",
           "description": "due date YYYY-MM-DD, or none",
+          "required": false,
+          "takesValue": true
+        },
+        {
+          "flags": "--repo <owner/name>",
+          "name": "repo",
+          "description": "one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it",
           "required": false,
           "takesValue": true
         },
@@ -846,6 +860,13 @@
           "description": "description",
           "required": false,
           "takesValue": true
+        },
+        {
+          "flags": "--visibility <visibility>",
+          "name": "visibility",
+          "description": "public: anyone can read; private (default): members and admins",
+          "required": false,
+          "takesValue": true
         }
       ]
     },
@@ -877,6 +898,13 @@
           "takesValue": true
         },
         {
+          "flags": "--visibility <visibility>",
+          "name": "visibility",
+          "description": "public: anyone can read; private: members and admins",
+          "required": false,
+          "takesValue": true
+        },
+        {
           "flags": "--archive",
           "name": "archive",
           "description": "archive the project (admin)",
@@ -902,6 +930,114 @@
           "required": false,
           "variadic": false,
           "description": "project key or id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "project members list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List the project members",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "project members add",
+      "aliases": [],
+      "description": "Give a user a role on the project (needs manage)",
+      "arguments": [
+        {
+          "name": "user",
+          "required": true,
+          "variadic": false,
+          "description": "handle, @handle or user id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--role <role>",
+          "name": "role",
+          "description": "viewer reads, editor also writes, manager also manages the project",
+          "required": true,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "project members set",
+      "aliases": [],
+      "description": "Change a member's role (needs manage)",
+      "arguments": [
+        {
+          "name": "user",
+          "required": true,
+          "variadic": false,
+          "description": "handle, @handle or user id"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--role <role>",
+          "name": "role",
+          "description": "the new role",
+          "required": true,
+          "takesValue": true
+        }
+      ]
+    },
+    {
+      "name": "project members remove",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Remove a user's role on the project (needs manage)",
+      "arguments": [
+        {
+          "name": "user",
+          "required": true,
+          "variadic": false,
+          "description": "handle, @handle or user id"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "project repo list",
+      "aliases": [
+        "ls"
+      ],
+      "description": "List the linked repositories",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "project repo add",
+      "aliases": [],
+      "description": "Link a GitHub repository to the project (needs manage)",
+      "arguments": [
+        {
+          "name": "repo",
+          "required": true,
+          "variadic": false,
+          "description": "owner/name or a github.com URL"
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "project repo remove",
+      "aliases": [
+        "rm"
+      ],
+      "description": "Unlink a repository (needs manage); issues that named it are cleared. Takes owner/name, a URL or an rpo_ id",
+      "arguments": [
+        {
+          "name": "repo",
+          "required": true,
+          "variadic": false,
+          "description": "owner/name, github.com URL or repo id"
         }
       ],
       "options": []

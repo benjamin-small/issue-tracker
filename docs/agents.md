@@ -15,7 +15,7 @@ export POIETIC_ISSUES_FORMAT=json            # machine output everywhere
 export POIETIC_ISSUES_DATABASE_URL=sqlite:/path/to/tracker.db POIETIC_ISSUES_ACTOR=claude
 ```
 
-Give every agent its own user (`poietic-issues user create --kind agent …`), so history shows who did what. Give every agent user a role on each private project it works in: `poietic-issues project members add <KEY> @agent --role editor`. The member API and this command both arrive with later parts of this change. Without a membership, a private project returns exit code 3 (not found), and a public one is read-only. A user created after the upgrade has no memberships, and admins always have full access. See [ADR 0021](adr/0021-project-visibility-and-roles.md).
+Give every agent its own user (`poietic-issues user create --kind agent …`), so history shows who did what. Give every agent user a role on each private project it works in: `poietic-issues project members add @agent --role editor -P <KEY>`. Without a membership, a private project returns exit code 3 (not found), and a public one is read-only. A user created after the upgrade has no memberships, and admins always have full access. See [ADR 0021](adr/0021-project-visibility-and-roles.md).
 
 Committing a `.poietic-issues.json` (`poietic-issues init --project ENG --server …`) in a repository lets any agent working there find the right project.
 
