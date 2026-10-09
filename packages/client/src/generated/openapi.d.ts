@@ -3544,7 +3544,7 @@ export interface paths {
                     project?: string;
                     /** @description Issue key or id. */
                     issue?: string;
-                    /** @description Comma-separated event types: issue.created, issue.updated, issue.deleted, issue.restored, comment.created, comment.updated, comment.deleted, link.created, link.deleted, project.created, project.updated, status.created, status.updated, status.deleted, label.created, label.updated, label.deleted, user.created, user.updated, field.created, field.updated, field.deleted, attachment.created, attachment.deleted. */
+                    /** @description Comma-separated event types: issue.created, issue.updated, issue.deleted, issue.restored, comment.created, comment.updated, comment.deleted, link.created, link.deleted, project.created, project.updated, project.member_added, project.member_changed, project.member_removed, status.created, status.updated, status.deleted, label.created, label.updated, label.deleted, user.created, user.updated, field.created, field.updated, field.deleted, attachment.created, attachment.deleted. */
                     types?: string;
                 };
                 header?: never;
@@ -5189,7 +5189,7 @@ export interface components {
             seq: number;
             id: string;
             /** @enum {string} */
-            type: "issue.created" | "issue.updated" | "issue.deleted" | "issue.restored" | "comment.created" | "comment.updated" | "comment.deleted" | "link.created" | "link.deleted" | "project.created" | "project.updated" | "status.created" | "status.updated" | "status.deleted" | "label.created" | "label.updated" | "label.deleted" | "user.created" | "user.updated" | "field.created" | "field.updated" | "field.deleted" | "attachment.created" | "attachment.deleted";
+            type: "issue.created" | "issue.updated" | "issue.deleted" | "issue.restored" | "comment.created" | "comment.updated" | "comment.deleted" | "link.created" | "link.deleted" | "project.created" | "project.updated" | "project.member_added" | "project.member_changed" | "project.member_removed" | "status.created" | "status.updated" | "status.deleted" | "label.created" | "label.updated" | "label.deleted" | "user.created" | "user.updated" | "field.created" | "field.updated" | "field.deleted" | "attachment.created" | "attachment.deleted";
             actorId: string | null;
             actor: components["schemas"]["UserSummary"] | null;
             projectId: string | null;
@@ -5417,6 +5417,7 @@ export interface components {
             key: string;
             name: string;
             description: string;
+            visibility: components["schemas"]["ProjectVisibility"];
             /**
              * Format: date-time
              * @description ISO-8601 UTC timestamp.
@@ -5436,17 +5437,24 @@ export interface components {
              */
             archivedAt: string | null;
         };
+        /**
+         * @description `public`: anyone can read, even signed out. `private`: members and admins only.
+         * @enum {string}
+         */
+        ProjectVisibility: "public" | "private";
         CreateProjectInput: {
             /** @example ENG */
             key: string;
             name: string;
             /** @default  */
             description?: string;
+            visibility?: components["schemas"]["ProjectVisibility"];
         };
         UpdateProjectInput: {
             name?: string;
             description?: string;
             archived?: boolean;
+            visibility?: components["schemas"]["ProjectVisibility"];
         };
         JsonSchema: {
             [key: string]: unknown;
@@ -6465,6 +6473,7 @@ export type ApiToken = components['schemas']['ApiToken'];
 export type CreatedApiToken = components['schemas']['CreatedApiToken'];
 export type CreateTokenInput = components['schemas']['CreateTokenInput'];
 export type Project = components['schemas']['Project'];
+export type ProjectVisibility = components['schemas']['ProjectVisibility'];
 export type CreateProjectInput = components['schemas']['CreateProjectInput'];
 export type UpdateProjectInput = components['schemas']['UpdateProjectInput'];
 export type JsonSchema = components['schemas']['JsonSchema'];
