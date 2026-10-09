@@ -83,21 +83,27 @@ function linkEnds(event: TrackerEvent): string[] {
   return [link?.source?.id, link?.target?.id].filter((id): id is string => typeof id === 'string');
 }
 
-/** Link events name both issues, so they are hidden when either end is in a project the actor cannot read. */
+/**
+ * Link events name both issues, so they are hidden when either end is in a project the actor cannot read.
+ * A link event whose two ends cannot both be resolved is hidden too (fails closed on malformed data).
+ */
 async function dropUnreadableLinks(
   db: Tx,
   events: TrackerEvent[],
   readable: string[],
 ): Promise<TrackerEvent[]> {
-  const ids = [...new Set(events.filter((e) => e.type.startsWith('link.')).flatMap(linkEnds))];
-  if (ids.length === 0) return events;
-  const rows = await db
-    .selectFrom('issues')
-    .select(['id', 'project_id'])
-    .where('id', 'in', ids)
-    .execute();
+  const linkEvents = events.filter((e) => e.type.startsWith('link.'));
+  if (linkEvents.length === 0) return events;
+  const ids = [...new Set(linkEvents.flatMap(linkEnds))];
+  const rows = ids.length
+    ? await db.selectFrom('issues').select(['id', 'project_id']).where('id', 'in', ids).execute()
+    : [];
   const ok = new Set(rows.filter((r) => readable.includes(r.project_id)).map((r) => r.id));
-  return events.filter((e) => !e.type.startsWith('link.') || linkEnds(e).every((id) => ok.has(id)));
+  return events.filter((e) => {
+    if (!e.type.startsWith('link.')) return true;
+    const ends = linkEnds(e);
+    return ends.length === 2 && ends.every((id) => ok.has(id));
+  });
 }
 
 /**

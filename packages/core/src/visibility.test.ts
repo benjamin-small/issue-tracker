@@ -609,4 +609,50 @@ describe(`project visibility (${testDialect()})`, () => {
     expect(forMember.some((e) => e.projectId === null)).toBe(true);
     expect((await filterEventsForViewer(anon, all)).some((e) => e.projectId === null)).toBe(false);
   });
+
+  it('hides link events whose two ends cannot both be resolved', async () => {
+    const { filterEventsForViewer, listEvents } = await import('./services/events.ts');
+    const { recordEvent } = await import('./events.ts');
+    const { withWriteTx } = await import('@poietic-tech/issues-db');
+    const pub = await t.db.kysely
+      .selectFrom('projects')
+      .select('id')
+      .where('key', '=', 'PUB')
+      .executeTakeFirstOrThrow();
+    const issue = await getIssue(t.ctx, 'PUB-1');
+    const malformed = [
+      { link: { id: 'lnk_malformed_one_end', type: 'relates', source: { id: issue.id } } },
+      { link: { id: 'lnk_malformed_no_ends', type: 'relates' } },
+      { note: 'no link at all' },
+      {
+        link: {
+          id: 'lnk_malformed_unknown',
+          type: 'relates',
+          source: { id: issue.id },
+          target: { id: newId('issue') },
+        },
+      },
+    ];
+    await withWriteTx(t.db, async (tx) => {
+      for (const data of malformed)
+        await recordEvent(tx, t.ctx, 'link.created', {
+          projectId: pub.id,
+          issueId: issue.id,
+          data,
+        });
+    });
+    const isMalformed = (e: { data: Record<string, unknown> }) =>
+      JSON.stringify(e.data).includes('malformed') || e.data.note === 'no link at all';
+    const all = (await listEvents(t.ctx, { limit: 1000 })).data;
+    expect(all.filter(isMalformed)).toHaveLength(malformed.length); // admins see the raw log
+    await grant(t, 'PUB', t.member, 'editor');
+    for (const who of [withActor(t.ctx, ANONYMOUS_ACTOR), t.member]) {
+      const listed = (await listEvents(who, { limit: 1000 })).data;
+      expect(listed.length, who.actor.handle).toBeGreaterThan(0);
+      expect(listed.some(isMalformed), who.actor.handle).toBe(false);
+      expect((await filterEventsForViewer(who, all)).some(isMalformed), who.actor.handle).toBe(
+        false,
+      );
+    }
+  });
 });
