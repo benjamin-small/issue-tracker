@@ -656,3 +656,60 @@ describe(`project visibility (${testDialect()})`, () => {
     }
   });
 });
+
+describe(`nothing readable (${testDialect()})`, () => {
+  let t: TestContext;
+  beforeAll(async () => {
+    t = await createTestContext();
+    const { createLabel } = await import('./services/labels.ts');
+    await createProject(t.ctx, { key: 'HID', name: 'Hidden' });
+    await createIssue(t.ctx, 'HID', { title: 'secret' });
+    await createIssue(t.ctx, 'HID', { title: 'also secret', parent: 'HID-1' });
+    await createLabel(t.ctx, 'HID', { name: 'hidden-label' });
+  });
+  afterAll(() => t.destroy());
+
+  it('returns empty lists and unknown names when no project is public and the actor has no memberships', async () => {
+    const { listProjects } = await import('./services/projects.ts');
+    const { filterEventsForViewer, listEvents } = await import('./services/events.ts');
+    const anon = withActor(t.ctx, ANONYMOUS_ACTOR);
+    const all = (await listEvents(t.ctx, { limit: 1000 })).data;
+    expect(all.some((e) => e.projectId !== null)).toBe(true);
+    expect((await listProjects(t.ctx)).map((p) => p.key)).toEqual(['HID']);
+
+    for (const who of [anon, t.member]) {
+      const name = who.actor.handle;
+      expect(await listProjects(who), name).toEqual([]);
+      expect((await listIssues(who, {})).data, name).toEqual([]);
+      expect(
+        (
+          await listIssues(who, {
+            filter: { conditions: [{ field: 'text', op: 'contains', value: 'secret' }] },
+          })
+        ).data,
+        name,
+      ).toEqual([]);
+      const unknown: [string, string, string][] = [
+        ['status', 'In Progress', 'Unknown status "In Progress"'],
+        ['labels', 'hidden-label', 'Unknown label "hidden-label"'],
+        ['parent', 'HID-1', 'Unknown issue'],
+      ];
+      for (const [field, value, message] of unknown)
+        await expect(
+          listIssues(who, { filter: { conditions: [{ field, op: 'eq', value }] } } as never),
+          `${name} ${field}`,
+        ).rejects.toMatchObject({
+          code: 'VALIDATION_FAILED',
+          message: expect.stringContaining(message),
+        });
+      const events = (await listEvents(who, { limit: 1000 })).data;
+      expect(
+        events.every((e) => e.projectId === null),
+        name,
+      ).toBe(true);
+      expect(await filterEventsForViewer(who, all), name).toEqual(events);
+    }
+    // Anonymous readers also get no project-less (user.*) events, so their log is empty.
+    expect((await listEvents(anon, { limit: 1000 })).data).toEqual([]);
+  });
+});
