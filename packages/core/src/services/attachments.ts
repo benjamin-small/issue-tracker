@@ -107,7 +107,7 @@ export async function uploadAttachment(
       'PAYLOAD_TOO_LARGE',
       `Files are limited to ${Math.round(maxBytes / 1024 / 1024)} MB`,
     );
-  const issue = await getIssueRow(ctx.db.kysely, issueRefOrId);
+  const issue = await getIssueRow(ctx, ctx.db.kysely, issueRefOrId, 'write');
   if (issue.deleted_at) throw conflict('Cannot attach files to a deleted issue');
   const filename = sanitizeFilename(input.filename);
   const contentType = sniffContentType(input.data, filename);
@@ -159,7 +159,7 @@ export async function listAttachments(
   ctx: ServiceContext,
   issueRefOrId: string,
 ): Promise<Attachment[]> {
-  const issue = await getIssueRow(ctx.db.kysely, issueRefOrId);
+  const issue = await getIssueRow(ctx, ctx.db.kysely, issueRefOrId, 'read');
   const rows = await ctx.db.kysely
     .selectFrom('attachments as a')
     .innerJoin('users as u', 'u.id', 'a.uploader_id')

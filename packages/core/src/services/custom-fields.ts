@@ -88,7 +88,7 @@ export async function listCustomFields(
   projectRef: string,
   opts: { includeArchived?: boolean } = {},
 ): Promise<CustomField[]> {
-  const project = await getProjectRow(ctx.db.kysely, projectRef);
+  const project = await getProjectRow(ctx, ctx.db.kysely, projectRef, 'read');
   return loadFields(ctx.db.kysely, { projectId: project.id }, opts.includeArchived ?? false);
 }
 
@@ -137,7 +137,7 @@ export async function createCustomField(
     throw validationError(`Options are only allowed for select and multi_select fields`);
   try {
     return await withWriteTx(ctx.db, async (tx) => {
-      const project = await getProjectRow(tx, projectRef);
+      const project = await getProjectRow(ctx, tx, projectRef, 'write');
       const count = await tx
         .selectFrom('custom_fields')
         .select((eb) => eb.fn.countAll<number>().as('n'))

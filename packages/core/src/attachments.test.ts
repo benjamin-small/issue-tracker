@@ -18,7 +18,7 @@ import {
   sniffContentType,
   uploadAttachment,
 } from './index.ts';
-import { createTestContext, type TestContext } from './testing.ts';
+import { createTestContext, grant, type TestContext } from './testing.ts';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
 const text = (s: string) => new TextEncoder().encode(s);
@@ -135,6 +135,8 @@ describe(`attachments service (${testDialect()})`, () => {
   beforeAll(async () => {
     t = await createTestContext();
     await createProject(t.ctx, { key: 'ATT', name: 'Attachments' });
+    await grant(t, 'ATT', t.member, 'editor');
+    await grant(t, 'ATT', t.agent, 'editor');
   });
   afterAll(async () => {
     await t.destroy();

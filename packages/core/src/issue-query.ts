@@ -20,8 +20,8 @@ import {
   type SortSpec,
 } from '@poietic-tech/issues-schema';
 import type { ServiceContext } from './context.ts';
-import { validationError } from './errors.ts';
-import { findIssue } from './refs.ts';
+import { DomainError, validationError } from './errors.ts';
+import { getIssueRow } from './refs.ts';
 import {
   customFieldSql,
   loadCustomFieldValues,
@@ -433,9 +433,13 @@ export async function resolveFilterRefs(
         }
         case 'parent': {
           if (isIdOf('issue', v)) return [v];
-          const row = await findIssue(db, v);
-          if (!row) throw validationError(`Unknown issue "${v}"`);
-          return [row.id];
+          try {
+            return [(await getIssueRow(ctx, db, v, 'read')).id];
+          } catch (error) {
+            if (error instanceof DomainError && error.code === 'NOT_FOUND')
+              throw validationError(`Unknown issue "${v}"`);
+            throw error;
+          }
         }
         default:
           return [v];

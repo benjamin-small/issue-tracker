@@ -15,7 +15,7 @@ import { getProjectRow } from '../refs.ts';
 
 /** Views visible to the actor in a project: shared ones plus the actor's personal ones. */
 export async function listViews(ctx: ServiceContext, projectRef: string): Promise<View[]> {
-  const project = await getProjectRow(ctx.db.kysely, projectRef);
+  const project = await getProjectRow(ctx, ctx.db.kysely, projectRef, 'read');
   const rows = await ctx.db.kysely
     .selectFrom('views')
     .selectAll()
@@ -46,7 +46,8 @@ export async function createView(
 ): Promise<View> {
   const data = parseInput(CreateViewInputSchema, input);
   return withWriteTx(ctx.db, async (tx) => {
-    const project = await getProjectRow(tx, projectRef);
+    // Personal views only need read access; shared views change the project for everyone.
+    const project = await getProjectRow(ctx, tx, projectRef, data.shared ? 'manage' : 'read');
     const count = await tx
       .selectFrom('views')
       .select((eb) => eb.fn.countAll<number>().as('n'))

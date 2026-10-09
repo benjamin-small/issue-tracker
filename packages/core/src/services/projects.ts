@@ -39,7 +39,7 @@ export async function listProjects(
 }
 
 export async function getProject(ctx: ServiceContext, ref: string): Promise<Project> {
-  return toProject(await getProjectRow(ctx.db.kysely, ref));
+  return toProject(await getProjectRow(ctx, ctx.db.kysely, ref, 'read'));
 }
 
 /** Creates a project with the default workflow and two shared views (list + board). Admin only. */
@@ -127,7 +127,7 @@ export async function updateProject(
   const patch = parseInput(UpdateProjectInputSchema, input);
   if (patch.archived !== undefined) requireAdmin(ctx, 'archive projects');
   return withWriteTx(ctx.db, async (tx) => {
-    const row = await getProjectRow(tx, ref);
+    const row = await getProjectRow(ctx, tx, ref, 'write');
     const before = toProject(row);
     const now = nowIso(ctx);
     const updated = await tx

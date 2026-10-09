@@ -32,7 +32,7 @@ async function linkTypeRow(tx: Tx, ref: string) {
 
 /** Links of an issue, each expressed from that issue's perspective ("blocks" vs "is blocked by"). */
 export async function listIssueLinks(ctx: ServiceContext, issueRef: string): Promise<IssueLink[]> {
-  const issue = await getIssueRow(ctx.db.kysely, issueRef);
+  const issue = await getIssueRow(ctx, ctx.db.kysely, issueRef, 'read');
   return linksOf(ctx.db.kysely, issue.id);
 }
 
@@ -116,8 +116,8 @@ export async function createLink(
   const data = parseInput(CreateLinkInputSchema, input);
   try {
     return await withWriteTx(ctx.db, async (tx) => {
-      const issue = await getIssueRow(tx, issueRef);
-      const other = await getIssueRow(tx, data.target);
+      const issue = await getIssueRow(ctx, tx, issueRef, 'write');
+      const other = await getIssueRow(ctx, tx, data.target, 'read');
       if (issue.id === other.id) throw invalidRelation('An issue cannot link to itself');
       if (issue.deleted_at || other.deleted_at) throw invalidRelation('Cannot link deleted issues');
       const type = await linkTypeRow(tx, data.type);

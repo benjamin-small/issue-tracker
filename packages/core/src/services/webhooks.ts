@@ -106,7 +106,7 @@ export async function createWebhook(
   const data = parseInput(CreateWebhookInputSchema, input);
   checkUrl(data.url, policy);
   return withWriteTx(ctx.db, async (tx) => {
-    const project = data.project ? await getProjectRow(tx, data.project) : null;
+    const project = data.project ? await getProjectRow(ctx, tx, data.project, 'read') : null;
     const now = nowIso(ctx);
     await ensureDispatchCursor(tx, now);
     const secret = generateWebhookSecret();
@@ -149,7 +149,8 @@ export async function updateWebhook(
     if (patch.description !== undefined) set.description = patch.description;
     if (patch.eventTypes !== undefined) set.event_types = toJson(patch.eventTypes);
     if (patch.project !== undefined)
-      set.project_id = patch.project === null ? null : (await getProjectRow(tx, patch.project)).id;
+      set.project_id =
+        patch.project === null ? null : (await getProjectRow(ctx, tx, patch.project, 'read')).id;
     if (patch.active !== undefined) {
       set.active = patch.active;
       if (patch.active && !toBool(row.active)) {

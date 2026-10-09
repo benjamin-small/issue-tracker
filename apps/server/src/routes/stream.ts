@@ -55,7 +55,9 @@ export function registerStreamRoute(
     if (!tailer) return problem(c, 'UNAVAILABLE', 'Live events are not enabled on this server');
     const ctx = c.get('ctx');
     const projectRef = c.req.query('project');
-    const projectId = projectRef ? (await getProjectRow(ctx.db.kysely, projectRef)).id : undefined;
+    const projectId = projectRef
+      ? (await getProjectRow(ctx, ctx.db.kysely, projectRef, 'read')).id
+      : undefined;
     const resumeRaw = c.req.header('last-event-id') ?? c.req.query('after');
     const resume =
       resumeRaw !== undefined && /^\d+$/.test(resumeRaw) ? Number(resumeRaw) : undefined;

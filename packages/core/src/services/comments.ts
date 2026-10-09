@@ -56,7 +56,7 @@ export async function listComments(
   issueRef: string,
   opts: { includeDeleted?: boolean } = {},
 ): Promise<Comment[]> {
-  const issue = await getIssueRow(ctx.db.kysely, issueRef);
+  const issue = await getIssueRow(ctx, ctx.db.kysely, issueRef, 'read');
   let q = ctx.db.kysely
     .selectFrom('comments as c')
     .innerJoin('users as u', 'u.id', 'c.author_id')
@@ -88,7 +88,7 @@ export async function createComment(
 ): Promise<Comment> {
   const data = parseInput(CreateCommentInputSchema, input);
   return withWriteTx(ctx.db, async (tx) => {
-    const issue = await getIssueRow(tx, issueRef);
+    const issue = await getIssueRow(ctx, tx, issueRef, 'write');
     if (issue.deleted_at) throw conflict('Cannot comment on a deleted issue');
     const now = nowIso(ctx);
     const id = ctx.ids('comment');

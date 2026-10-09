@@ -35,7 +35,7 @@ export async function issueInputJsonSchema(
   projectRef: string,
 ): Promise<Record<string, unknown>> {
   const db = ctx.db.kysely;
-  const project = await getProjectRow(db, projectRef);
+  const project = await getProjectRow(ctx, db, projectRef, 'read');
   const [statuses, labels, users, fields, options] = await Promise.all([
     db
       .selectFrom('statuses')

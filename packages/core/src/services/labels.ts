@@ -14,7 +14,7 @@ import { toLabel } from '../mappers.ts';
 import { getProjectRow } from '../refs.ts';
 
 export async function listLabels(ctx: ServiceContext, projectRef: string): Promise<Label[]> {
-  const project = await getProjectRow(ctx.db.kysely, projectRef);
+  const project = await getProjectRow(ctx, ctx.db.kysely, projectRef, 'read');
   const rows = await ctx.db.kysely
     .selectFrom('labels')
     .selectAll()
@@ -33,7 +33,7 @@ export async function createLabel(
   const data = parseInput(CreateLabelInputSchema, input);
   try {
     return await withWriteTx(ctx.db, async (tx) => {
-      const project = await getProjectRow(tx, projectRef);
+      const project = await getProjectRow(ctx, tx, projectRef, 'write');
       const now = nowIso(ctx);
       const row = await tx
         .insertInto('labels')

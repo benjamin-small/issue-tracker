@@ -1,4 +1,5 @@
-import { SYSTEM_ACTOR, type ServiceContext, withActor } from '../context.ts';
+import { withWriteTx } from '@poietic-tech/issues-db';
+import { nowIso, SYSTEM_ACTOR, type ServiceContext, withActor } from '../context.ts';
 import { createToken } from './auth.ts';
 import { createComment } from './comments.ts';
 import { createCustomField } from './custom-fields.ts';
@@ -41,10 +42,26 @@ export async function seedDemoData(ctx: ServiceContext): Promise<SeedResult> {
   const asAda = withActor(ctx, toActor(ada));
   const asClaude = withActor(ctx, toActor(claude));
 
-  await createProject(asAda, {
+  const eng = await createProject(asAda, {
     key: 'ENG',
     name: 'Engineering',
     description: 'Product engineering: the web app, API and CLI.',
+  });
+  // The non-admin demo users edit ENG (as migration 0004's backfill would make them).
+  await withWriteTx(ctx.db, async (tx) => {
+    const now = nowIso(ctx);
+    await tx
+      .insertInto('project_members')
+      .values(
+        [grace, claude].map((u) => ({
+          project_id: eng.id,
+          user_id: u.id,
+          role: 'editor' as const,
+          created_at: now,
+          updated_at: now,
+        })),
+      )
+      .execute();
   });
   for (const [name, color] of [
     ['bug', '#eb5757'],

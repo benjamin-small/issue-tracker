@@ -1,5 +1,5 @@
 import { createToken } from '@poietic-tech/issues-core';
-import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
+import { createTestContext, grant, type TestContext } from '@poietic-tech/issues-core/testing';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
@@ -55,6 +55,7 @@ describe(`HTTP API (${testDialect()})`, () => {
 
   it('creates projects and issues and resolves human refs', async () => {
     const project = await call('POST', '/projects', { body: { key: 'api', name: 'API' } });
+    await grant(t, 'API', t.member, 'editor');
     expect(project.status).toBe(201);
     expect(project.body.key).toBe('API');
     expect(

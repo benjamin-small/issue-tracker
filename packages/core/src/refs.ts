@@ -1,9 +1,11 @@
 import type { Kysely, Database, Selectable } from '@poietic-tech/issues-db';
 import { isIdOf, parseIssueKey } from '@poietic-tech/issues-schema';
+import { type AccessLevel, projectLevel, requireLevel } from './access.ts';
 import type { ServiceContext } from './context.ts';
 import { notFound } from './errors.ts';
 
 type Exec = Kysely<Database>;
+type Need = Exclude<AccessLevel, 'none'>;
 
 /** Resolves a project by id (`prj_…`) or key (`ENG`, case-insensitive). */
 export async function findProject(
@@ -16,10 +18,22 @@ export async function findProject(
     : q.where('key', '=', ref.trim().toUpperCase()).executeTakeFirst();
 }
 
-export async function getProjectRow(db: Exec, ref: string) {
+/** Resolves a project the actor may access at `level`; unreadable projects are NOT_FOUND (ADR 0021). */
+export async function getProjectRow(ctx: ServiceContext, db: Exec, ref: string, level: Need) {
   const row = await findProject(db, ref);
   if (!row) throw notFound('Project', ref);
+  requireLevel(ctx, await projectLevel(ctx, db, row), level, 'Project', ref);
   return row;
+}
+
+/** `getProjectRow` for an id read from another row (a label's, a comment's issue's, …). */
+export async function requireProjectId(
+  ctx: ServiceContext,
+  db: Exec,
+  projectId: string,
+  level: Need,
+) {
+  return getProjectRow(ctx, db, projectId, level);
 }
 
 /** Resolves an issue by id (`iss_…`) or key (`ENG-42`). Includes soft-deleted issues. */
@@ -40,9 +54,12 @@ export async function findIssue(
     .executeTakeFirst();
 }
 
-export async function getIssueRow(db: Exec, ref: string) {
+/** Resolves an issue whose project the actor may access at `level`. Includes soft-deleted issues. */
+export async function getIssueRow(ctx: ServiceContext, db: Exec, ref: string, level: Need) {
   const row = await findIssue(db, ref);
   if (!row) throw notFound('Issue', ref);
+  const project = await findProject(db, row.project_id);
+  requireLevel(ctx, await projectLevel(ctx, db, project!), level, 'Issue', ref);
   return row;
 }
 

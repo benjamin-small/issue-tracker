@@ -13,7 +13,7 @@ import { toStatus } from '../mappers.ts';
 import { getProjectRow, getStatusRow } from '../refs.ts';
 
 export async function listStatuses(ctx: ServiceContext, projectRef: string): Promise<Status[]> {
-  const project = await getProjectRow(ctx.db.kysely, projectRef);
+  const project = await getProjectRow(ctx, ctx.db.kysely, projectRef, 'read');
   const rows = await ctx.db.kysely
     .selectFrom('statuses')
     .selectAll()
@@ -38,7 +38,7 @@ export async function createStatus(
   const data = parseInput(CreateStatusInputSchema, input);
   try {
     return await withWriteTx(ctx.db, async (tx) => {
-      const project = await getProjectRow(tx, projectRef);
+      const project = await getProjectRow(ctx, tx, projectRef, 'write');
       const existing = await tx
         .selectFrom('statuses')
         .select('id')
@@ -180,7 +180,7 @@ export async function reorderStatuses(
   ids: string[],
 ): Promise<Status[]> {
   return withWriteTx(ctx.db, async (tx) => {
-    const project = await getProjectRow(tx, projectRef);
+    const project = await getProjectRow(ctx, tx, projectRef, 'write');
     const rows = await tx
       .selectFrom('statuses')
       .selectAll()
