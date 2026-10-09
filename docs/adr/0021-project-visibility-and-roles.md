@@ -70,6 +70,6 @@ A project, issue or other resource the actor cannot read is reported as `NOT_FOU
 - Agent users need a membership on each private project they work in. Users created after the upgrade start with none, so an admin or manager adds them.
 - Admins see and manage everything. Nobody else sees a private project, and a bad id and a hidden project look the same.
 - The CLI in remote mode without a token reads as anonymous: private projects return not found, and `poietic-issues auth status` reports "Not signed in".
-- The demo seed gives the `claude` and `grace` demo users editor memberships, because the seed runs as a non-admin agent.
+- The demo seed runs as the admin `ada` and adds memberships with the ordinary member service. `grace` and the `claude` agent edit the public `ENG` project, as the migration's backfill would make them. In the private `OPS` project, `margaret` manages, `grace` edits and `claude` only views, so every role can be tried.
 - Permissions are checked per call with an extra lookup. If that shows up in profiles, add a cache that is invalidated by membership events, not one held on the context.
 - Roles are per project and fixed to three. Teams, groups or finer permissions would need a new ADR.

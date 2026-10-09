@@ -83,10 +83,18 @@ All settings are environment variables, validated at startup. An invalid value s
 ## Database and migrations
 
 - **Postgres 14+** is the production database. The server needs a normal user that owns its schema. Timestamps are `timestamptz`, and all times are UTC.
-- **Migrations** are forward-only files compiled into the bundle. They run at startup when `POIETIC_ISSUES_AUTO_MIGRATE=1`. Kysely's migrator takes a lock, so replicas starting together are safe.
+- **Migrations** are files compiled into the bundle. They run at startup when `POIETIC_ISSUES_AUTO_MIGRATE=1`. Kysely's migrator takes a lock, so replicas starting together are safe.
 - **Explicit migrations.** To run migrations as a separate release step instead, set `POIETIC_ISSUES_AUTO_MIGRATE=0` and run `poietic-issues db migrate` with `POIETIC_ISSUES_DATABASE_URL` set, e.g. `docker run --rm -e POIETIC_ISSUES_DATABASE_URL=… tracker poietic-issues db migrate`.
 - **Status.** `poietic-issues db status` shows applied and pending migrations.
-- **Upgrading to project visibility (migration 0004).** Existing projects stay `private`, and every active user who is not an admin or the `system` user becomes an `editor` of every existing project, so nobody loses access. Admins need no membership. Users and agents created afterwards start with none: add them to a project to give them access. Projects set to `public` are readable without signing in; see [security.md](security.md#project-access). The backfill is stamped with the time the migration runs.
+- **Back up before upgrading.** Once a release's migrations have run, older releases cannot start on that database: the migrator stops with `corrupted migrations: previously executed migration <name> is missing`. Take a backup (below) before deploying a release that adds a migration, and check that it opens with `poietic-issues db status --database <url-of-the-copy>`.
+- **Rolling back.** Prefer fixing forward. To run the previous release again, its database must not have the newer migrations. Either restore the pre-upgrade backup, losing every write since, or revert the schema in place:
+  1. Stop the server.
+  2. With the **new** release's CLI, run `poietic-issues db migrate --down` once per migration to undo. Each run reverts the newest applied migration; older releases don't know the migration, so they can't revert it. Check with `poietic-issues db status`.
+  3. Start the previous release.
+
+  Reverting drops whatever the migration added. Reverting 0004 drops project visibility, memberships, linked repos and issues' repo links; migrating forward again re-runs its backfill (every project private, every active non-admin an editor).
+
+- **Upgrading to project visibility (migration 0004).** Existing projects stay `private`, and every active user who is not an admin or the `system` user becomes an `editor` of every existing project, so nobody loses access. Admins need no membership. Users and agents created afterwards start with none: add them to a project to give them access. So do users who are deactivated when the migration runs, including SSO sign-ins still waiting for approval: after an admin activates them, they see only public projects until someone adds them to a project. Projects set to `public` are readable without signing in; see [security.md](security.md#project-access). The backfill is stamped with the time the migration runs.
 - **SQLite** works for single-instance installs. It runs in WAL mode with `BEGIN IMMEDIATE` writes, so the server and CLI can share the file. Put it on a local disk, not network storage.
 
 **Backups** need the database (e.g. `pg_dump`) and the blob store: the bucket, or `/data/blobs`. Restore both from the same point in time. An attachment row whose bytes are missing downloads as 404; bytes without a row are only wasted space.
@@ -173,6 +181,17 @@ litestream restore -o tracker-$(date +%F).db \
 ```
 
 Store the file somewhere other than R2. Copy the attachments bucket at the same time.
+
+**Upgrades and rollback:** The image migrates at startup (`POIETIC_ISSUES_AUTO_MIGRATE=1`), so a deploy that adds a migration changes the live database as soon as the new container starts. From then on the previous image cannot start: the tracker exits with `corrupted migrations: previously executed migration … is missing`, and the container restarts in a loop. Redeploying the previous image alone does not help, because every cold start restores the migrated database from the replica.
+
+- **Before merging a release with a migration**, take a snapshot with the backup recipe above, named for the release (e.g. `tracker-pre-0004.db`), and check it with `poietic-issues db status --database sqlite:tracker-pre-0004.db`.
+- **Fix forward** if the release misbehaves. This is the default: push a fix to `main`, and the schema stays as it is.
+- **Go back to the previous release** only if fixing forward is not possible. The container restores whatever the replica holds, so publish a database without the migration as a new replica first:
+  1. Choose the database. Either take the current data (`litestream restore -o tracker-now.db "s3://poietic-issues-db/tracker?…"`, the same URL as the backup recipe) and revert the migration with the new release's CLI, from a checkout of it: `pnpm poietic-issues db migrate --down --database sqlite:tracker-now.db`. This keeps the writes, but drops what the migration added. Or use the pre-deploy snapshot, which loses every write since the deploy.
+  2. Replicate the file to an empty bucket with the same R2 credential: `litestream replicate tracker-now.db "s3://<new-bucket>/tracker?endpoint=https://<account-id>.r2.cloudflarestorage.com&region=auto&forcePathStyle=true"`. Stop it once the first sync has finished. Then check the result: restore it with `litestream restore -o check.db …` and run `poietic-issues db status --database sqlite:check.db`. The bucket and the credential's access to it are managed in poietic-tech/poietic-dot-tech.
+  3. On `main`, revert the release and point `DB_BUCKET` in `wrangler.jsonc` at the new bucket in the same commit. The deploy workflow ships it, and the fresh container restores from the new bucket.
+
+  The old bucket is left untouched, so this can be undone. Writes made between step 1 and the deploy are lost, so keep that window short. Never delete or overwrite the live replica in place, because the running container keeps replicating to it.
 
 **Deploys:** `.github/workflows/deploy.yml` runs after CI passes on a push to `main`. It can also be started by hand (`workflow_dispatch` on `main`); that is the owner's escape hatch and deploys `main` as it is, without waiting for CI. The workflow is the only deploy path: the deploy package has no `deploy` script, because a manual `wrangler deploy` without `--var R2_ENDPOINT:…` breaks every request. It requires these secrets:
 
