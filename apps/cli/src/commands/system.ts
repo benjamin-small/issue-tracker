@@ -9,7 +9,12 @@ import {
   seedDemoData,
   SYSTEM_ACTOR,
 } from '@poietic-tech/issues-core';
-import { latestMigrationName, migrateToLatest, migrationStatus } from '@poietic-tech/issues-db';
+import {
+  latestMigrationName,
+  migrateDown,
+  migrateToLatest,
+  migrationStatus,
+} from '@poietic-tech/issues-db';
 import {
   CommentSchema,
   CreateCommentInputSchema,
@@ -211,9 +216,23 @@ export function dbCommand(io: CliIO): Command {
   cmd
     .command('migrate')
     .description('Apply pending migrations')
-    .action(async (_o: Opts, command: Command) => {
+    .option(
+      '--down',
+      'revert the newest applied migration instead (one step; drops its tables and columns, so back up first)',
+    )
+    .action(async (o: Opts, command: Command) => {
       const { config, db } = await localDb(command.optsWithGlobals());
       try {
+        if (o.down) {
+          const reverted = await migrateDown(db);
+          const result = { database: config.database, reverted, latest: latestMigrationName() };
+          if (config.format === 'table')
+            io.stdout(
+              reverted.length ? `Reverted: ${reverted.join(', ')}\n` : 'No migrations to revert.\n',
+            );
+          else io.stdout(`${JSON.stringify(result, null, 2)}\n`);
+          return;
+        }
         const applied = await migrateToLatest(db);
         await ensureBuiltins(db);
         const result = { database: config.database, applied, latest: latestMigrationName() };

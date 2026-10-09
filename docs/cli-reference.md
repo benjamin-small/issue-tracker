@@ -890,6 +890,10 @@ Write .poietic-issues.json here from the global --server/--database, --project a
 
 Apply pending migrations
 
+| Option | Description |
+| --- | --- |
+| `--down` | revert the newest applied migration instead (one step; drops its tables and columns, so back up first) |
+
 ### `tracker db status`
 
 Show applied and pending migrations

@@ -2102,7 +2102,15 @@
       "aliases": [],
       "description": "Apply pending migrations",
       "arguments": [],
-      "options": []
+      "options": [
+        {
+          "flags": "--down",
+          "name": "down",
+          "description": "revert the newest applied migration instead (one step; drops its tables and columns, so back up first)",
+          "required": false,
+          "takesValue": false
+        }
+      ]
     },
     {
       "name": "db status",

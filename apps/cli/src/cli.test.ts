@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createProject, LocalDiskBlobStore } from '@poietic-tech/issues-core';
 import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
+import { latestMigrationName } from '@poietic-tech/issues-db';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { createApp } from '@poietic-tech/issues-server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -575,6 +576,27 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
     expect((await local(['project', 'members', 'list', '-P', 'ENG', '-q'])).stdout).toContain(
       'zed',
     );
+  });
+
+  it('reverts the newest migration one step at a time, keeping the data', async () => {
+    const env = { POIETIC_ISSUES_DATABASE_URL: `sqlite:${join(dir, 'down.db')}` };
+    const local = (args: string[]) => cli(args, { env, fetch: null });
+    const latest = latestMigrationName();
+    expect((await local(['db', 'seed'])).code).toBe(0);
+    const down = await local(['db', 'migrate', '--down', '--json']);
+    expect(down.stderr).toBe('');
+    expect(down.code).toBe(0);
+    expect(down.json()).toMatchObject({ reverted: [latest], latest });
+    expect((await local(['db', 'status', '--json'])).json()).toMatchObject({
+      pending: [latest],
+      upToDate: false,
+    });
+    // Commands refuse to run on a database that is behind, then migrating forward again works.
+    expect((await local(['issue', 'list', '-P', 'ENG'])).code).toBe(6);
+    expect((await local(['db', 'migrate'])).stdout).toBe(`Applied: ${latest}\n`);
+    const issues = await local(['issue', 'list', '-P', 'ENG', '-q', '--sort', 'key']);
+    expect(issues.stdout.trim().split('\n')[0]).toBe('ENG-1');
+    expect((await local(['db', 'migrate', '--down'])).stdout).toBe(`Reverted: ${latest}\n`);
   });
 
   it('creates the SQLite file’s directory, like the server does', async () => {
