@@ -11,6 +11,25 @@ let memberToken: string;
 
 const BASE = 'http://tracker.test';
 
+function as(
+  token: string | undefined,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<Response> {
+  return Promise.resolve(
+    app.request(`${BASE}/api/v1${path}`, {
+      method,
+      headers: {
+        ...(token && { authorization: `Bearer ${token}` }),
+        'content-type': 'application/json',
+        origin: BASE,
+      },
+      ...(body !== undefined && { body: JSON.stringify(body) }),
+    }),
+  );
+}
+
 function asAdmin(path: string, init: { method?: string; body?: unknown } = {}) {
   return app.request(`${BASE}/api/v1${path}`, {
     method: init.method ?? 'GET',
@@ -106,5 +125,104 @@ describe(`anonymous HTTP access (${testDialect()})`, () => {
     });
     expect(tokenLogin.status).toBe(200);
     expect(((await tokenLogin.json()) as { handle: string }).handle).toBe('member');
+  });
+});
+
+describe(`member and repo routes (${testDialect()})`, () => {
+  it('manages members and repos over HTTP', async () => {
+    const add = await as(adminToken, 'POST', '/projects/PRV/members', {
+      user: '@member',
+      role: 'viewer',
+    });
+    expect(add.status).toBe(201);
+    const added = (await add.json()) as { user: { handle: string }; role: string };
+    expect(added.user.handle).toBe('member');
+    expect(added.role).toBe('viewer');
+    expect((await as(memberToken, 'GET', '/projects/PRV')).status).toBe(200);
+
+    const list = await as(memberToken, 'GET', '/projects/PRV/members');
+    expect(list.status).toBe(200);
+    const listed = (await list.json()) as { data: { user: { handle: string }; role: string }[] };
+    expect(listed.data.map((m) => [m.user.handle, m.role])).toEqual([['member', 'viewer']]);
+
+    // A viewer cannot manage.
+    expect(
+      (await as(memberToken, 'POST', '/projects/PRV/repos', { repo: 'acme/app' })).status,
+    ).toBe(403);
+    expect(
+      (await as(memberToken, 'POST', '/projects/PRV/members', { user: 'admin', role: 'viewer' }))
+        .status,
+    ).toBe(403);
+    expect(
+      (await as(memberToken, 'PATCH', '/projects/PRV/members/@member', { role: 'manager' })).status,
+    ).toBe(403);
+
+    const patched = await as(adminToken, 'PATCH', '/projects/PRV/members/@member', {
+      role: 'editor',
+    });
+    expect(patched.status).toBe(200);
+    expect(((await patched.json()) as { role: string }).role).toBe('editor');
+    expect(
+      (await as(adminToken, 'POST', '/projects/PRV/members', { user: '@member', role: 'viewer' }))
+        .status,
+    ).toBe(409);
+
+    const repo = await as(adminToken, 'POST', '/projects/PRV/repos', { repo: 'acme/app' });
+    expect(repo.status).toBe(201);
+    const linked = (await repo.json()) as { id: string; owner: string; name: string };
+    expect(linked).toMatchObject({ owner: 'acme', name: 'app' });
+    expect(linked.id.startsWith('rpo_')).toBe(true);
+    expect((await as(adminToken, 'POST', '/projects/PRV/repos', { repo: 'acme/app' })).status).toBe(
+      409,
+    );
+    expect(
+      (await as(adminToken, 'POST', '/projects/PRV/repos', { repo: 'not a repo' })).status,
+    ).toBe(400);
+    const shown = (await (await as(adminToken, 'GET', '/projects/PRV')).json()) as {
+      repos: { id: string }[];
+    };
+    expect(shown.repos.map((r) => r.id)).toEqual([linked.id]);
+
+    // Unlink by URL-encoded owner/name, then by id.
+    const byName = await as(
+      adminToken,
+      'DELETE',
+      `/projects/PRV/repos/${encodeURIComponent('acme/app')}`,
+    );
+    expect(byName.status).toBe(204);
+    expect(await byName.text()).toBe('');
+    expect(
+      (await as(adminToken, 'DELETE', `/projects/PRV/repos/${encodeURIComponent('acme/app')}`))
+        .status,
+    ).toBe(404);
+    const again = (await (
+      await as(adminToken, 'POST', '/projects/PRV/repos', { repo: 'acme/app' })
+    ).json()) as { id: string };
+    expect((await as(adminToken, 'DELETE', `/projects/PRV/repos/${again.id}`)).status).toBe(204);
+
+    expect((await as(adminToken, 'DELETE', '/projects/PRV/members/@member')).status).toBe(204);
+    expect((await as(adminToken, 'DELETE', '/projects/PRV/members/@member')).status).toBe(404);
+    expect((await as(memberToken, 'GET', '/projects/PRV')).status).toBe(404);
+  });
+
+  it('hides private projects from non-members and rejects anonymous writes', async () => {
+    expect((await as(memberToken, 'GET', '/projects/PRV/members')).status).toBe(404);
+    expect(
+      (await as(memberToken, 'POST', '/projects/PRV/repos', { repo: 'acme/app' })).status,
+    ).toBe(404);
+    expect((await as(memberToken, 'DELETE', '/projects/PRV/members/@member')).status).toBe(404);
+    expect((await as(undefined, 'GET', '/projects/PRV/members')).status).toBe(404);
+    expect((await as(undefined, 'GET', '/projects/PUB/members')).status).toBe(200);
+    expect(
+      (await as(undefined, 'POST', '/projects/PUB/members', { user: '@member', role: 'viewer' }))
+        .status,
+    ).toBe(401);
+    expect((await as(undefined, 'POST', '/projects/PUB/repos', { repo: 'acme/app' })).status).toBe(
+      401,
+    );
+    expect((await as(undefined, 'DELETE', '/projects/PUB/members/@member')).status).toBe(401);
+    expect(
+      (await as(memberToken, 'POST', '/projects/PUB/repos', { repo: 'acme/app' })).status,
+    ).toBe(403);
   });
 });

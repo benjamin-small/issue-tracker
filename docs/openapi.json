@@ -1052,6 +1052,85 @@
           }
         }
       },
+      "ProjectMember": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ProjectRole"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp.",
+            "example": "2026-09-26T13:49:00.123Z"
+          }
+        },
+        "required": [
+          "user",
+          "role",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ProjectRole": {
+        "type": "string",
+        "enum": [
+          "viewer",
+          "editor",
+          "manager"
+        ],
+        "description": "`viewer` reads, `editor` also writes, `manager` also manages settings, repos and members."
+      },
+      "AddProjectMemberInput": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "string",
+            "description": "User id, handle or `me`.",
+            "example": "@ada"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ProjectRole"
+          }
+        },
+        "required": [
+          "user",
+          "role"
+        ]
+      },
+      "UpdateProjectMemberInput": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/ProjectRole"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "AddProjectRepoInput": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "`owner/name` or a github.com URL.",
+            "example": "acme/app"
+          }
+        },
+        "required": [
+          "repo"
+        ]
+      },
       "IssuePage": {
         "type": "object",
         "properties": {
@@ -4886,6 +4965,507 @@
           },
           "401": {
             "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/members": {
+      "get": {
+        "tags": [
+          "Project access"
+        ],
+        "summary": "List project members",
+        "description": "Anyone who can read the project can see its members.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ENG"
+            },
+            "required": true,
+            "name": "project",
+            "in": "path",
+            "description": "Project key (e.g. `ENG`) or id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Members",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProjectMember"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Project access"
+        ],
+        "summary": "Add a project member",
+        "description": "Needs manage on the project. `CONFLICT` if the user is already a member.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ENG"
+            },
+            "required": true,
+            "name": "project",
+            "in": "path",
+            "description": "Project key (e.g. `ENG`) or id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddProjectMemberInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectMember"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem details. Codes: CONFLICT.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/members/{user}": {
+      "patch": {
+        "tags": [
+          "Project access"
+        ],
+        "summary": "Change a member's role",
+        "description": "Needs manage on the project.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ENG"
+            },
+            "required": true,
+            "name": "project",
+            "in": "path",
+            "description": "Project key (e.g. `ENG`) or id."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "@ada"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path",
+            "description": "User id, handle or `@handle`."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectMemberInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectMember"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Project access"
+        ],
+        "summary": "Remove a project member",
+        "description": "Needs manage on the project.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ENG"
+            },
+            "required": true,
+            "name": "project",
+            "in": "path",
+            "description": "Project key (e.g. `ENG`) or id."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "@ada"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path",
+            "description": "User id, handle or `@handle`."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/repos": {
+      "post": {
+        "tags": [
+          "Project access"
+        ],
+        "summary": "Link a GitHub repository to a project",
+        "description": "Needs manage on the project. `repo` is `owner/name` or a github.com URL. `CONFLICT` if it is already linked.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ENG"
+            },
+            "required": true,
+            "name": "project",
+            "in": "path",
+            "description": "Project key (e.g. `ENG`) or id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddProjectRepoInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Linked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRepo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem details. Codes: NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem details. Codes: CONFLICT.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project}/repos/{repo}": {
+      "delete": {
+        "tags": [
+          "Project access"
+        ],
+        "summary": "Unlink a repository from a project",
+        "description": "Needs manage on the project. Issues that named the repository have it cleared.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ENG"
+            },
+            "required": true,
+            "name": "project",
+            "in": "path",
+            "description": "Project key (e.g. `ENG`) or id."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "acme%2Fapp"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path",
+            "description": "Linked repository: its `rpo_` id, or `owner/name` with the slash URL-encoded (`acme%2Fapp`)."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "400": {
+            "description": "Problem details. Codes: VALIDATION_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem details. Codes: UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem details. Codes: FORBIDDEN.",
             "content": {
               "application/problem+json": {
                 "schema": {
