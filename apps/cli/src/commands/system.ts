@@ -14,6 +14,7 @@ import {
   migrateDown,
   migrateToLatest,
   migrationStatus,
+  parseDatabaseUrl,
 } from '@poietic-tech/issues-db';
 import {
   CommentSchema,
@@ -203,14 +204,27 @@ export function initCommand(io: CliIO): Command {
     });
 }
 
+/** `db migrate --down` stops above this one: reverting it would drop every table. */
+const FIRST_MIGRATION = '0001_init';
+
 export function dbCommand(io: CliIO): Command {
   const cmd = new Command('db').description('Local database administration (local mode only)');
-  const localDb = async (flags: Opts) => {
+  /** `mustExist`: refuse a SQLite path with no file, instead of creating an empty database (a typo would look like success). */
+  const localDb = async (flags: Opts, mustExist = false) => {
     const config = resolveConfig(flags, io);
     if (config.mode !== 'local' || !config.database)
       throw usage(
         'db commands need a local database: set --database or POIETIC_ISSUES_DATABASE_URL (not --server)',
       );
+    if (mustExist) {
+      const parsed = parseDatabaseUrl(config.database);
+      if (
+        parsed.dialect === 'sqlite' &&
+        parsed.filename !== ':memory:' &&
+        !existsSync(parsed.filename)
+      )
+        throw usage(`No database at ${parsed.filename}`);
+    }
     return { config, db: await openLocalDatabase(config.database, false) };
   };
   cmd
@@ -218,12 +232,17 @@ export function dbCommand(io: CliIO): Command {
     .description('Apply pending migrations')
     .option(
       '--down',
-      'revert the newest applied migration instead (one step; drops its tables and columns, so back up first)',
+      'revert the newest applied migration instead (one step; drops its tables and columns, so back up first; never reverts the first migration)',
     )
     .action(async (o: Opts, command: Command) => {
-      const { config, db } = await localDb(command.optsWithGlobals());
+      const { config, db } = await localDb(command.optsWithGlobals(), Boolean(o.down));
       try {
         if (o.down) {
+          const newest = (await migrationStatus(db)).applied.at(-1);
+          if (newest === FIRST_MIGRATION)
+            throw usage(
+              `Refusing to revert ${FIRST_MIGRATION}: it drops every table. To start over, delete the database instead.`,
+            );
           const reverted = await migrateDown(db);
           const result = { database: config.database, reverted, latest: latestMigrationName() };
           if (config.format === 'table')
@@ -249,7 +268,7 @@ export function dbCommand(io: CliIO): Command {
     .command('status')
     .description('Show applied and pending migrations')
     .action(async (_o: Opts, command: Command) => {
-      const { config, db } = await localDb(command.optsWithGlobals());
+      const { config, db } = await localDb(command.optsWithGlobals(), true);
       try {
         const status = await migrationStatus(db);
         if (config.format === 'table')

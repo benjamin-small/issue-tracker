@@ -892,7 +892,7 @@ Apply pending migrations
 
 | Option | Description |
 | --- | --- |
-| `--down` | revert the newest applied migration instead (one step; drops its tables and columns, so back up first) |
+| `--down` | revert the newest applied migration instead (one step; drops its tables and columns, so back up first; never reverts the first migration) |
 
 ### `tracker db status`
 

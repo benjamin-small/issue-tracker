@@ -2106,7 +2106,7 @@
         {
           "flags": "--down",
           "name": "down",
-          "description": "revert the newest applied migration instead (one step; drops its tables and columns, so back up first)",
+          "description": "revert the newest applied migration instead (one step; drops its tables and columns, so back up first; never reverts the first migration)",
           "required": false,
           "takesValue": false
         }

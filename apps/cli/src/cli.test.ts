@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -597,6 +597,35 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
     const issues = await local(['issue', 'list', '-P', 'ENG', '-q', '--sort', 'key']);
     expect(issues.stdout.trim().split('\n')[0]).toBe('ENG-1');
     expect((await local(['db', 'migrate', '--down'])).stdout).toBe(`Reverted: ${latest}\n`);
+  });
+
+  it('never reverts the first migration, and never creates a database to revert', async () => {
+    const file = join(dir, 'floor.db');
+    const local = (args: string[], url = `sqlite:${file}`) =>
+      cli(args, { env: { POIETIC_ISSUES_DATABASE_URL: url }, fetch: null });
+    expect((await local(['db', 'migrate'])).code).toBe(0);
+    for (;;) {
+      const { applied } = (await local(['db', 'status', '--json'])).json() as { applied: string[] };
+      if (applied.length === 1) break;
+      expect((await local(['db', 'migrate', '--down'])).code).toBe(0);
+    }
+    const refused = await local(['db', 'migrate', '--down']);
+    expect(refused.code).toBe(2);
+    expect(refused.stderr).toContain('Refusing to revert 0001_init');
+    expect((await local(['db', 'status', '--json'])).json()).toMatchObject({
+      applied: ['0001_init'],
+    });
+
+    const missing = join(dir, 'no-such', 'typo.db');
+    for (const args of [
+      ['db', 'migrate', '--down'],
+      ['db', 'status'],
+    ]) {
+      const result = await local(args, `sqlite:${missing}`);
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain('No database at');
+    }
+    expect(existsSync(missing)).toBe(false);
   });
 
   it('creates the SQLite file’s directory, like the server does', async () => {
