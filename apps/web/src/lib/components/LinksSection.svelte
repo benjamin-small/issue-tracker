@@ -71,7 +71,7 @@
 
   async function remove(id: string, otherKey: string) {
     try {
-      await api.DELETE('/links/{id}', { params: { path: { id } } });
+      await call(api.DELETE('/links/{id}', { params: { path: { id } } }));
       refresh(otherKey);
     } catch (e) {
       toast(errorMessage(e), 'error');

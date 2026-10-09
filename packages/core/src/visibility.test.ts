@@ -173,7 +173,7 @@ describe(`project visibility (${testDialect()})`, () => {
     expect((await deleteAttachment(t.member, blobs, file.id)).id).toBe(file.id);
   });
 
-  it('needs write on the source issue to delete a link', async () => {
+  it('needs write on one end of a link, and read on both, to delete it', async () => {
     const { createLink, deleteLink } = await import('./services/links.ts');
     await createIssue(t.ctx, 'PUB', { title: 'second' });
     const link = await createLink(t.ctx, 'PUB-1', { type: 'relates', target: 'PUB-2' });
@@ -184,6 +184,52 @@ describe(`project visibility (${testDialect()})`, () => {
     });
     await grant(t, 'PUB', t.member, 'editor');
     await deleteLink(t.member, link.id);
+  });
+
+  it('lets an editor of either end delete a link, whichever issue it is stored from', async () => {
+    const { createLink, deleteLink } = await import('./services/links.ts');
+    const storedSource = async (id: string) =>
+      (
+        await t.db.kysely
+          .selectFrom('issue_links as l')
+          .innerJoin('issues as i', 'i.id', 'l.source_id')
+          .innerJoin('projects as p', 'p.id', 'i.project_id')
+          .select('p.key')
+          .where('l.id', '=', id)
+          .executeTakeFirstOrThrow()
+      ).key;
+    await revoke('PUB', t.member); // PUB is public: read only
+    await grant(t, 'PRV', t.member, 'editor');
+
+    // "PRV-1 is blocked by PUB-1" is stored from PUB-1, a project the editor can only read.
+    const inward = await createLink(t.member, 'PRV-1', {
+      type: 'blocks',
+      target: 'PUB-1',
+      direction: 'inward',
+    });
+    expect(await storedSource(inward.id)).toBe('PUB');
+    await deleteLink(t.member, inward.id);
+
+    // Symmetric links are stored in id order, so this one is also stored from PUB-1 (created first).
+    const symmetric = await createLink(t.member, 'PRV-1', { type: 'relates', target: 'PUB-1' });
+    expect(await storedSource(symmetric.id)).toBe('PUB');
+    await deleteLink(t.member, symmetric.id);
+
+    // A viewer of both ends cannot.
+    const other = await createLink(t.ctx, 'PRV-1', { type: 'blocks', target: 'PUB-1' });
+    await grant(t, 'PRV', t.member, 'viewer');
+    await expect(deleteLink(t.member, other.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    // Write on one end is not enough when the other end is hidden: the link is not visible at all,
+    // even when it is stored from the writable end.
+    const intoHidden = await createLink(t.ctx, 'PUB-1', { type: 'duplicates', target: 'PRV-1' });
+    expect(await storedSource(intoHidden.id)).toBe('PUB');
+    await revoke('PRV', t.member);
+    await grant(t, 'PUB', t.member, 'editor');
+    for (const id of [other.id, intoHidden.id])
+      await expect(deleteLink(t.member, id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await deleteLink(t.ctx, other.id);
+    await deleteLink(t.ctx, intoHidden.id);
   });
 
   it('keeps shared views for managers and personal views for their owners', async () => {

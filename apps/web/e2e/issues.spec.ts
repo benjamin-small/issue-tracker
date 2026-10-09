@@ -98,6 +98,9 @@ test('links issues and shows both perspectives', async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/i/${blocked}$`));
   await expect(page.getByTestId('links')).toContainText('is blocked by');
   await expect(page.getByTestId('links')).toContainText('The blocker');
+  // The link is stored from the blocker; removing it from the blocked side works too.
+  await page.getByTestId('links').getByRole('button', { name: 'Remove link' }).click();
+  await expect(page.getByTestId('links')).toContainText('No linked issues.');
 });
 
 test('adds sub-issues', async ({ page }) => {

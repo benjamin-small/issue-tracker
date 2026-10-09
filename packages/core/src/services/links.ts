@@ -7,12 +7,12 @@ import {
   type IssueLink,
   type LinkType,
 } from '@poietic-tech/issues-schema';
-import { readableProjectIds } from '../access.ts';
+import { atLeast, projectLevel, readableProjectIds, requireLevel } from '../access.ts';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, invalidRelation, isUniqueViolation, notFound, parseInput } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { toLinkType } from '../mappers.ts';
-import { getIssueRow, requireProjectId } from '../refs.ts';
+import { findProject, getIssueRow } from '../refs.ts';
 
 export async function listLinkTypes(ctx: ServiceContext): Promise<LinkType[]> {
   const rows = await ctx.db.kysely.selectFrom('link_types').selectAll().orderBy('key').execute();
@@ -175,19 +175,39 @@ export async function createLink(
   }
 }
 
+/**
+ * Deletes a link. Like creating one, it needs write access to one end and read access to the other: the actor
+ * must be able to see the link (both ends readable, else NOT_FOUND, as in link lists) and write at least one end.
+ */
 export async function deleteLink(ctx: ServiceContext, linkId: string): Promise<void> {
   await withWriteTx(ctx.db, async (tx) => {
     const row = isIdOf('issueLink', linkId)
       ? await tx
           .selectFrom('issue_links as l')
           .innerJoin('link_types as t', 't.id', 'l.type_id')
-          .innerJoin('issues as i', 'i.id', 'l.source_id')
-          .select(['l.id', 'l.source_id', 'l.target_id', 't.key', 'i.project_id'])
+          .innerJoin('issues as s', 's.id', 'l.source_id')
+          .innerJoin('issues as d', 'd.id', 'l.target_id')
+          .select([
+            'l.id',
+            'l.source_id',
+            'l.target_id',
+            't.key',
+            's.project_id',
+            'd.project_id as target_project_id',
+          ])
           .where('l.id', '=', linkId)
           .executeTakeFirst()
       : undefined;
     if (!row) throw notFound('Link', linkId);
-    await requireProjectId(ctx, tx, row.project_id, 'write', 'Link', linkId);
+    const levels = await Promise.all(
+      [row.project_id, row.target_project_id].map(async (id) => {
+        const project = await findProject(tx, id);
+        return project ? projectLevel(ctx, tx, project) : 'none';
+      }),
+    );
+    if (levels.some((level) => !atLeast(level, 'read'))) throw notFound('Link', linkId);
+    const best = levels.find((level) => atLeast(level, 'write')) ?? 'read';
+    requireLevel(ctx, best, 'write', 'Link', linkId);
     const link = {
       id: row.id,
       type: row.key,

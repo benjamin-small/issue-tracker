@@ -80,7 +80,7 @@ Each actor has one of four access levels per project: `none < read < write < man
 - **write:** all of today's member actions inside the project:
   - create and edit issues, including soft delete;
   - comment and upload;
-  - create and remove links (write on the source issue, read on the target);
+  - create and remove links (write on one of the two issues, read on the other; whichever end the link is stored from);
   - create and edit labels, statuses and custom fields;
   - set `repo`.
   - Existing ownership rules still apply: you can edit or delete only your own comments and attachments.
