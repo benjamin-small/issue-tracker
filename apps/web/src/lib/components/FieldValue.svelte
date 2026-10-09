@@ -14,7 +14,8 @@
 
   /**
    * Renders one field-registry field of an issue compactly — used for list columns and board card fields.
-   * Status, priority and assignee are editable in place; custom fields (`cf:<key>`) render their value.
+   * Status, priority and assignee are editable in place (given write access); custom fields (`cf:<key>`)
+   * render their value.
    */
   let {
     issue,
@@ -37,11 +38,16 @@
 {:else if field === 'title'}
   <span class="truncate">{issue.title}</span>
 {:else if field === 'status'}
-  <StatusPicker {issue} statuses={project.statuses} showLabel={!compact} />
+  <StatusPicker
+    {issue}
+    statuses={project.statuses}
+    showLabel={!compact}
+    readonly={!project.canWrite}
+  />
 {:else if field === 'priority'}
-  <PriorityPicker {issue} showLabel={!compact} />
+  <PriorityPicker {issue} showLabel={!compact} readonly={!project.canWrite} />
 {:else if field === 'assignee'}
-  <AssigneePicker {issue} users={project.users} showLabel={!compact} />
+  <AssigneePicker {issue} users={project.users} showLabel={!compact} readonly={!project.canWrite} />
 {:else if field === 'creator'}
   <span class="inline-flex items-center gap-1.5 text-xs text-fg-muted"
     ><Avatar user={issue.creator} size={16} />{#if !compact}{issue.creator.name}{/if}</span

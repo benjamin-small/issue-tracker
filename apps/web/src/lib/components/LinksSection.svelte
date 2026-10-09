@@ -9,7 +9,11 @@
   import { toast } from '../toast.svelte.ts';
   import StatusIcon from './StatusIcon.svelte';
 
-  let { issue, onopen }: { issue: Issue; onopen: (key: string) => void } = $props();
+  let {
+    issue,
+    onopen,
+    canWrite,
+  }: { issue: Issue; onopen: (key: string) => void; canWrite: boolean } = $props();
   const qc = useQueryClient();
   const links = createQuery(() => ({
     queryKey: keys.links(issue.key),
@@ -78,13 +82,15 @@
 <section data-testid="links">
   <div class="mb-2 flex items-center">
     <h3 class="text-sm font-semibold">Links</h3>
-    <button
-      class="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-fg-muted hover:bg-bg-hover"
-      onclick={() => (adding = !adding)}
-      data-testid="add-link"><Link2 size={12} /> Link issue</button
-    >
+    {#if canWrite}
+      <button
+        class="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-fg-muted hover:bg-bg-hover"
+        onclick={() => (adding = !adding)}
+        data-testid="add-link"><Link2 size={12} /> Link issue</button
+      >
+    {/if}
   </div>
-  {#if adding}
+  {#if adding && canWrite}
     <form onsubmit={add} class="mb-2 flex items-center gap-2 text-sm">
       <span class="font-mono text-xs text-fg-subtle">{issue.key}</span>
       <Select
@@ -117,11 +123,13 @@
             <span class="font-mono text-xs text-fg-subtle">{l.issue.key}</span>
             <span class="truncate">{l.issue.title}</span>
           </button>
-          <button
-            class="rounded p-0.5 text-fg-subtle opacity-0 group-hover:opacity-100 hover:text-danger focus:opacity-100"
-            aria-label="Remove link"
-            onclick={() => remove(l.id, l.issue.key)}><X size={13} /></button
-          >
+          {#if canWrite}
+            <button
+              class="rounded p-0.5 text-fg-subtle opacity-0 group-hover:opacity-100 hover:text-danger focus:opacity-100"
+              aria-label="Remove link"
+              onclick={() => remove(l.id, l.issue.key)}><X size={13} /></button
+            >
+          {/if}
         </li>
       {/each}
     </ul>

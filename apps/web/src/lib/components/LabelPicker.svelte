@@ -6,7 +6,11 @@
   import LabelChip from './LabelChip.svelte';
   import Picker from './Picker.svelte';
 
-  let { issue, labels }: { issue: Issue; labels: Label[] } = $props();
+  let {
+    issue,
+    labels,
+    readonly = false,
+  }: { issue: Issue; labels: Label[]; readonly?: boolean } = $props();
   const qc = useQueryClient();
   const items = $derived(labels.map((l) => ({ value: l.id, label: l.name, color: l.color })));
 
@@ -32,12 +36,15 @@
   triggerLabel="Change labels"
   placeholder="Labels…"
   testid="label-picker"
+  {readonly}
 >
   {#snippet trigger()}
     {#if issue.labels.length}
       <span class="flex flex-wrap gap-1"
         >{#each issue.labels as l (l.id)}<LabelChip label={l} />{/each}</span
       >
+    {:else if readonly}
+      <span class="text-fg-subtle">No labels</span>
     {:else}
       <Tag size={14} class="text-fg-subtle" /><span class="text-fg-subtle">Add labels</span>
     {/if}

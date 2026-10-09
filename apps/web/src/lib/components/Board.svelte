@@ -219,8 +219,10 @@
     scroller.scrollBy({ left: direction * scroller.clientWidth * 0.8, behavior: 'smooth' });
   }
 
+  // Dragging a card changes the issue, so it needs write access.
   const draggable = $derived(
-    ['status', 'priority', 'assignee'].includes(groupBy) || groupBy.startsWith('cf:'),
+    project.canWrite &&
+      (['status', 'priority', 'assignee'].includes(groupBy) || groupBy.startsWith('cf:')),
   );
 </script>
 
@@ -265,7 +267,7 @@
                 title="Collapse column"
                 onclick={() => toggleCollapsed(column.id)}><Minimize2 size={13} /></button
               >
-              {#if groupBy === 'status'}
+              {#if groupBy === 'status' && project.canWrite}
                 <button
                   class="rounded p-0.5 text-fg-subtle hover:bg-bg-hover hover:text-fg"
                   aria-label="New issue in {column.label}"

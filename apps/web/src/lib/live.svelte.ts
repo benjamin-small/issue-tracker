@@ -6,9 +6,9 @@ import {
   matchesFilter,
   type SortSpec,
 } from '@poietic-tech/issues-schema';
-import { type Issue, ownRequestIds, type TrackerEvent, type User } from './api.ts';
+import { type Issue, ownRequestIds, type TrackerEvent } from './api.ts';
 import { projectKeyOf } from './issues.ts';
-import { type IssueListQuery, keys } from './queries.ts';
+import { type IssueListQuery, isSignedIn, keys, type Me } from './queries.ts';
 
 /** Connection state, shown in the UI. */
 export const live = $state({ connected: false });
@@ -86,6 +86,7 @@ function handle(qc: QueryClient, event: TrackerEvent, meId: string | undefined) 
     void qc.invalidateQueries({ queryKey: ['statuses'] });
     void qc.invalidateQueries({ queryKey: ['labels'] });
     void qc.invalidateQueries({ queryKey: keys.projects });
+    void qc.invalidateQueries({ queryKey: ['project'] });
     void qc.invalidateQueries({ queryKey: ['issues'] });
   } else if (event.type.startsWith('field.')) {
     // Field definitions changed: refetch them and anything embedding custom field values.
@@ -98,14 +99,18 @@ function handle(qc: QueryClient, event: TrackerEvent, meId: string | undefined) 
 }
 
 /**
- * Subscribes to live events for a project over SSE (cookie-authenticated, same origin). The browser reconnects
+ * Subscribes to live events for a project over SSE (cookie-authenticated, same origin; signed-out visitors get
+ * the public projects' events, filtered by the server). The browser reconnects
  * automatically and resumes with Last-Event-ID; a `reset` means the gap was too large, so everything refetches.
  * Returns a function that closes the connection.
  */
 export function connectLive(qc: QueryClient, projectKey: string): () => void {
   if (typeof EventSource === 'undefined' || !projectKey) return () => {};
   const source = new EventSource(`/api/v1/events/stream?project=${encodeURIComponent(projectKey)}`);
-  const meId = () => qc.getQueryData<User>(keys.me)?.id;
+  const meId = () => {
+    const me = qc.getQueryData<Me>(keys.me);
+    return isSignedIn(me) ? me.id : undefined;
+  };
   let opened = false;
 
   source.addEventListener('ready', () => {

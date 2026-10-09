@@ -36,6 +36,10 @@
   let shared = $state(false);
 
   const refresh = () => qc.invalidateQueries({ queryKey: keys.views(project.key) });
+  // Personal views need a signed-in user; shared views change the project for everyone (manage).
+  const canChange = (v: View) => (v.ownerId ? project.signedIn : project.canManage);
+  const canSave = $derived(dirty && !!view && canChange(view));
+  const canDelete = $derived(!!view && project.views.length > 1 && canChange(view));
 
   async function save() {
     if (!view) return;
@@ -56,7 +60,7 @@
       const created = await call(
         api.POST('/projects/{project}/views', {
           params: { path: { project: project.key } },
-          body: { name: newName.trim(), layout, config, shared },
+          body: { name: newName.trim(), layout, config, shared: shared && project.canManage },
         }),
       );
       await refresh();
@@ -123,8 +127,10 @@
             />{/if}
         </a>
       {/each}
-      <div class="my-1 border-t border-border"></div>
-      {#if dirty && view}
+      {#if canSave || project.signedIn || canDelete}
+        <div class="my-1 border-t border-border"></div>
+      {/if}
+      {#if canSave && view}
         <button
           class="w-full rounded px-2 py-1.5 text-left hover:bg-bg-hover"
           onclick={save}
@@ -140,23 +146,25 @@
             data-testid="view-name"
             class="w-full rounded border border-border bg-bg px-2 py-1 outline-none focus:border-accent"
           />
-          <label class="flex items-center gap-2 text-xs text-fg-muted"
-            ><input type="checkbox" bind:checked={shared} /> Share with the project</label
-          >
+          {#if project.canManage}
+            <label class="flex items-center gap-2 text-xs text-fg-muted"
+              ><input type="checkbox" bind:checked={shared} /> Share with the project</label
+            >
+          {/if}
           <button
             class="{btn.primarySm} w-full"
             disabled={!newName.trim()}
             data-testid="view-create">Create view</button
           >
         </form>
-      {:else}
+      {:else if project.signedIn}
         <button
           class="w-full rounded px-2 py-1.5 text-left hover:bg-bg-hover"
           onclick={() => (saving = true)}
           data-testid="view-save-as">Save as new view…</button
         >
       {/if}
-      {#if view && project.views.length > 1}
+      {#if canDelete}
         <button
           class="w-full rounded px-2 py-1.5 text-left text-danger hover:bg-bg-hover"
           onclick={remove}>Delete view</button

@@ -9,7 +9,8 @@
     issue,
     users,
     showLabel = true,
-  }: { issue: Issue; users: User[]; showLabel?: boolean } = $props();
+    readonly = false,
+  }: { issue: Issue; users: User[]; showLabel?: boolean; readonly?: boolean } = $props();
   const qc = useQueryClient();
   const NONE = '__none__';
   const items = $derived([
@@ -48,6 +49,7 @@
   onselect={select}
   triggerLabel="Change assignee"
   testid="assignee-picker"
+  {readonly}
 >
   {#snippet trigger()}
     <Avatar user={issue.assignee} />

@@ -51,22 +51,6 @@ export async function call<T>(
   return unwrap(result);
 }
 
-/**
- * The signed-in user from `GET /me`. The server answers signed-out visitors with `{ anonymous: true }`; until the
- * UI supports browsing signed out, that is handled like a 401 (the sign-in redirect).
- */
-export function signedInUser(me: Schemas['Me']): User {
-  if (!('anonymous' in me)) return me;
-  onUnauthenticated?.();
-  throw new ApiError({
-    type: 'urn:tracker:error:UNAUTHENTICATED',
-    title: 'Unauthenticated',
-    status: 401,
-    code: 'UNAUTHENTICATED',
-    detail: 'Sign in to continue',
-  });
-}
-
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   return error instanceof Error ? error.message : String(error);

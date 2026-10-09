@@ -10,10 +10,10 @@
   import X from '@lucide/svelte/icons/x';
   import { MediaQuery } from 'svelte/reactivity';
   import { ApiError } from '../api.ts';
-  import { href, shareUrl } from '../nav.ts';
+  import { href, navigate, shareUrl, signInPath } from '../nav.ts';
   import { deleteIssue, projectKeyOf, restoreIssue, updateIssue } from '../issues.ts';
   import { useProjectData } from '../project-data.svelte.ts';
-  import { fetchers, keys } from '../queries.ts';
+  import { fetchers, isSignedIn, keys } from '../queries.ts';
   import { toast } from '../toast.svelte.ts';
   import { ui } from '../ui.svelte.ts';
   import { markdownUploader } from '../attachments.ts';
@@ -22,6 +22,7 @@
   import ActivityTimeline from './ActivityTimeline.svelte';
   import AttachmentsSection from './AttachmentsSection.svelte';
   import CustomFieldEditor from './CustomFieldEditor.svelte';
+  import CustomFieldValue from './CustomFieldValue.svelte';
   import EmptyState from './EmptyState.svelte';
   import IssueProperties from './IssueProperties.svelte';
   import LinksSection from './LinksSection.svelte';
@@ -50,6 +51,8 @@
   const me = createQuery(() => ({ queryKey: keys.me, queryFn: fetchers.me, staleTime: 300_000 }));
   const project = useProjectData(() => projectKeyOf(issueKey));
   const issue = $derived(query.data);
+  /** Editing needs write access on the project; without it the issue reads like a document. */
+  const editable = $derived(project.canWrite && !issue?.deletedAt);
   const upload = markdownUploader(qc, () => issueKey);
 
   // Side-by-side properties only on a wide full page; the panel and narrow screens stack them under the title.
@@ -87,7 +90,7 @@
   }
 
   function startEditing() {
-    if (!issue || issue.deletedAt) return;
+    if (!issue || !editable) return;
     description = issue.description;
     editingDescription = true;
   }
@@ -112,18 +115,25 @@
     testid="issue-error"
   >
     {notFound
-      ? 'It may have been deleted permanently, or the key may be mistyped.'
+      ? project.signedIn
+        ? 'It may have been deleted permanently, or the key may be mistyped.'
+        : 'It may not exist, or it may be in a private project. Sign in to see it.'
       : query.error.message}
     {#snippet actions()}
       {#if onclose}
         <button class={btn.secondary} onclick={onclose}>Close</button>
       {/if}
-      <a href={href(`/p/${projectKeyOf(issueKey)}`)} class={btn.primary}
-        >Back to {projectKeyOf(issueKey)} issues</a
-      >
+      {#if notFound && !project.signedIn}
+        <button class={btn.primary} onclick={() => navigate(signInPath())}>Sign in</button>
+      {:else}
+        <a href={href(`/p/${projectKeyOf(issueKey)}`)} class={btn.primary}
+          >Back to {projectKeyOf(issueKey)} issues</a
+        >
+      {/if}
     {/snippet}
   </EmptyState>
-{:else if !issue}
+{:else if !issue || project.access === undefined}
+  <!-- Waits for the caller's access too, so editing controls never flash on or off. -->
   <div class="space-y-3 p-6" aria-busy="true" aria-label="Loading issue">
     <div class="h-6 w-2/3 animate-pulse rounded bg-bg-muted"></div>
     <div class="h-4 w-full animate-pulse rounded bg-bg-muted"></div>
@@ -151,7 +161,9 @@
           title="Copy link"
           aria-label="Copy link"><Link size={15} /></button
         >
-        {#if issue.deletedAt}
+        {#if !project.canWrite}
+          <!-- Read-only: no delete or restore. -->
+        {:else if issue.deletedAt}
           <button
             class="inline-flex items-center gap-1 rounded px-2 py-1 hover:bg-bg-hover hover:text-fg"
             onclick={() => restoreIssue(qc, issue)}
@@ -194,7 +206,8 @@
         class="border-b border-border bg-bg-muted px-4 py-2 text-sm text-fg-muted"
         data-testid="deleted-banner"
       >
-        This issue is in the trash. Restore it to make changes.
+        This issue is in the trash.{#if project.canWrite}
+          Restore it to make changes.{/if}
       </div>
     {/if}
 
@@ -210,6 +223,7 @@
             }
           }}
           disabled={!!issue.deletedAt}
+          readonly={!project.canWrite}
           aria-label="Title"
           data-testid="issue-title"
           use:autosize={title}
@@ -248,26 +262,25 @@
                 <!-- Clicking the text edits it (links and task boxes keep their own clicks); the Edit button is the keyboard path. -->
                 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
                 <div
-                  class="-mx-2 rounded-md px-2 py-1 {issue.deletedAt
-                    ? ''
-                    : 'cursor-text hover:bg-bg-subtle'}"
+                  class="-mx-2 rounded-md px-2 py-1 {editable
+                    ? 'cursor-text hover:bg-bg-subtle'
+                    : ''}"
                   onclick={(e) => {
                     if (!(e.target as HTMLElement).closest('a, input, button')) startEditing();
                   }}
                   data-testid="description"
                 >
-                  <Markdown
-                    source={issue.description}
-                    ontask={issue.deletedAt ? undefined : toggleTask}
-                  />
+                  <Markdown source={issue.description} ontask={editable ? toggleTask : undefined} />
                 </div>
-                {#if !issue.deletedAt}
+                {#if editable}
                   <button
                     class="absolute top-1 right-0 inline-flex items-center gap-1 rounded-md border border-border bg-bg px-2 py-0.5 text-xs text-fg-muted opacity-0 group-hover/desc:opacity-100 hover:text-fg focus-visible:opacity-100"
                     onclick={startEditing}
                     data-testid="edit-description"><Pencil size={12} /> Edit</button
                   >
                 {/if}
+              {:else if !project.canWrite}
+                <p class="text-sm text-fg-subtle" data-testid="description">No description.</p>
               {:else}
                 <button
                   class="-mx-2 block w-[calc(100%+1rem)] rounded-md px-2 py-1 text-left text-sm text-fg-subtle hover:bg-bg-subtle disabled:hover:bg-transparent"
@@ -280,10 +293,15 @@
           {/if}
         </div>
 
-        <SubIssues {issue} {onopen} />
-        <LinksSection {issue} {onopen} />
-        <AttachmentsSection {issue} />
-        <ActivityTimeline {issue} me={me.data} />
+        <SubIssues {issue} {onopen} canWrite={project.canWrite} />
+        <LinksSection {issue} {onopen} canWrite={project.canWrite} />
+        <AttachmentsSection {issue} canWrite={project.canWrite} />
+        <ActivityTimeline
+          {issue}
+          me={isSignedIn(me.data) ? me.data : undefined}
+          canWrite={project.canWrite}
+          canManage={project.canManage}
+        />
       </div>
 
       {#if !stacked}
@@ -305,7 +323,13 @@
               >{field.name}</span
             >
             <div class="min-w-0">
-              <CustomFieldEditor {issue} {field} users={project.users} />
+              {#if project.canWrite}
+                <CustomFieldEditor {issue} {field} users={project.users} />
+              {:else}
+                <span class="px-1.5 text-sm"
+                  ><CustomFieldValue {issue} {field} users={project.users} /></span
+                >
+              {/if}
             </div>
           </div>
         {/each}

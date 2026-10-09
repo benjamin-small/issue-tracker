@@ -3,6 +3,7 @@
   import { useQueryClient } from '@tanstack/svelte-query';
   import KanbanSquare from '@lucide/svelte/icons/square-kanban';
   import List from '@lucide/svelte/icons/list';
+  import LogIn from '@lucide/svelte/icons/log-in';
   import LogOut from '@lucide/svelte/icons/log-out';
   import Moon from '@lucide/svelte/icons/moon';
   import Plus from '@lucide/svelte/icons/plus';
@@ -10,15 +11,20 @@
   import Sun from '@lucide/svelte/icons/sun';
   import { MediaQuery } from 'svelte/reactivity';
   import Webhook from '@lucide/svelte/icons/webhook';
-  import { api, type Project, type User } from '../api.ts';
+  import { api, type Project } from '../api.ts';
   import { live } from '../live.svelte.ts';
   import { current, href, navigate } from '../nav.ts';
+  import { canManage, canWrite, isSignedIn, type Me } from '../queries.ts';
   import { applyTheme } from '../theme.ts';
   import { openCreateIssue, ui } from '../ui.svelte.ts';
   import Avatar from './Avatar.svelte';
 
-  let { me, projects, currentProject }: { me: User; projects: Project[]; currentProject: string } =
-    $props();
+  let {
+    me,
+    projects,
+    currentProject,
+    onsignin,
+  }: { me: Me; projects: Project[]; currentProject: string; onsignin: () => void } = $props();
   const qc = useQueryClient();
   let dark = $state(document.documentElement.classList.contains('dark'));
 
@@ -35,7 +41,8 @@
 
   const path = $derived(current().path);
   const wide = new MediaQuery('min-width: 768px');
-  const isAdmin = $derived(me.role === 'admin');
+  const isAdmin = $derived(isSignedIn(me) && me.role === 'admin');
+  const access = $derived(projects.find((p) => p.key === currentProject)?.myAccess);
   const link = (active: boolean) =>
     `flex items-center gap-2 rounded-md px-2 py-1 text-sm ${active ? 'bg-bg-hover text-fg font-medium' : 'text-fg-muted hover:bg-bg-hover hover:text-fg'}`;
 </script>
@@ -69,19 +76,21 @@
       {live.connected ? 'Live' : 'Offline'}
     </span>
   </div>
-  <div class="px-2 pb-2">
-    <button
-      class="flex w-full items-center gap-2 rounded-md border border-border bg-bg px-2 py-1.5 text-sm text-fg-muted shadow-xs hover:text-fg disabled:opacity-50"
-      disabled={!currentProject}
-      onclick={() => openCreateIssue(currentProject)}
-      data-testid="new-issue"
-    >
-      <Plus size={15} /> New issue
-      <kbd class="ml-auto rounded border border-border px-1 font-mono text-[10px] text-fg-subtle"
-        >C</kbd
+  {#if canWrite(access)}
+    <div class="px-2 pb-2">
+      <button
+        class="flex w-full items-center gap-2 rounded-md border border-border bg-bg px-2 py-1.5 text-sm text-fg-muted shadow-xs hover:text-fg disabled:opacity-50"
+        disabled={!currentProject}
+        onclick={() => openCreateIssue(currentProject)}
+        data-testid="new-issue"
       >
-    </button>
-  </div>
+        <Plus size={15} /> New issue
+        <kbd class="ml-auto rounded border border-border px-1 font-mono text-[10px] text-fg-subtle"
+          >C</kbd
+        >
+      </button>
+    </div>
+  {/if}
 
   <div class="flex-1 overflow-y-auto px-2">
     <div class="flex items-center px-2 pt-2 pb-1">
@@ -115,16 +124,20 @@
               class={link(path === `/p/${p.key}/board`)}
               data-testid="nav-board"><KanbanSquare size={14} /> Board</a
             >
-            <a
-              href={href(`/p/${p.key}/settings`)}
-              class={link(path.startsWith(`/p/${p.key}/settings`))}
-              ><Settings size={14} /> Settings</a
-            >
+            {#if canManage(p.myAccess)}
+              <a
+                href={href(`/p/${p.key}/settings`)}
+                class={link(path.startsWith(`/p/${p.key}/settings`))}
+                ><Settings size={14} /> Settings</a
+              >
+            {/if}
           </div>
         {/if}
       </div>
     {:else}
-      <p class="px-2 text-xs text-fg-subtle">No projects yet.</p>
+      <p class="px-2 text-xs text-fg-subtle">
+        {isSignedIn(me) ? 'No projects yet.' : 'No public projects.'}
+      </p>
     {/each}
     {#if isAdmin}
       <p class="px-2 pt-4 pb-1 text-xs font-medium text-fg-subtle">Workspace</p>
@@ -137,11 +150,19 @@
   </div>
 
   <div class="flex items-center gap-2 border-t border-border px-3 py-2">
-    <Avatar user={me} size={22} />
-    <div class="min-w-0 flex-1">
-      <div class="truncate text-sm font-medium">{me.name}</div>
-      <div class="truncate text-xs text-fg-subtle">@{me.handle}</div>
-    </div>
+    {#if isSignedIn(me)}
+      <Avatar user={me} size={22} />
+      <div class="min-w-0 flex-1">
+        <div class="truncate text-sm font-medium">{me.name}</div>
+        <div class="truncate text-xs text-fg-subtle">@{me.handle}</div>
+      </div>
+    {:else}
+      <button
+        class="flex flex-1 items-center gap-2 rounded-md px-1 py-1 text-sm font-medium text-fg-muted hover:bg-bg-hover hover:text-fg"
+        onclick={onsignin}
+        data-testid="sign-in"><LogIn size={15} /> Sign in</button
+      >
+    {/if}
     <button
       class="rounded p-1 text-fg-subtle hover:bg-bg-hover hover:text-fg"
       onclick={toggleTheme}
@@ -149,13 +170,15 @@
     >
       {#if dark}<Sun size={15} />{:else}<Moon size={15} />{/if}
     </button>
-    <button
-      class="rounded p-1 text-fg-subtle hover:bg-bg-hover hover:text-fg"
-      onclick={logout}
-      aria-label="Sign out"
-      data-testid="logout"
-    >
-      <LogOut size={15} />
-    </button>
+    {#if isSignedIn(me)}
+      <button
+        class="rounded p-1 text-fg-subtle hover:bg-bg-hover hover:text-fg"
+        onclick={logout}
+        aria-label="Sign out"
+        data-testid="logout"
+      >
+        <LogOut size={15} />
+      </button>
+    {/if}
   </div>
 </nav>

@@ -18,7 +18,8 @@
   const next = $derived(current().params.get('next') ?? '/');
 
   async function finish() {
-    await qc.invalidateQueries();
+    // Signed-out browsing may have cached what an anonymous visitor sees (empty lists, not-found projects).
+    qc.clear();
     await navigate(next.startsWith('/') && !next.startsWith('//') ? next : '/');
   }
 

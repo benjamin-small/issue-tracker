@@ -6,7 +6,11 @@
   import Picker from './Picker.svelte';
   import PriorityIcon from './PriorityIcon.svelte';
 
-  let { issue, showLabel = true }: { issue: Issue; showLabel?: boolean } = $props();
+  let {
+    issue,
+    showLabel = true,
+    readonly = false,
+  }: { issue: Issue; showLabel?: boolean; readonly?: boolean } = $props();
   const qc = useQueryClient();
   const items = PRIORITY_ORDER.map((p) => ({
     value: String(p),
@@ -26,6 +30,7 @@
   onselect={select}
   triggerLabel="Change priority"
   testid="priority-picker"
+  {readonly}
 >
   {#snippet trigger()}
     <PriorityIcon priority={issue.priority} />
