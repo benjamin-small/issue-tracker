@@ -20,6 +20,7 @@ export * from './services/events.ts';
 export * from './services/issues.ts';
 export * from './services/labels.ts';
 export * from './services/links.ts';
+export * from './services/members.ts';
 export * from './services/projects.ts';
 export * from './services/seed.ts';
 export * from './services/sso.ts';
