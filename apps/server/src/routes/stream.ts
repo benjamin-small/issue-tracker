@@ -94,9 +94,7 @@ export function registerStreamRoute(
       });
       let last = resume ?? tailer.lastSeq;
       stream.onAbort(unsubscribe);
-      // Read access only after subscribing: any change committed after this read is queued, and
-      // re-reads it before the events that follow are filtered.
-      let readable = await readableProjectIds(ctx, ctx.db.kysely);
+      let readable: Awaited<ReturnType<typeof readableProjectIds>> = [];
       const refresh = async (events: TrackerEvent[]) => {
         if (events.some(changesAccess)) readable = await readableProjectIds(ctx, ctx.db.kysely);
       };
@@ -112,7 +110,11 @@ export function registerStreamRoute(
         await stream.writeSSE({ id: String(e.seq), event: e.type, data: JSON.stringify(e) });
       };
 
+      // Everything after subscribing runs inside this try, so a failure (even in the access read) unsubscribes.
       try {
+        // Read access only after subscribing: any change committed after this read is queued, and
+        // re-reads it before the events that follow are filtered.
+        readable = await readableProjectIds(ctx, ctx.db.kysely);
         if (resume !== undefined) {
           const replay = await listEvents(ctx, {
             after: resume,

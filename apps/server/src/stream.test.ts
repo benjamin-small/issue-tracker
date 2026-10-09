@@ -227,6 +227,29 @@ describe(`SSE /events/stream (${testDialect()})`, () => {
     expect(messages.some((m) => m.event === 'project.member_removed')).toBe(false);
   });
 
+  it('drops its subscription when setting up the stream fails', async () => {
+    const listeners = new Set<(e: TrackerEvent) => void>();
+    const counting = {
+      lastSeq: 0,
+      subscribe(l: (e: TrackerEvent) => void) {
+        listeners.add(l);
+        return () => listeners.delete(l);
+      },
+    } as unknown as EventTailer;
+    // The access read is the first database call of an anonymous stream; make it fail.
+    const broken = new Proxy(t.db, {
+      get(target, prop, receiver) {
+        if (prop === 'kysely') throw new Error('database unavailable');
+        return Reflect.get(target, prop, receiver) as unknown;
+      },
+    });
+    const brokenApp = createApp({ db: broken, tailer: counting });
+    const res = await brokenApp.request('http://t/api/v1/events/stream');
+    const reader = res.body!.getReader();
+    while (!(await reader.read()).done);
+    expect(listeners.size).toBe(0);
+  });
+
   it('lets anonymous viewers stream public projects, and hides private ones', async () => {
     const res = await app.request('http://t/api/v1/events/stream?project=OTH');
     expect(res.status).toBe(404);
