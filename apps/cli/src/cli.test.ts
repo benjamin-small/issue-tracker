@@ -565,10 +565,11 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
     expect(added.stderr).toBe('');
     expect(added.json()).toMatchObject({ user: { handle: 'zed' }, role: 'editor' });
     expect((await local(['project', 'repo', 'add', 'acme/app', '-P', 'ENG', '-q'])).code).toBe(0);
-    const project = await local(['project', 'edit', 'ENG', '--visibility', 'public', '--json']);
+    // The seeded ENG project is already public (and has the demo repo), so flip it to private.
+    const project = await local(['project', 'edit', 'ENG', '--visibility', 'private', '--json']);
     expect(project.json()).toMatchObject({
-      visibility: 'public',
-      repos: [{ fullName: 'acme/app' }],
+      visibility: 'private',
+      repos: expect.arrayContaining([expect.objectContaining({ fullName: 'acme/app' })]),
       myAccess: 'manage',
     });
     expect((await local(['project', 'members', 'list', '-P', 'ENG', '-q'])).stdout).toContain(

@@ -8,8 +8,11 @@ test.beforeEach(async ({ page }) => {
     throw error;
   });
   await page.goto('index.html');
-  // Signed out with no public project, the app asks visitors to sign in (ADR 0021).
-  await page.getByRole('main').getByRole('button', { name: 'Sign in' }).click();
+  // Signed out, visitors browse the public project; sign-in lives in the sidebar (ADR 0021).
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('button', { name: 'Sign in' })
+    .click();
   await page.getByText('Ada Lovelace').click();
   await expect(rows(page).first()).toBeVisible();
   expect(page.url()).toContain('index.html#/p/ENG');
@@ -77,6 +80,9 @@ test('signs out and resets', async ({ page }) => {
   await page.getByTestId('logout').click();
   await expect(page.getByText('Explore as')).toBeVisible();
   await page.getByTestId('demo-badge').getByRole('button', { name: 'Reset data' }).click();
-  await page.getByRole('main').getByRole('button', { name: 'Sign in' }).click();
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('button', { name: 'Sign in' })
+    .click();
   await expect(page.getByText('Grace Hopper')).toBeVisible();
 });

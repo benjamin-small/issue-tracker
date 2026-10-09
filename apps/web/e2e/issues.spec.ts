@@ -2,13 +2,13 @@ import { apiCreateIssue, choose, expect, openList, row, test } from './fixtures.
 
 test('signs in with the dev user picker', async ({ browser }) => {
   const page = await (await browser.newContext()).newPage();
-  await page.goto('/p/ENG');
-  // ENG is private: signed out it reads as not found, with a way to sign in (ADR 0021).
+  await page.goto('/p/OPS');
+  // OPS is private: signed out it reads as not found, with a way to sign in (ADR 0021).
   await expect(page.getByTestId('project-not-found')).toBeVisible();
   await page.getByTestId('project-not-found').getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/login\?next=/);
   await page.getByRole('button', { name: /Grace Hopper/ }).click();
-  await expect(page).toHaveURL(/\/p\/ENG/);
+  await expect(page).toHaveURL(/\/p\/OPS/);
   await expect(page.getByText('Grace Hopper')).toBeVisible();
 });
 

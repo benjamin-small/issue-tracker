@@ -20,7 +20,7 @@ pnpm dev
 
 - The web UI is at http://127.0.0.1:5943. Vite moves to the next free port if 5943 is taken and prints the URL it chose.
 - The API is on `:3000`, with its reference at http://127.0.0.1:3000/api/docs.
-- On first start the database (`data/dev.db`) is created, migrated and seeded with demo users (`ada` is an admin, `grace` a member, `claude` an agent) and an `ENG` project.
+- On first start the database (`data/dev.db`) is created, migrated and seeded with demo users (`ada` is an admin, `grace` and `margaret` are members, `claude` is an agent), a public `ENG` project with a linked repo and a private `OPS` project.
 - Dev auth mode lets you sign in as any demo user with one click.
 - To start over, stop the server and delete `data/`.
 - Settings come from the environment, or from a `.env` file at the repo root (copy `.env.example`), which `pnpm dev` loads.
