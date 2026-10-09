@@ -1,4 +1,4 @@
-import type { Database, Kysely } from '@poietic-tech/issues-db';
+import { type Database, type Kysely, type RawBuilder, sql } from '@poietic-tech/issues-db';
 import type { ServiceContext } from './context.ts';
 import { DomainError, forbidden, notFound } from './errors.ts';
 
@@ -78,4 +78,23 @@ export async function readableProjectIds(ctx: ServiceContext, db: Exec): Promise
       );
   }
   return (await q.execute()).map((r) => r.id);
+}
+
+/**
+ * Adds "the project id in `column` is readable" to a query (e.g. `'i.project_id'`). Admins and the system
+ * actor are unrestricted; an actor who can read nothing gets no rows.
+ */
+export async function whereReadable<QB extends { where(expr: RawBuilder<boolean>): QB }>(
+  ctx: ServiceContext,
+  db: Exec,
+  qb: QB,
+  column: string,
+): Promise<QB> {
+  const readable = await readableProjectIds(ctx, db);
+  if (readable === 'all') return qb;
+  return qb.where(
+    readable.length
+      ? sql<boolean>`${sql.ref(column)} in (${sql.join(readable.map((id) => sql`${id}`))})`
+      : sql<boolean>`1 = 0`,
+  );
 }

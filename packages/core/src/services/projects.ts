@@ -8,6 +8,7 @@ import {
   type UpdateProjectInput,
   UpdateProjectInputSchema,
 } from '@poietic-tech/issues-schema';
+import { whereReadable } from '../access.ts';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, isUniqueViolation, parseInput } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';
@@ -35,6 +36,7 @@ export async function listProjects(
 ): Promise<Project[]> {
   let q = ctx.db.kysely.selectFrom('projects').selectAll().orderBy('key');
   if (!opts.includeArchived) q = q.where('archived_at', 'is', null);
+  q = await whereReadable(ctx, ctx.db.kysely, q, 'id');
   return (await q.execute()).map(toProject);
 }
 

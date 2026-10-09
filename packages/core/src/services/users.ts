@@ -7,8 +7,8 @@ import {
   type User,
 } from '@poietic-tech/issues-schema';
 import type { z } from 'zod';
-import { type Actor, nowIso, type ServiceContext } from '../context.ts';
-import { conflict, forbidden, isUniqueViolation, parseInput } from '../errors.ts';
+import { type Actor, isAnonymous, nowIso, type ServiceContext } from '../context.ts';
+import { conflict, DomainError, forbidden, isUniqueViolation, parseInput } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';
 import { toUser } from '../mappers.ts';
 import { isAdmin, requireAdmin } from '../permissions.ts';
@@ -18,23 +18,36 @@ export function toActor(user: Pick<User, 'id' | 'handle' | 'name' | 'kind' | 'ro
   return { id: user.id, handle: user.handle, name: user.name, kind: user.kind, role: user.role };
 }
 
+function requireSignedIn(ctx: ServiceContext): void {
+  if (isAnonymous(ctx)) throw new DomainError('UNAUTHENTICATED', 'Sign in to see users');
+}
+
+/** Emails are private: only admins and the user themselves see them. */
+function redact(ctx: ServiceContext, u: User): User {
+  return ctx.actor.role === 'admin' || ctx.actor.kind === 'system' || u.id === ctx.actor.id
+    ? u
+    : { ...u, email: null };
+}
+
 /** Lists users. Deactivated users are included only when asked. */
 export async function listUsers(
   ctx: ServiceContext,
   opts: { includeDeactivated?: boolean } = {},
 ): Promise<User[]> {
+  requireSignedIn(ctx);
   let q = ctx.db.kysely
     .selectFrom('users')
     .selectAll()
     .where('kind', '!=', 'system')
     .orderBy('handle');
   if (!opts.includeDeactivated) q = q.where('deactivated_at', 'is', null);
-  return (await q.execute()).map(toUser);
+  return (await q.execute()).map((r) => redact(ctx, toUser(r)));
 }
 
 /** Gets a user by id, handle, `@handle` or `me`. */
 export async function getUser(ctx: ServiceContext, ref: string): Promise<User> {
-  return toUser(await getUserRow(ctx, ctx.db.kysely, ref));
+  requireSignedIn(ctx);
+  return redact(ctx, toUser(await getUserRow(ctx, ctx.db.kysely, ref)));
 }
 
 /** Creates a human or agent user. Admin only. */

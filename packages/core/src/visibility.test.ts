@@ -291,43 +291,188 @@ describe(`project visibility (${testDialect()})`, () => {
       expect(error?.code).toBe('NOT_FOUND');
       return error!.message;
     };
-    const cases: [string, Promise<unknown>, Promise<unknown>][] = [
+    const cases: [string, () => Promise<unknown>, () => Promise<unknown>][] = [
       [
         'label',
-        updateLabel(t.member, label.id, { name: 'x' }),
-        updateLabel(t.member, newId('label'), { name: 'x' }),
+        () => updateLabel(t.member, label.id, { name: 'x' }),
+        () => updateLabel(t.member, newId('label'), { name: 'x' }),
       ],
       [
         'status',
-        updateStatus(t.member, status!.id, { name: 'x' }),
-        updateStatus(t.member, newId('status'), { name: 'x' }),
+        () => updateStatus(t.member, status!.id, { name: 'x' }),
+        () => updateStatus(t.member, newId('status'), { name: 'x' }),
       ],
-      ['field', getCustomField(t.member, field.id), getCustomField(t.member, newId('customField'))],
+      [
+        'field',
+        () => getCustomField(t.member, field.id),
+        () => getCustomField(t.member, newId('customField')),
+      ],
       [
         'option',
-        updateFieldOption(t.member, field.options[0]!.id, { label: 'x' }),
-        updateFieldOption(t.member, newId('customFieldOption'), { label: 'x' }),
+        () => updateFieldOption(t.member, field.options[0]!.id, { label: 'x' }),
+        () => updateFieldOption(t.member, newId('customFieldOption'), { label: 'x' }),
       ],
       [
         'comment',
-        updateComment(t.member, comment.id, { body: 'y' }),
-        updateComment(t.member, newId('comment'), { body: 'y' }),
+        () => updateComment(t.member, comment.id, { body: 'y' }),
+        () => updateComment(t.member, newId('comment'), { body: 'y' }),
       ],
-      ['view', getView(t.member, view.id), getView(t.member, newId('view'))],
-      ['link', deleteLink(t.member, link.id), deleteLink(t.member, newId('issueLink'))],
+      ['view', () => getView(t.member, view.id), () => getView(t.member, newId('view'))],
+      ['link', () => deleteLink(t.member, link.id), () => deleteLink(t.member, newId('issueLink'))],
       [
         'attachment',
-        getAttachment(t.member, file.id),
-        getAttachment(t.member, newId('attachment')),
+        () => getAttachment(t.member, file.id),
+        () => getAttachment(t.member, newId('attachment')),
       ],
     ];
     for (const [name, hidden, missing] of cases) {
-      const hiddenMessage = await message(hidden);
-      const missingMessage = await message(missing);
+      const hiddenMessage = await message(hidden());
+      const missingMessage = await message(missing());
       expect(hiddenMessage.replace(/"[^"]*"/, '"id"'), name).toBe(
         missingMessage.replace(/"[^"]*"/, '"id"'),
       );
       expect(hiddenMessage, name).not.toMatch(/Project|prj_/);
     }
+  });
+
+  it('never returns unreadable projects from cross-project reads', async () => {
+    const { listProjects } = await import('./services/projects.ts');
+    const { listEvents } = await import('./services/events.ts');
+    const anon = withActor(t.ctx, ANONYMOUS_ACTOR);
+    expect((await listProjects(anon)).map((p) => p.key)).toEqual(['PUB']);
+    await revoke('PRV', t.member);
+    expect((await listProjects(t.member)).map((p) => p.key)).toEqual(['PUB']);
+    expect((await listProjects(t.ctx)).map((p) => p.key)).toEqual(['PRV', 'PUB']);
+    const issues = await listIssues(anon, {});
+    expect(issues.data.length).toBeGreaterThan(0);
+    expect(issues.data.every((i) => i.key.startsWith('PUB-'))).toBe(true);
+    const memberIssues = await listIssues(t.member, {});
+    expect(memberIssues.data.every((i) => i.key.startsWith('PUB-'))).toBe(true);
+    const events = await listEvents(anon, { limit: 1000 });
+    const prv = await t.db.kysely
+      .selectFrom('projects')
+      .select('id')
+      .where('key', '=', 'PRV')
+      .executeTakeFirstOrThrow();
+    expect(events.data.length).toBeGreaterThan(0);
+    expect(events.data.some((e) => e.projectId === prv.id)).toBe(false);
+    expect(events.data.some((e) => e.projectId === null)).toBe(false); // user.* events need sign-in
+    const signedIn = await listEvents(t.member, { limit: 1000 });
+    expect(signedIn.data.some((e) => e.projectId === prv.id)).toBe(false);
+    expect(signedIn.data.some((e) => e.projectId === null)).toBe(true);
+    await grant(t, 'PRV', t.member, 'viewer');
+    expect((await listProjects(t.member)).map((p) => p.key)).toEqual(['PRV', 'PUB']);
+    expect(
+      (await listEvents(t.member, { limit: 1000 })).data.some((e) => e.projectId === prv.id),
+    ).toBe(true);
+  });
+
+  it('does not confirm private names through filter errors', async () => {
+    const { createLabel } = await import('./services/labels.ts');
+    await createLabel(t.ctx, 'PRV', { name: 'only-private' });
+    const anon = withActor(t.ctx, ANONYMOUS_ACTOR);
+    await expect(
+      listIssues(anon, {
+        filter: { conditions: [{ field: 'labels', op: 'eq', value: 'only-private' }] },
+      }),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+      message: 'Unknown label "only-private"',
+    });
+    // Admins see everything, so the same filter is valid for them.
+    await expect(
+      listIssues(t.ctx, {
+        filter: { conditions: [{ field: 'labels', op: 'eq', value: 'only-private' }] },
+      }),
+    ).resolves.toMatchObject({ data: [] });
+  });
+
+  it('does not use an unreadable issue id as a parent filter', async () => {
+    const prv = await t.db.kysely
+      .selectFrom('issues as i')
+      .innerJoin('projects as p', 'p.id', 'i.project_id')
+      .select('i.id')
+      .where('p.key', '=', 'PRV')
+      .where('i.number', '=', 1)
+      .executeTakeFirstOrThrow();
+    await revoke('PRV', t.member);
+    await expect(
+      listIssues(t.member, {
+        project: 'PUB',
+        filter: { conditions: [{ field: 'parent', op: 'eq', value: prv.id }] },
+      }),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+      message: expect.stringContaining('Unknown issue'),
+    });
+    await grant(t, 'PRV', t.member, 'viewer');
+    await expect(
+      listIssues(t.member, {
+        filter: { conditions: [{ field: 'parent', op: 'eq', value: prv.id }] },
+      }),
+    ).resolves.toMatchObject({ data: [] });
+  });
+
+  it('omits links into unreadable projects', async () => {
+    const { createLink, listIssueLinks } = await import('./services/links.ts');
+    const link = await createLink(t.ctx, 'PUB-1', { type: 'relates', target: 'PRV-1' });
+    expect(link.issue.key).toBe('PRV-1');
+    const anon = withActor(t.ctx, ANONYMOUS_ACTOR);
+    expect(await listIssueLinks(anon, 'PUB-1')).toEqual([]);
+    const { listIssueActivity } = await import('./services/issues.ts');
+    const linkEvents = async (who: ServiceContext) =>
+      (await listIssueActivity(who, 'PUB-1')).data.filter(
+        (e) => e.type.startsWith('link.') && JSON.stringify(e.data).includes('PRV-1'),
+      );
+    expect(await linkEvents(anon)).toEqual([]);
+    expect((await linkEvents(t.ctx)).length).toBeGreaterThanOrEqual(1);
+    await revoke('PRV', t.member);
+    expect(await linkEvents(t.member)).toEqual([]);
+    expect(await listIssueLinks(t.member, 'PUB-1')).toEqual([]);
+    expect((await listIssueLinks(t.ctx, 'PUB-1')).length).toBeGreaterThanOrEqual(1);
+    await grant(t, 'PRV', t.member, 'viewer');
+    expect((await listIssueLinks(t.member, 'PUB-1')).map((l) => l.issue.key)).toContain('PRV-1');
+    expect((await linkEvents(t.member)).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('requires sign-in for users and shows emails only to admins and the user', async () => {
+    const { listUsers, getUser, createUser, updateUser } = await import('./services/users.ts');
+    const { listEvents } = await import('./services/events.ts');
+    const anon = withActor(t.ctx, ANONYMOUS_ACTOR);
+    await expect(listUsers(anon)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(getUser(anon, 'admin')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await updateUser(t.ctx, 'admin', { email: 'admin@example.com' });
+    await updateUser(t.member, 'me', { email: 'member@example.com' });
+    const created = await createUser(t.ctx, { handle: 'other', name: 'Other', email: 'o@x.io' });
+
+    const seen = await listUsers(t.member);
+    expect(seen.length).toBeGreaterThan(2);
+    expect(seen.filter((u) => u.id !== t.member.actor.id).every((u) => u.email === null)).toBe(
+      true,
+    );
+    expect(seen.find((u) => u.id === t.member.actor.id)?.email).toBe('member@example.com');
+    expect((await getUser(t.member, 'admin')).email).toBeNull();
+    expect((await getUser(t.member, 'me')).email).toBe('member@example.com');
+    expect((await getUser(t.ctx, 'other')).email).toBe('o@x.io');
+    expect((await listUsers(t.ctx)).find((u) => u.id === created.id)?.email).toBe('o@x.io');
+
+    // The event log must not leak the emails the user list hides.
+    const userEvents = (await listEvents(t.member, { limit: 1000 })).data.filter((e) =>
+      e.type.startsWith('user.'),
+    );
+    expect(userEvents.length).toBeGreaterThan(0);
+    for (const e of userEvents) {
+      const user = e.data.user as { id: string; email: string | null };
+      if (user.id === t.member.actor.id) continue;
+      expect(user.email, e.type).toBeNull();
+      expect(
+        (e.data.changes as Record<string, unknown> | undefined)?.email,
+        e.type,
+      ).toBeUndefined();
+    }
+    const adminEvents = (await listEvents(t.ctx, { limit: 1000 })).data.filter(
+      (e) => e.type === 'user.created' && (e.data.user as { id: string }).id === created.id,
+    );
+    expect((adminEvents[0]!.data.user as { email: string }).email).toBe('o@x.io');
   });
 });

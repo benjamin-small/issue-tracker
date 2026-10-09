@@ -7,6 +7,7 @@ import {
   type IssueLink,
   type LinkType,
 } from '@poietic-tech/issues-schema';
+import { readableProjectIds } from '../access.ts';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, invalidRelation, isUniqueViolation, notFound, parseInput } from '../errors.ts';
 import { recordEvent } from '../events.ts';
@@ -33,10 +34,12 @@ async function linkTypeRow(tx: Tx, ref: string) {
 /** Links of an issue, each expressed from that issue's perspective ("blocks" vs "is blocked by"). */
 export async function listIssueLinks(ctx: ServiceContext, issueRef: string): Promise<IssueLink[]> {
   const issue = await getIssueRow(ctx, ctx.db.kysely, issueRef, 'read');
-  return linksOf(ctx.db.kysely, issue.id);
+  return linksOf(ctx, ctx.db.kysely, issue.id);
 }
 
-async function linksOf(db: Tx, issueId: string): Promise<IssueLink[]> {
+/** Links of an issue, leaving out those whose other end is in a project the actor cannot read. */
+async function linksOf(ctx: ServiceContext, db: Tx, issueId: string): Promise<IssueLink[]> {
+  const readable = await readableProjectIds(ctx, db);
   const rows = await db
     .selectFrom('issue_links as l')
     .innerJoin('link_types as t', 't.id', 'l.type_id')
@@ -59,6 +62,7 @@ async function linksOf(db: Tx, issueId: string): Promise<IssueLink[]> {
       't.inward_label',
       'o.id as other_id',
       'o.number',
+      'o.project_id as other_project_id',
       'o.title',
       'p.key as project_key',
       's.id as status_id',
@@ -71,7 +75,8 @@ async function linksOf(db: Tx, issueId: string): Promise<IssueLink[]> {
     .orderBy('t.key')
     .orderBy('l.created_at')
     .execute();
-  return rows.map((r) => {
+  const visible = rows.filter((r) => readable === 'all' || readable.includes(r.other_project_id));
+  return visible.map((r) => {
     const outward = r.source_id === issueId;
     return {
       id: r.id,
@@ -161,7 +166,7 @@ export async function createLink(
         issueId: source,
         data: { link },
       });
-      const created = (await linksOf(tx, issue.id)).find((l) => l.id === id);
+      const created = (await linksOf(ctx, tx, issue.id)).find((l) => l.id === id);
       return created!;
     });
   } catch (error) {
