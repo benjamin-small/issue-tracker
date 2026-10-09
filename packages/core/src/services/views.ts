@@ -8,10 +8,10 @@ import {
   UpdateViewInputSchema,
   type View,
 } from '@poietic-tech/issues-schema';
-import { nowIso, type ServiceContext } from '../context.ts';
-import { forbidden, notFound, parseInput } from '../errors.ts';
+import { isAnonymous, nowIso, type ServiceContext } from '../context.ts';
+import { DomainError, forbidden, notFound, parseInput } from '../errors.ts';
 import { toView } from '../mappers.ts';
-import { getProjectRow } from '../refs.ts';
+import { getProjectRow, requireProjectId } from '../refs.ts';
 
 /** Views visible to the actor in a project: shared ones plus the actor's personal ones. */
 export async function listViews(ctx: ServiceContext, projectRef: string): Promise<View[]> {
@@ -32,6 +32,7 @@ async function visibleViewRow(ctx: ServiceContext, id: string, db: Tx = ctx.db.k
     ? await db.selectFrom('views').selectAll().where('id', '=', id).executeTakeFirst()
     : undefined;
   if (!row || (row.owner_id !== null && row.owner_id !== ctx.actor.id)) throw notFound('View', id);
+  await requireProjectId(ctx, db, row.project_id, 'read');
   return row;
 }
 
@@ -48,6 +49,8 @@ export async function createView(
   return withWriteTx(ctx.db, async (tx) => {
     // Personal views only need read access; shared views change the project for everyone.
     const project = await getProjectRow(ctx, tx, projectRef, data.shared ? 'manage' : 'read');
+    // Anonymous actors own nothing, so even personal views need a signed-in user.
+    if (isAnonymous(ctx)) throw new DomainError('UNAUTHENTICATED', 'Sign in to make changes');
     const count = await tx
       .selectFrom('views')
       .select((eb) => eb.fn.countAll<number>().as('n'))
@@ -81,6 +84,7 @@ export async function updateView(
   const patch = parseInput(UpdateViewInputSchema, input);
   return withWriteTx(ctx.db, async (tx) => {
     const row = await visibleViewRow(ctx, id, tx);
+    if (row.owner_id === null) await requireProjectId(ctx, tx, row.project_id, 'manage');
     const updated = await tx
       .updateTable('views')
       .set({
@@ -99,6 +103,7 @@ export async function updateView(
 export async function deleteView(ctx: ServiceContext, id: string): Promise<View> {
   return withWriteTx(ctx.db, async (tx) => {
     const row = await visibleViewRow(ctx, id, tx);
+    if (row.owner_id === null) await requireProjectId(ctx, tx, row.project_id, 'manage');
     if (row.owner_id === null && ctx.actor.role !== 'admin') {
       const others = await tx
         .selectFrom('views')

@@ -11,7 +11,7 @@ import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, invalidRelation, isUniqueViolation, notFound, parseInput } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { toLinkType } from '../mappers.ts';
-import { getIssueRow } from '../refs.ts';
+import { getIssueRow, requireProjectId } from '../refs.ts';
 
 export async function listLinkTypes(ctx: ServiceContext): Promise<LinkType[]> {
   const rows = await ctx.db.kysely.selectFrom('link_types').selectAll().orderBy('key').execute();
@@ -182,6 +182,7 @@ export async function deleteLink(ctx: ServiceContext, linkId: string): Promise<v
           .executeTakeFirst()
       : undefined;
     if (!row) throw notFound('Link', linkId);
+    await requireProjectId(ctx, tx, row.project_id, 'write');
     const link = {
       id: row.id,
       type: row.key,
