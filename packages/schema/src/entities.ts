@@ -36,6 +36,12 @@ export const UserSchema = UserSummarySchema.extend({
 }).meta({ id: 'User' });
 export type User = z.infer<typeof UserSchema>;
 
+/** `GET /me`: the signed-in user, or `{ anonymous: true }` for a visitor without credentials. */
+export const MeSchema = z
+  .union([UserSchema, z.object({ anonymous: z.literal(true) }).meta({ id: 'AnonymousMe' })])
+  .meta({ id: 'Me' });
+export type Me = z.infer<typeof MeSchema>;
+
 export const HandleSchema = z
   .string()
   .regex(/^[a-z0-9][a-z0-9_-]{1,38}$/i, 'handle must be 2–39 chars of letters, digits, "-" or "_"')

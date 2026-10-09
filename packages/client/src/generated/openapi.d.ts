@@ -308,7 +308,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The authenticated user */
+        /**
+         * The authenticated user
+         * @description Signed-out visitors get `{ "anonymous": true }` instead of a user.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -318,13 +321,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Current user */
+                /** @description Current user, or { anonymous: true } */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["User"];
+                        "application/json": components["schemas"]["Me"];
                     };
                 };
                 /** @description Problem details. Codes: VALIDATION_FAILED. */
@@ -833,7 +836,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List projects */
+        /**
+         * List projects
+         * @description Projects the caller can read: public ones (also for signed-out visitors), private ones they are a member of, and every project for admins. `myAccess` is the caller's level on each.
+         */
         get: {
             parameters: {
                 query?: {
@@ -852,7 +858,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            data: components["schemas"]["Project"][];
+                            data: components["schemas"]["ProjectWithAccess"][];
                         };
                     };
                 };
@@ -879,7 +885,7 @@ export interface paths {
         put?: never;
         /**
          * Create a project
-         * @description Admin only. Creates the default workflow (Backlog → Canceled) and shared list and board views.
+         * @description Admin only. Creates the default workflow (Backlog → Canceled) and shared list and board views. `visibility` defaults to `private`.
          */
         post: {
             parameters: {
@@ -900,7 +906,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Project"];
+                        "application/json": components["schemas"]["ProjectWithAccess"];
                     };
                 };
                 /** @description Problem details. Codes: VALIDATION_FAILED. */
@@ -954,7 +960,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a project */
+        /**
+         * Get a project
+         * @description Public projects are readable by anyone, private ones by members and admins; others get `NOT_FOUND`.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -973,7 +982,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Project"];
+                        "application/json": components["schemas"]["ProjectWithAccess"];
                     };
                 };
                 /** @description Problem details. Codes: VALIDATION_FAILED. */
@@ -1012,7 +1021,7 @@ export interface paths {
         head?: never;
         /**
          * Update a project
-         * @description Archiving (`archived: true`) is admin only. Project keys are immutable.
+         * @description Name, description and visibility need manage. Archiving (`archived: true`) is admin only. Project keys are immutable.
          */
         patch: {
             parameters: {
@@ -1036,7 +1045,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Project"];
+                        "application/json": components["schemas"]["ProjectWithAccess"];
                     };
                 };
                 /** @description Problem details. Codes: VALIDATION_FAILED. */
@@ -5298,6 +5307,11 @@ export interface components {
              */
             user: string;
         };
+        Me: components["schemas"]["User"] | components["schemas"]["AnonymousMe"];
+        AnonymousMe: {
+            /** @enum {boolean} */
+            anonymous: true;
+        };
         CreateUserInput: {
             handle: string;
             name: string;
@@ -5408,7 +5422,7 @@ export interface components {
              */
             expiresAt?: string | null;
         };
-        Project: {
+        ProjectWithAccess: {
             id: string;
             /**
              * @description Immutable issue-key prefix.
@@ -5436,6 +5450,11 @@ export interface components {
              * @example 2026-09-26T13:49:00.123Z
              */
             archivedAt: string | null;
+            /**
+             * @description The caller's access to this project.
+             * @enum {string}
+             */
+            myAccess: "read" | "write" | "manage";
         };
         /**
          * @description `public`: anyone can read, even signed out. `private`: members and admins only.
@@ -6467,12 +6486,14 @@ export type User = components['schemas']['User'];
 export type Problem = components['schemas']['Problem'];
 export type TokenLoginInput = components['schemas']['TokenLoginInput'];
 export type DevLoginInput = components['schemas']['DevLoginInput'];
+export type Me = components['schemas']['Me'];
+export type AnonymousMe = components['schemas']['AnonymousMe'];
 export type CreateUserInput = components['schemas']['CreateUserInput'];
 export type UpdateUserInput = components['schemas']['UpdateUserInput'];
 export type ApiToken = components['schemas']['ApiToken'];
 export type CreatedApiToken = components['schemas']['CreatedApiToken'];
 export type CreateTokenInput = components['schemas']['CreateTokenInput'];
-export type Project = components['schemas']['Project'];
+export type ProjectWithAccess = components['schemas']['ProjectWithAccess'];
 export type ProjectVisibility = components['schemas']['ProjectVisibility'];
 export type CreateProjectInput = components['schemas']['CreateProjectInput'];
 export type UpdateProjectInput = components['schemas']['UpdateProjectInput'];

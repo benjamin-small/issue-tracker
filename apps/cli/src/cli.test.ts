@@ -501,6 +501,13 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
           })
         ).code,
       ).toBe(5);
+      // Without a token the server answers as an anonymous visitor; the CLI reports "not signed in".
+      const anonymous = await cli(['whoami', '--json'], {
+        env: { POIETIC_ISSUES_SERVER: server.url },
+        fetch: null,
+      });
+      expect(anonymous.code).toBe(5);
+      expect(anonymous.stderr).toMatch(/not signed in/i);
 
       const login = await cli(['auth', 'login', '--server', server.url, '--with-token'], {
         stdin: token,

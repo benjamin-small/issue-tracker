@@ -4,7 +4,7 @@ export type Issue = Schemas['Issue'];
 export type Status = Schemas['Status'];
 export type Label = Schemas['Label'];
 export type User = Schemas['User'];
-export type Project = Schemas['Project'];
+export type Project = Schemas['ProjectWithAccess'];
 export type View = Schemas['View'];
 export type ViewConfig = Schemas['ViewConfig'];
 export type Comment = Schemas['Comment'];
@@ -49,6 +49,22 @@ export async function call<T>(
   const result = await request;
   if (result.response.status === 401) onUnauthenticated?.();
   return unwrap(result);
+}
+
+/**
+ * The signed-in user from `GET /me`. The server answers signed-out visitors with `{ anonymous: true }`; until the
+ * UI supports browsing signed out, that is handled like a 401 (the sign-in redirect).
+ */
+export function signedInUser(me: Schemas['Me']): User {
+  if (!('anonymous' in me)) return me;
+  onUnauthenticated?.();
+  throw new ApiError({
+    type: 'urn:tracker:error:UNAUTHENTICATED',
+    title: 'Unauthenticated',
+    status: 401,
+    code: 'UNAUTHENTICATED',
+    detail: 'Sign in to continue',
+  });
 }
 
 export function errorMessage(error: unknown): string {

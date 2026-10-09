@@ -6,11 +6,13 @@ import {
   deleteSession,
   DomainError,
   getUser,
+  isAnonymous,
   listUsers,
   signInWithSso,
   SYSTEM_ACTOR,
+  withActor,
 } from '@poietic-tech/issues-core';
-import { UserSchema, UserSummarySchema } from '@poietic-tech/issues-schema';
+import { MeSchema, UserSchema, UserSummarySchema } from '@poietic-tech/issues-schema';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Context } from 'hono';
 import { sameOrigin } from '../middleware/auth.ts';
@@ -83,7 +85,8 @@ export function registerAuthRoutes(app: TrackerApp, deps: ResolvedDeps) {
     }),
     async (c) => {
       if (!devLogin) return c.json({ devLogin: false, sso: ssoInfo }, 200);
-      const users = await listUsers(c.get('ctx'));
+      // Signed-out visitors can't list users; the dev picker only needs public fields (no email).
+      const users = await listUsers(withActor(c.get('ctx'), SYSTEM_ACTOR));
       return c.json(
         {
           devLogin: true,
@@ -117,7 +120,7 @@ export function registerAuthRoutes(app: TrackerApp, deps: ResolvedDeps) {
       const actor = await authenticateToken(c.get('ctx'), token);
       if (!actor) throw new DomainError('UNAUTHENTICATED', 'Invalid, expired or revoked token');
       await startSession(c, actor.id);
-      return c.json(await getUser(c.get('ctx'), actor.id), 200);
+      return c.json(await getUser(withActor(c.get('ctx'), actor), actor.id), 200);
     },
   );
 
@@ -149,7 +152,7 @@ export function registerAuthRoutes(app: TrackerApp, deps: ResolvedDeps) {
       const actor = await actorForUser(c.get('ctx'), user);
       if (!actor) throw new DomainError('NOT_FOUND', `User "${user}" not found`);
       await startSession(c, actor.id);
-      return c.json(await getUser(c.get('ctx'), actor.id), 200);
+      return c.json(await getUser(withActor(c.get('ctx'), actor), actor.id), 200);
     },
   );
 
@@ -189,7 +192,7 @@ export function registerAuthRoutes(app: TrackerApp, deps: ResolvedDeps) {
         }
       }
       if (!claims) throw new DomainError('UNAUTHENTICATED', `Not signed in to ${sso.name}`);
-      const ctx = { ...c.get('ctx'), actor: SYSTEM_ACTOR };
+      const ctx = withActor(c.get('ctx'), SYSTEM_ACTOR);
       const { user, status } = await signInWithSso(
         ctx,
         { issuer: sso.issuer, subject: claims.sub, name: claims.name, role: claims.role },
@@ -230,8 +233,16 @@ export function registerAuthRoutes(app: TrackerApp, deps: ResolvedDeps) {
       path: '/me',
       tags,
       summary: 'The authenticated user',
-      responses: { 200: json(UserSchema, 'Current user'), ...errorResponses() },
+      description: 'Signed-out visitors get `{ "anonymous": true }` instead of a user.',
+      responses: {
+        200: json(MeSchema, 'Current user, or { anonymous: true }'),
+        ...errorResponses(),
+      },
     }),
-    async (c) => c.json(await getUser(c.get('ctx'), c.get('ctx').actor.id), 200),
+    async (c) => {
+      const ctx = c.get('ctx');
+      if (isAnonymous(ctx)) return c.json({ anonymous: true as const }, 200);
+      return c.json(await getUser(ctx, ctx.actor.id), 200);
+    },
   );
 }

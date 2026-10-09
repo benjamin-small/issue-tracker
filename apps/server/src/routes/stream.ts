@@ -1,5 +1,11 @@
 import { z } from '@hono/zod-openapi';
-import { type EventTailer, getProjectRow, listEvents } from '@poietic-tech/issues-core';
+import {
+  type EventTailer,
+  filterEventsForViewer,
+  getProjectRow,
+  listEvents,
+  readableProjectIds,
+} from '@poietic-tech/issues-core';
 import type { TrackerEvent } from '@poietic-tech/issues-schema';
 import { streamSSE } from 'hono/streaming';
 import type { ResolvedDeps, TrackerApp } from '../env.ts';
@@ -14,6 +20,10 @@ const MAX_REPLAY = 1000;
  * Each message has `id: <seq>`, `event: <type>` and the event JSON as `data`. Browsers reconnect automatically
  * and send `Last-Event-ID`; the server replays what was missed (up to 1000 events — beyond that it sends a
  * `reset` event, telling the client to refetch). Optional `?project=` filters to one project.
+ *
+ * The tailer fans out every event, so each connection applies its viewer's access (the same rules as
+ * `GET /events`): only readable projects, and the readable set is re-read when memberships or a project's
+ * visibility change.
  */
 export function registerStreamRoute(
   app: TrackerApp,
@@ -69,6 +79,13 @@ export function registerStreamRoute(
       const queue: TrackerEvent[] = [];
       let wake: (() => void) | undefined;
       const matches = (e: TrackerEvent) => !projectId || e.projectId === projectId;
+      let readable = await readableProjectIds(ctx, ctx.db.kysely);
+      /** Filters and redacts one live event for this viewer, first catching up on access changes. */
+      const visible = async (e: TrackerEvent) => {
+        if (e.type.startsWith('project.member_') || e.type === 'project.updated')
+          readable = await readableProjectIds(ctx, ctx.db.kysely);
+        return filterEventsForViewer(ctx, [e], readable);
+      };
       // Subscribe before replaying so nothing committed in between is lost; duplicates are dropped by seq.
       const unsubscribe = tailer.subscribe((e) => {
         if (matches(e)) {
@@ -108,7 +125,7 @@ export function registerStreamRoute(
         deps.shutdownSignal?.addEventListener('abort', onShutdown);
         stream.onAbort(() => deps.shutdownSignal?.removeEventListener('abort', onShutdown));
         while (!stopping()) {
-          while (queue.length) await send(queue.shift()!);
+          while (queue.length) for (const e of await visible(queue.shift()!)) await send(e);
           await new Promise<void>((resolve) => {
             wake = resolve;
             setTimeout(resolve, HEARTBEAT_MS);

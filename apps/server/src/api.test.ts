@@ -41,7 +41,7 @@ afterAll(() => t.destroy());
 
 describe(`HTTP API (${testDialect()})`, () => {
   it('requires authentication and answers with problem+json', async () => {
-    const res = await call('GET', '/projects', { token: null });
+    const res = await call('GET', '/users', { token: null });
     expect(res.status).toBe(401);
     expect(res.headers.get('content-type')).toBe('application/problem+json');
     expect(res.body).toMatchObject({
@@ -355,7 +355,9 @@ describe(`HTTP API (${testDialect()})`, () => {
     expect(crossSite.status).toBe(403);
 
     await call('POST', '/auth/logout', { token: null, headers: { cookie, origin: BASE } });
-    expect((await call('GET', '/me', { token: null, headers: { cookie } })).status).toBe(401);
+    expect((await call('GET', '/me', { token: null, headers: { cookie } })).body).toEqual({
+      anonymous: true,
+    });
 
     const tokenLogin = await call('POST', '/auth/token-login', {
       token: null,

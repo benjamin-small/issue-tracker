@@ -1,4 +1,13 @@
-import { createIssue, createProject, createToken, EventTailer } from '@poietic-tech/issues-core';
+import {
+  addMember,
+  createIssue,
+  createLink,
+  createProject,
+  createToken,
+  createUser,
+  EventTailer,
+  removeMember,
+} from '@poietic-tech/issues-core';
 import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -8,15 +17,18 @@ let t: TestContext;
 let tailer: EventTailer;
 let app: ReturnType<typeof createApp>;
 let token: string;
+let memberToken: string;
 
 beforeAll(async () => {
   t = await createTestContext();
   await createProject(t.ctx, { key: 'SSE', name: 'SSE' });
   await createProject(t.ctx, { key: 'OTH', name: 'Other' });
+  await createProject(t.ctx, { key: 'PUB', name: 'Public', visibility: 'public' });
   tailer = new EventTailer(t.db, { intervalMs: 50 });
   await tailer.start();
   app = createApp({ db: t.db, tailer });
   token = (await createToken(t.ctx, 'admin', { name: 'sse' })).token;
+  memberToken = (await createToken(t.member, 'member', { name: 'sse' })).token;
 });
 afterAll(async () => {
   await tailer.stop();
@@ -35,10 +47,11 @@ async function collect(
   headers: Record<string, string>,
   done: (m: Message[]) => boolean,
   act?: () => Promise<void>,
+  bearer: string | null = token,
 ) {
   const controller = new AbortController();
   const res = await app.request(`http://t/api/v1/events/stream${query}`, {
-    headers: { authorization: `Bearer ${token}`, ...headers },
+    headers: { ...(bearer && { authorization: `Bearer ${bearer}` }), ...headers },
     signal: controller.signal,
   });
   expect(res.status).toBe(200);
@@ -108,8 +121,73 @@ describe(`SSE /events/stream (${testDialect()})`, () => {
     expect(titles).toEqual(['missed 1', 'missed 2']);
   });
 
-  it('requires authentication', async () => {
-    const res = await app.request('http://t/api/v1/events/stream');
-    expect(res.status).toBe(401);
+  /** Issue titles of the `issue.created` messages received. */
+  const titles = (messages: Message[]) =>
+    messages
+      .filter((m) => m.event === 'issue.created')
+      .map((m) => JSON.parse(m.data!).data.issue.title as string);
+  const sawTitle = (title: string) => (m: Message[]) => titles(m).includes(title);
+
+  it('streams only what the viewer can read', async () => {
+    let seq = 0;
+    const act = async () => {
+      const n = ++seq;
+      const prv = await createIssue(t.ctx, 'OTH', { title: `private ${n}` });
+      const pub = await createIssue(t.ctx, 'PUB', { title: `public ${n}` });
+      await createLink(t.ctx, pub.key, { type: 'relates', target: prv.key });
+      await createUser(t.ctx, { handle: `sse-user-${n}`, name: 'SSE', email: `u${n}@x.io` });
+      await createIssue(t.ctx, 'PUB', { title: `done ${n}` });
+    };
+
+    const member = await collect('', {}, sawTitle('done 1'), act, memberToken);
+    expect(titles(member)).toEqual(['public 1', 'done 1']);
+    expect(member.some((m) => m.event?.startsWith('link.'))).toBe(false);
+    const users = member.filter((m) => m.event === 'user.created');
+    expect(users).toHaveLength(1);
+    expect(JSON.parse(users[0]!.data!).data.user.email).toBeNull();
+
+    const anonymous = await collect('', {}, sawTitle('done 2'), act, null);
+    expect(titles(anonymous)).toEqual(['public 2', 'done 2']);
+    expect(anonymous.some((m) => m.event?.startsWith('link.'))).toBe(false);
+    expect(anonymous.some((m) => m.event?.startsWith('user.'))).toBe(false);
+
+    const admin = await collect('', {}, sawTitle('done 3'), act);
+    expect(titles(admin)).toEqual(['private 3', 'public 3', 'done 3']);
+    expect(admin.some((m) => m.event === 'link.created')).toBe(true);
+    const adminUsers = admin.filter((m) => m.event === 'user.created');
+    expect(JSON.parse(adminUsers[0]!.data!).data.user.email).toBe('u3@x.io');
+  });
+
+  it('follows membership changes while the stream is open', async () => {
+    const messages = await collect(
+      '',
+      {},
+      sawTitle('after removal marker'),
+      async () => {
+        await createIssue(t.ctx, 'OTH', { title: 'before grant' });
+        await addMember(t.ctx, 'OTH', { user: 'member', role: 'viewer' });
+        await createIssue(t.ctx, 'OTH', { title: 'after grant' });
+        await removeMember(t.ctx, 'OTH', 'member');
+        await createIssue(t.ctx, 'OTH', { title: 'after removal' });
+        await createIssue(t.ctx, 'PUB', { title: 'after removal marker' });
+      },
+      memberToken,
+    );
+    expect(titles(messages)).toEqual(['after grant', 'after removal marker']);
+  });
+
+  it('lets anonymous viewers stream public projects, and hides private ones', async () => {
+    const res = await app.request('http://t/api/v1/events/stream?project=OTH');
+    expect(res.status).toBe(404);
+    const messages = await collect(
+      '?project=PUB',
+      {},
+      sawTitle('anonymous live'),
+      async () => {
+        await createIssue(t.ctx, 'PUB', { title: 'anonymous live' });
+      },
+      null,
+    );
+    expect(titles(messages)).toEqual(['anonymous live']);
   });
 });

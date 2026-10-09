@@ -1,5 +1,5 @@
 import type { IssueFilter, SortSpec } from '@poietic-tech/issues-schema';
-import { api, call, type Issue } from './api.ts';
+import { api, call, type Issue, signedInUser } from './api.ts';
 
 /** Query keys. Issues are cached by key (`ENG-42`), lists by project + query. */
 export const keys = {
@@ -32,7 +32,7 @@ export interface IssueListQuery {
 }
 
 export const fetchers = {
-  me: () => call(api.GET('/me')),
+  me: async () => signedInUser(await call(api.GET('/me'))),
   authConfig: () => call(api.GET('/auth/config')),
   projects: async () => (await call(api.GET('/projects', { params: { query: {} } }))).data,
   project: (key: string) =>

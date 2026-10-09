@@ -20,7 +20,7 @@ import {
   CreateProjectInputSchema,
   CreateStatusInputSchema,
   LabelSchema,
-  ProjectSchema,
+  ProjectWithAccessSchema,
   StatusSchema,
   UpdateLabelInputSchema,
   UpdateProjectInputSchema,
@@ -42,9 +42,12 @@ export function registerProjectRoutes(app: TrackerApp) {
       path: '/projects',
       tags,
       summary: 'List projects',
+      description:
+        'Projects the caller can read: public ones (also for signed-out visitors), private ones they are a ' +
+        "member of, and every project for admins. `myAccess` is the caller's level on each.",
       request: { query: z.object({ includeArchived: BooleanQuery }) },
       responses: {
-        200: json(z.object({ data: z.array(ProjectSchema) }), 'Projects'),
+        200: json(z.object({ data: z.array(ProjectWithAccessSchema) }), 'Projects'),
         ...errorResponses(),
       },
     }),
@@ -57,10 +60,11 @@ export function registerProjectRoutes(app: TrackerApp) {
       tags,
       summary: 'Create a project',
       description:
-        'Admin only. Creates the default workflow (Backlog → Canceled) and shared list and board views.',
+        'Admin only. Creates the default workflow (Backlog → Canceled) and shared list and board views. ' +
+        '`visibility` defaults to `private`.',
       request: { body: jsonBody(CreateProjectInputSchema) },
       responses: {
-        201: json(ProjectSchema, 'Created'),
+        201: json(ProjectWithAccessSchema, 'Created'),
         ...errorResponses('FORBIDDEN', 'CONFLICT'),
       },
     }),
@@ -72,8 +76,13 @@ export function registerProjectRoutes(app: TrackerApp) {
       path: '/projects/{project}',
       tags,
       summary: 'Get a project',
+      description:
+        'Public projects are readable by anyone, private ones by members and admins; others get `NOT_FOUND`.',
       request: { params: projectParam },
-      responses: { 200: json(ProjectSchema, 'Project'), ...errorResponses('NOT_FOUND') },
+      responses: {
+        200: json(ProjectWithAccessSchema, 'Project'),
+        ...errorResponses('NOT_FOUND'),
+      },
     }),
     async (c) => c.json(await getProject(c.get('ctx'), c.req.valid('param').project), 200),
   );
@@ -83,10 +92,12 @@ export function registerProjectRoutes(app: TrackerApp) {
       path: '/projects/{project}',
       tags,
       summary: 'Update a project',
-      description: 'Archiving (`archived: true`) is admin only. Project keys are immutable.',
+      description:
+        'Name, description and visibility need manage. Archiving (`archived: true`) is admin only. ' +
+        'Project keys are immutable.',
       request: { params: projectParam, body: jsonBody(UpdateProjectInputSchema) },
       responses: {
-        200: json(ProjectSchema, 'Updated'),
+        200: json(ProjectWithAccessSchema, 'Updated'),
         ...errorResponses('FORBIDDEN', 'NOT_FOUND'),
       },
     }),

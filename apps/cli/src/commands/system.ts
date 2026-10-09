@@ -1,6 +1,6 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createClient, unwrap } from '@poietic-tech/issues-client';
+import { createClient, type Schemas, unwrap } from '@poietic-tech/issues-client';
 import {
   bootstrapAdmin,
   createContext,
@@ -77,6 +77,16 @@ function jsonSchema(name: string): Record<string, unknown> {
   }) as Record<string, unknown>;
 }
 
+/** `GET /me` answers `{ anonymous: true }` without credentials; the CLI treats that as not signed in. */
+function signedIn(me: Schemas['Me']): Schemas['User'] {
+  if ('anonymous' in me)
+    throw new CliError(
+      'UNAUTHENTICATED',
+      'Not signed in: set POIETIC_ISSUES_TOKEN or run `poietic-issues auth login`',
+    );
+  return me;
+}
+
 export function authCommand(io: CliIO): Command {
   const act = actFor(io);
   const cmd = new Command('auth').description(
@@ -99,7 +109,7 @@ export function authCommand(io: CliIO): Command {
           token,
           ...(rt.io.fetch && { fetch: rt.io.fetch }),
         });
-        const me = unwrap(await client.GET('/me'));
+        const me = signedIn(unwrap(await client.GET('/me')));
         const config = readUserConfig(rt.io.env);
         config.tokens[server] = token;
         config.defaultServer = server;
@@ -131,7 +141,7 @@ export function authCommand(io: CliIO): Command {
     .action(
       act(async (rt) => {
         const api = await rt.api();
-        const me = await rt.call(api.GET('/me'));
+        const me = signedIn(await rt.call(api.GET('/me')));
         const status = {
           mode: rt.config.mode,
           transport: await rt.describeTransport(),
@@ -161,7 +171,7 @@ export function whoamiCommand(io: CliIO): Command {
       const api = await rt.api();
       rt.out.item(
         'user',
-        await rt.call(api.GET('/me')),
+        signedIn(await rt.call(api.GET('/me'))),
         (u) => `@${String(u.handle)} (${String(u.kind)}, ${String(u.role)})\n`,
       );
     }),
