@@ -76,7 +76,7 @@ export async function updateLabel(
   try {
     return await withWriteTx(ctx.db, async (tx) => {
       const row = await labelRow(tx, labelId);
-      await requireProjectId(ctx, tx, row.project_id, 'write');
+      await requireProjectId(ctx, tx, row.project_id, 'write', 'Label', labelId);
       const before = toLabel(row);
       const updated = await tx
         .updateTable('labels')
@@ -104,7 +104,7 @@ export async function updateLabel(
 export async function deleteLabel(ctx: ServiceContext, labelId: string): Promise<Label> {
   return withWriteTx(ctx.db, async (tx) => {
     const row = await labelRow(tx, labelId);
-    await requireProjectId(ctx, tx, row.project_id, 'write');
+    await requireProjectId(ctx, tx, row.project_id, 'write', 'Label', labelId);
     await tx.deleteFrom('labels').where('id', '=', row.id).execute();
     const label = toLabel(row);
     await recordEvent(tx, ctx, 'label.deleted', { projectId: label.projectId, data: { label } });

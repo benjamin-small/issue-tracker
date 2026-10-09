@@ -93,7 +93,7 @@ export async function listCustomFields(
 
 export async function getCustomField(ctx: ServiceContext, id: string): Promise<CustomField> {
   const field = await fieldById(ctx.db.kysely, id);
-  await requireProjectId(ctx, ctx.db.kysely, field.projectId, 'read');
+  await requireProjectId(ctx, ctx.db.kysely, field.projectId, 'read', 'Custom field', id);
   return field;
 }
 
@@ -183,7 +183,7 @@ export async function updateCustomField(
   const patch = parseInput(UpdateCustomFieldInputSchema, input);
   return withWriteTx(ctx.db, async (tx) => {
     const before = await fieldById(tx, id);
-    await requireProjectId(ctx, tx, before.projectId, 'write');
+    await requireProjectId(ctx, tx, before.projectId, 'write', 'Custom field', id);
     const now = nowIso(ctx);
     await tx
       .updateTable('custom_fields')
@@ -220,7 +220,7 @@ export async function updateCustomField(
 export async function deleteCustomField(ctx: ServiceContext, id: string): Promise<CustomField> {
   return withWriteTx(ctx.db, async (tx) => {
     const field = await fieldById(tx, id);
-    await requireProjectId(ctx, tx, field.projectId, 'manage');
+    await requireProjectId(ctx, tx, field.projectId, 'manage', 'Custom field', id);
     await tx.deleteFrom('custom_fields').where('id', '=', field.id).execute();
     await recordEvent(tx, ctx, 'field.deleted', { projectId: field.projectId, data: { field } });
     return field;
@@ -235,7 +235,7 @@ export async function addFieldOption(
 ): Promise<CustomField> {
   return withWriteTx(ctx.db, async (tx) => {
     const before = await fieldById(tx, fieldId);
-    await requireProjectId(ctx, tx, before.projectId, 'write');
+    await requireProjectId(ctx, tx, before.projectId, 'write', 'Custom field', fieldId);
     if (!SELECT_TYPES.has(before.type))
       throw validationError(`"${before.key}" is a ${before.type} field; it has no options`);
     await insertOption(tx, ctx, before.id, input, before.options.length);
@@ -265,7 +265,7 @@ export async function updateFieldOption(
       : undefined;
     if (!row) throw notFound('Option', optionId);
     const before = await fieldById(tx, row.field_id);
-    await requireProjectId(ctx, tx, before.projectId, 'write');
+    await requireProjectId(ctx, tx, before.projectId, 'write', 'Option', optionId);
     const now = nowIso(ctx);
     await tx
       .updateTable('custom_field_options')

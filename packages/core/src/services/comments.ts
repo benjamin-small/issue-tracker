@@ -121,7 +121,7 @@ async function editableComment(tx: Tx, ctx: ServiceContext, id: string) {
   const comment = isIdOf('comment', id) ? await loadComment(tx, id) : undefined;
   if (!comment || comment.deletedAt) throw notFound('Comment', id);
   const { projectId } = await issueRefFor(tx, comment.issueId);
-  const project = await requireProjectId(ctx, tx, projectId, 'write');
+  const project = await requireProjectId(ctx, tx, projectId, 'write', 'Comment', id);
   if (comment.authorId !== ctx.actor.id && !atLeast(await projectLevel(ctx, tx, project), 'manage'))
     throw forbidden('You can only change your own comments');
   return comment;

@@ -26,14 +26,23 @@ export async function getProjectRow(ctx: ServiceContext, db: Exec, ref: string, 
   return row;
 }
 
-/** `getProjectRow` for an id read from another row (a label's, a comment's issue's, …). */
+/**
+ * Access check for a row found by its own id (a label, a comment, …) that belongs to `projectId`.
+ * Failures are reported about the row (`what` and `ref`, e.g. `'Label'`, `lbl_…`), never the project, so an
+ * unreadable row is indistinguishable from one that doesn't exist.
+ */
 export async function requireProjectId(
   ctx: ServiceContext,
   db: Exec,
   projectId: string,
   level: Need,
+  what: string,
+  ref: string,
 ) {
-  return getProjectRow(ctx, db, projectId, level);
+  const row = await findProject(db, projectId);
+  if (!row) throw notFound(what, ref);
+  requireLevel(ctx, await projectLevel(ctx, db, row), level, what, ref);
+  return row;
 }
 
 /** Resolves an issue by id (`iss_…`) or key (`ENG-42`). Includes soft-deleted issues. */

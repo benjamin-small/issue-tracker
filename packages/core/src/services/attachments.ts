@@ -179,7 +179,7 @@ export async function getAttachment(
   const attachment = await loadAttachment(ctx.db.kysely, id);
   if (!attachment || attachment.deletedAt) throw notFound('Attachment', id);
   const { projectId } = await issueRef(ctx.db.kysely, attachment.issueId);
-  await requireProjectId(ctx, ctx.db.kysely, projectId, 'read');
+  await requireProjectId(ctx, ctx.db.kysely, projectId, 'read', 'Attachment', id);
   return attachment;
 }
 
@@ -193,7 +193,7 @@ export async function deleteAttachment(
     const attachment = await loadAttachment(tx, id);
     if (!attachment || attachment.deletedAt) throw notFound('Attachment', id);
     const { ref, projectId } = await issueRef(tx, attachment.issueId);
-    const project = await requireProjectId(ctx, tx, projectId, 'write');
+    const project = await requireProjectId(ctx, tx, projectId, 'write', 'Attachment', id);
     if (
       attachment.uploader.id !== ctx.actor.id &&
       !atLeast(await projectLevel(ctx, tx, project), 'manage')

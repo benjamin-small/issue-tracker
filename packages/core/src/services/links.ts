@@ -182,7 +182,7 @@ export async function deleteLink(ctx: ServiceContext, linkId: string): Promise<v
           .executeTakeFirst()
       : undefined;
     if (!row) throw notFound('Link', linkId);
-    await requireProjectId(ctx, tx, row.project_id, 'write');
+    await requireProjectId(ctx, tx, row.project_id, 'write', 'Link', linkId);
     const link = {
       id: row.id,
       type: row.key,

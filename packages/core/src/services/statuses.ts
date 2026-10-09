@@ -89,7 +89,7 @@ export async function updateStatus(
   try {
     return await withWriteTx(ctx.db, async (tx) => {
       const row = await statusRowById(tx, statusId);
-      await requireProjectId(ctx, tx, row.project_id, 'write');
+      await requireProjectId(ctx, tx, row.project_id, 'write', 'Status', statusId);
       const before = toStatus(row);
       const updated = await tx
         .updateTable('statuses')
@@ -124,7 +124,7 @@ export async function deleteStatus(
 ): Promise<Status> {
   return withWriteTx(ctx.db, async (tx) => {
     const row = await statusRowById(tx, statusId);
-    await requireProjectId(ctx, tx, row.project_id, 'write');
+    await requireProjectId(ctx, tx, row.project_id, 'write', 'Status', statusId);
     const count = await tx
       .selectFrom('statuses')
       .select((eb) => eb.fn.countAll<number>().as('n'))

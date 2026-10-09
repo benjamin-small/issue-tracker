@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { testDialect } from '@poietic-tech/issues-db/testing';
+import { newId } from '@poietic-tech/issues-schema';
 import { ANONYMOUS_ACTOR, type ServiceContext, withActor } from './context.ts';
 import { createIssue, getIssue, listIssues, updateIssue } from './services/issues.ts';
 import { createProject, getProject } from './services/projects.ts';
@@ -251,5 +252,82 @@ describe(`project visibility (${testDialect()})`, () => {
       code: 'VALIDATION_FAILED',
       message: expect.stringContaining('Unknown issue'),
     });
+  });
+
+  it('reports an unreadable resource exactly like a missing one, without naming its project', async () => {
+    const { createLabel, updateLabel } = await import('./services/labels.ts');
+    const { listStatuses, updateStatus } = await import('./services/statuses.ts');
+    const { createCustomField, getCustomField, updateFieldOption } =
+      await import('./services/custom-fields.ts');
+    const { createComment, updateComment } = await import('./services/comments.ts');
+    const { createView, getView } = await import('./services/views.ts');
+    const { createLink, deleteLink } = await import('./services/links.ts');
+    const { uploadAttachment, getAttachment } = await import('./services/attachments.ts');
+    const blobs = new LocalDiskBlobStore(join(mkdtempSync(join(tmpdir(), 'vis-blobs-')), 'b'));
+
+    const label = await createLabel(t.ctx, 'PRV', { name: 'oracle-label' });
+    const [status] = await listStatuses(t.ctx, 'PRV');
+    const field = await createCustomField(t.ctx, 'PRV', {
+      key: 'oracle',
+      name: 'Oracle',
+      type: 'select',
+      options: [{ value: 'a' }],
+    });
+    const comment = await createComment(t.ctx, 'PRV-1', { body: 'x' });
+    const view = await createView(t.ctx, 'PRV', { name: 'Oracle', layout: 'list', shared: true });
+    await createIssue(t.ctx, 'PRV', { title: 'other' });
+    const link = await createLink(t.ctx, 'PRV-1', { type: 'relates', target: 'PRV-2' });
+    const file = await uploadAttachment(t.ctx, blobs, 'PRV-1', {
+      filename: 'a.txt',
+      data: new TextEncoder().encode('hi'),
+    });
+    await revoke('PRV', t.member);
+
+    const message = async (p: Promise<unknown>) => {
+      const error = await p.then(
+        () => undefined,
+        (e: unknown) => e as { code: string; message: string },
+      );
+      expect(error?.code).toBe('NOT_FOUND');
+      return error!.message;
+    };
+    const cases: [string, Promise<unknown>, Promise<unknown>][] = [
+      [
+        'label',
+        updateLabel(t.member, label.id, { name: 'x' }),
+        updateLabel(t.member, newId('label'), { name: 'x' }),
+      ],
+      [
+        'status',
+        updateStatus(t.member, status!.id, { name: 'x' }),
+        updateStatus(t.member, newId('status'), { name: 'x' }),
+      ],
+      ['field', getCustomField(t.member, field.id), getCustomField(t.member, newId('customField'))],
+      [
+        'option',
+        updateFieldOption(t.member, field.options[0]!.id, { label: 'x' }),
+        updateFieldOption(t.member, newId('customFieldOption'), { label: 'x' }),
+      ],
+      [
+        'comment',
+        updateComment(t.member, comment.id, { body: 'y' }),
+        updateComment(t.member, newId('comment'), { body: 'y' }),
+      ],
+      ['view', getView(t.member, view.id), getView(t.member, newId('view'))],
+      ['link', deleteLink(t.member, link.id), deleteLink(t.member, newId('issueLink'))],
+      [
+        'attachment',
+        getAttachment(t.member, file.id),
+        getAttachment(t.member, newId('attachment')),
+      ],
+    ];
+    for (const [name, hidden, missing] of cases) {
+      const hiddenMessage = await message(hidden);
+      const missingMessage = await message(missing);
+      expect(hiddenMessage.replace(/"[^"]*"/, '"id"'), name).toBe(
+        missingMessage.replace(/"[^"]*"/, '"id"'),
+      );
+      expect(hiddenMessage, name).not.toMatch(/Project|prj_/);
+    }
   });
 });

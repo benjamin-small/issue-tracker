@@ -32,7 +32,7 @@ async function visibleViewRow(ctx: ServiceContext, id: string, db: Tx = ctx.db.k
     ? await db.selectFrom('views').selectAll().where('id', '=', id).executeTakeFirst()
     : undefined;
   if (!row || (row.owner_id !== null && row.owner_id !== ctx.actor.id)) throw notFound('View', id);
-  await requireProjectId(ctx, db, row.project_id, 'read');
+  await requireProjectId(ctx, db, row.project_id, 'read', 'View', id);
   return row;
 }
 
@@ -84,7 +84,8 @@ export async function updateView(
   const patch = parseInput(UpdateViewInputSchema, input);
   return withWriteTx(ctx.db, async (tx) => {
     const row = await visibleViewRow(ctx, id, tx);
-    if (row.owner_id === null) await requireProjectId(ctx, tx, row.project_id, 'manage');
+    if (row.owner_id === null)
+      await requireProjectId(ctx, tx, row.project_id, 'manage', 'View', id);
     const updated = await tx
       .updateTable('views')
       .set({
@@ -103,7 +104,8 @@ export async function updateView(
 export async function deleteView(ctx: ServiceContext, id: string): Promise<View> {
   return withWriteTx(ctx.db, async (tx) => {
     const row = await visibleViewRow(ctx, id, tx);
-    if (row.owner_id === null) await requireProjectId(ctx, tx, row.project_id, 'manage');
+    if (row.owner_id === null)
+      await requireProjectId(ctx, tx, row.project_id, 'manage', 'View', id);
     if (row.owner_id === null && ctx.actor.role !== 'admin') {
       const others = await tx
         .selectFrom('views')
