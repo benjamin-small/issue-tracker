@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ID_PREFIXES, isIdOf } from './ids.ts';
+import { ID_PREFIXES, isIdOf, newId } from './ids.ts';
 
 describe('ID_PREFIXES', () => {
   it('are unique', () => {
@@ -9,6 +9,11 @@ describe('ID_PREFIXES', () => {
 
   it('are 3 lowercase letters', () => {
     for (const prefix of Object.values(ID_PREFIXES)) expect(prefix).toMatch(/^[a-z]{3}$/);
+  });
+
+  it('has a prefix for project repos', () => {
+    expect(ID_PREFIXES.projectRepo).toBe('rpo');
+    expect(newId('projectRepo')).toMatch(/^rpo_/);
   });
 });
 

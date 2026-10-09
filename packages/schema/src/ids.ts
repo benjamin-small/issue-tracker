@@ -27,6 +27,7 @@ export const ID_PREFIXES = {
   event: 'evt',
   webhook: 'whk',
   webhookDelivery: 'whd',
+  projectRepo: 'rpo',
 } as const;
 
 export type EntityKind = keyof typeof ID_PREFIXES;

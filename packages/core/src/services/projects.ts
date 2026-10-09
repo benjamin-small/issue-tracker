@@ -59,6 +59,7 @@ export async function createProject(
           key: data.key,
           name: data.name,
           description: data.description,
+          visibility: data.visibility,
           next_issue_number: 1,
           created_at: now,
           updated_at: now,

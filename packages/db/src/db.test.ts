@@ -37,6 +37,7 @@ async function seedBasics(db: TestDb, key = 'ENG') {
         key,
         name: 'Engineering',
         description: '',
+        visibility: 'private',
         next_issue_number: 1,
         created_at: NOW,
         updated_at: NOW,
@@ -270,6 +271,8 @@ describe(`migrations (${dialect})`, () => {
   it('migrate down removes everything and migrate up restores it', async () => {
     const db = await createTestDb();
     try {
+      expect(await migrateDown(db)).toEqual(['0004_project_access']);
+      await expect(sql`select count(*) from project_members`.execute(db.kysely)).rejects.toThrow();
       expect(await migrateDown(db)).toEqual(['0003_user_identities']);
       await expect(sql`select count(*) from user_identities`.execute(db.kysely)).rejects.toThrow();
       expect(await migrateDown(db)).toEqual(['0002_webhook_delivery_details']);
@@ -282,13 +285,55 @@ describe(`migrations (${dialect})`, () => {
         '0001_init',
         '0002_webhook_delivery_details',
         '0003_user_identities',
+        '0004_project_access',
       ]);
       expect(await migrateToLatest(db)).toEqual([
         '0001_init',
         '0002_webhook_delivery_details',
         '0003_user_identities',
+        '0004_project_access',
       ]);
       expect((await migrationStatus(db)).upToDate).toBe(true);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  it('0004 makes active non-admin users editors of existing projects', async () => {
+    const db = await createTestDb();
+    try {
+      await migrateDown(db); // back to 0003
+      const ts = '2026-01-01T00:00:00.000Z';
+      const user = (
+        id: string,
+        handle: string,
+        role: string,
+        kind: string,
+        deactivated: string | null,
+      ) =>
+        sql`insert into users (id, handle, name, email, kind, role, avatar_url, created_at, updated_at, deactivated_at)
+          values (${id}, ${handle}, ${handle}, null, ${kind}, ${role}, null, ${ts}, ${ts}, ${deactivated})`.execute(
+          db.kysely,
+        );
+      await user('usr_m', 'm', 'member', 'human', null);
+      await user('usr_bot', 'bot', 'member', 'agent', null);
+      await user('usr_a', 'a', 'admin', 'human', null);
+      await user('usr_gone', 'gone', 'member', 'human', ts);
+      await sql`insert into projects (id, key, name, description, next_issue_number, created_at, updated_at, archived_at)
+              values ('prj_1', 'ENG', 'Eng', '', 1, ${ts}, ${ts}, null)`.execute(db.kysely);
+      await migrateToLatest(db);
+      const rows = await sql<{ user_id: string; role: string }>`
+      select user_id, role from project_members where project_id = 'prj_1' order by user_id`.execute(
+        db.kysely,
+      );
+      expect(rows.rows).toEqual([
+        { user_id: 'usr_bot', role: 'editor' },
+        { user_id: 'usr_m', role: 'editor' },
+      ]);
+      const vis = await sql<{ visibility: string }>`select visibility from projects`.execute(
+        db.kysely,
+      );
+      expect(vis.rows).toEqual([{ visibility: 'private' }]);
     } finally {
       await db.destroy();
     }

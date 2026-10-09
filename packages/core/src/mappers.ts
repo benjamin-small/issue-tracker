@@ -55,6 +55,7 @@ export function toProject(r: Row<'projects'>): Project {
     key: r.key,
     name: r.name,
     description: r.description,
+    visibility: r.visibility,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     archivedAt: r.archived_at,

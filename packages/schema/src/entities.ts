@@ -112,12 +112,31 @@ export const ProjectKeySchema = z
   )
   .meta({ example: 'ENG' });
 
+export const ProjectVisibilitySchema = z.enum(['public', 'private']).meta({
+  id: 'ProjectVisibility',
+  description: '`public`: anyone can read, even signed out. `private`: members and admins only.',
+});
+export type ProjectVisibility = z.infer<typeof ProjectVisibilitySchema>;
+
+export const ProjectRoleSchema = z.enum(['viewer', 'editor', 'manager']).meta({
+  id: 'ProjectRole',
+  description:
+    '`viewer` reads, `editor` also writes, `manager` also manages settings, repos and members.',
+});
+export type ProjectRole = z.infer<typeof ProjectRoleSchema>;
+
+export const ProjectAccessSchema = z
+  .enum(['read', 'write', 'manage'])
+  .meta({ id: 'ProjectAccess' });
+export type ProjectAccess = z.infer<typeof ProjectAccessSchema>;
+
 export const ProjectSchema = z
   .object({
     id: z.string(),
     key: z.string().meta({ description: 'Immutable issue-key prefix.', example: 'ENG' }),
     name: z.string(),
     description: z.string(),
+    visibility: ProjectVisibilitySchema,
     createdAt: TimestampSchema,
     updatedAt: TimestampSchema,
     archivedAt: TimestampSchema.nullable(),
@@ -125,11 +144,17 @@ export const ProjectSchema = z
   .meta({ id: 'Project' });
 export type Project = z.infer<typeof ProjectSchema>;
 
+export const ProjectWithAccessSchema = ProjectSchema.extend({
+  myAccess: ProjectAccessSchema.meta({ description: "The caller's access to this project." }),
+}).meta({ id: 'ProjectWithAccess' });
+export type ProjectWithAccess = z.infer<typeof ProjectWithAccessSchema>;
+
 export const CreateProjectInputSchema = z
   .object({
     key: ProjectKeySchema,
     name: z.string().min(1).max(100),
     description: z.string().max(10_000).default(''),
+    visibility: ProjectVisibilitySchema.default('private'),
   })
   .meta({ id: 'CreateProjectInput' });
 export type CreateProjectInput = z.input<typeof CreateProjectInputSchema>;
@@ -139,10 +164,34 @@ export const UpdateProjectInputSchema = z
     name: z.string().min(1).max(100),
     description: z.string().max(10_000),
     archived: z.boolean(),
+    visibility: ProjectVisibilitySchema,
   })
   .partial()
   .meta({ id: 'UpdateProjectInput' });
 export type UpdateProjectInput = z.input<typeof UpdateProjectInputSchema>;
+
+export const ProjectMemberSchema = z
+  .object({
+    user: UserSummarySchema,
+    role: ProjectRoleSchema,
+    createdAt: TimestampSchema,
+    updatedAt: TimestampSchema,
+  })
+  .meta({ id: 'ProjectMember' });
+export type ProjectMember = z.infer<typeof ProjectMemberSchema>;
+
+export const AddProjectMemberInputSchema = z
+  .object({
+    user: z.string().meta({ description: 'User id, handle or `me`.', example: '@ada' }),
+    role: ProjectRoleSchema,
+  })
+  .meta({ id: 'AddProjectMemberInput' });
+export type AddProjectMemberInput = z.input<typeof AddProjectMemberInputSchema>;
+
+export const UpdateProjectMemberInputSchema = z
+  .object({ role: ProjectRoleSchema })
+  .meta({ id: 'UpdateProjectMemberInput' });
+export type UpdateProjectMemberInput = z.input<typeof UpdateProjectMemberInputSchema>;
 
 export const STATUS_CATEGORIES = [
   'backlog',
