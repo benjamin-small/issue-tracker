@@ -23,7 +23,7 @@ Committing a `.poietic-issues.json` (`poietic-issues init --project ENG --server
 
 ```sh
 poietic-issues commands --json      # all commands/options/exit codes
-poietic-issues project schema       # valid statuses, labels, users, custom fields for the project
+poietic-issues project schema       # valid statuses, labels, repos, assignable users, custom fields
 ```
 
 ## Recipes

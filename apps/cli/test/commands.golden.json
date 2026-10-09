@@ -923,7 +923,7 @@
     {
       "name": "project schema",
       "aliases": [],
-      "description": "JSON Schema for issue create/update in this project, with live enums (statuses, labels, users, custom fields)",
+      "description": "JSON Schema for issue create/update in this project, with live enums (statuses, labels, repos, assignable users, custom fields)",
       "arguments": [
         {
           "name": "project",

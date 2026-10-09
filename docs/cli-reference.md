@@ -371,7 +371,7 @@ Edit a project
 
 ### `tracker project schema [project]`
 
-JSON Schema for issue create/update in this project, with live enums (statuses, labels, users, custom fields)
+JSON Schema for issue create/update in this project, with live enums (statuses, labels, repos, assignable users, custom fields)
 
 | Argument | Description |
 | --- | --- |

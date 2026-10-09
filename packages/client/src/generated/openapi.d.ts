@@ -1097,7 +1097,7 @@ export interface paths {
         };
         /**
          * JSON Schema for creating issues in this project
-         * @description Input JSON Schema for issue create/update with live enums: status names, label names, user handles and custom fields. Lets agents discover valid values in one call.
+         * @description Input JSON Schema for issue create/update with live enums: status names, label names, linked repos, assignable user handles (editors, managers and admins; `me` only for callers who can write; none for anonymous readers) and custom fields. Lets agents discover valid values in one call.
          */
         get: {
             parameters: {

@@ -114,8 +114,9 @@ export function registerProjectRoutes(app: TrackerApp) {
       tags,
       summary: 'JSON Schema for creating issues in this project',
       description:
-        'Input JSON Schema for issue create/update with live enums: status names, label names, user handles and ' +
-        'custom fields. Lets agents discover valid values in one call.',
+        'Input JSON Schema for issue create/update with live enums: status names, label names, linked repos, ' +
+        'assignable user handles (editors, managers and admins; `me` only for callers who can write; none for ' +
+        'anonymous readers) and custom fields. Lets agents discover valid values in one call.',
       request: { params: projectParam },
       responses: {
         200: json(

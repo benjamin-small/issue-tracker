@@ -148,7 +148,7 @@ export function projectCommand(io: CliIO): Command {
   cmd
     .command('schema')
     .description(
-      'JSON Schema for issue create/update in this project, with live enums (statuses, labels, users, custom fields)',
+      'JSON Schema for issue create/update in this project, with live enums (statuses, labels, repos, assignable users, custom fields)',
     )
     .argument('[project]', 'project key or id')
     .action(

@@ -175,4 +175,6 @@ Every change is appended to the event log. Each event carries a full resource sn
 
 ## Discovery for agents
 
-`GET /projects/{project}/schema/issue` returns JSON Schemas for create and update with live enums: status names, label names, user handles and custom fields. One call tells an agent every valid value.
+`GET /projects/{project}/schema/issue` returns JSON Schemas for create and update with live enums: status names, label names, linked repos (`owner/name`), assignable user handles and custom fields. One call tells an agent every valid value.
+
+The endpoint needs only read access, so it lists only the users who can be assigned: the project's editors and managers, plus admins. `me` is offered only to callers who can write the project. Anonymous readers of a public project get no user handles at all.

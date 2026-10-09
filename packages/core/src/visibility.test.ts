@@ -491,6 +491,59 @@ describe(`project visibility (${testDialect()})`, () => {
     }
   });
 
+  it('lists only users who can write in the issue input schema, and none to anonymous readers', async () => {
+    const { issueInputJsonSchema } = await import('./services/schema.ts');
+    const { addRepo } = await import('./services/repos.ts');
+    const { createCustomField } = await import('./services/custom-fields.ts');
+    const { createUser } = await import('./services/users.ts');
+    await createProject(t.ctx, { key: 'SCH', name: 'Schema', visibility: 'public' });
+    await addRepo(t.ctx, 'SCH', { repo: 'acme/app' });
+    await createCustomField(t.ctx, 'SCH', { key: 'owner', name: 'Owner', type: 'user' });
+    await createUser(t.ctx, { handle: 'outsider', name: 'Outsider' }); // no membership in SCH
+    await grant(t, 'SCH', t.agent, 'editor');
+    await grant(t, 'SCH', t.member, 'viewer');
+    type Prop = { anyOf?: { enum?: unknown[] }[]; examples?: unknown[] };
+    type Shape = {
+      properties: {
+        assignee: Prop;
+        repo: Prop;
+        customFields: { properties: Record<string, Prop> };
+      };
+    };
+    const schemaFor = async (who: ServiceContext) =>
+      (await issueInputJsonSchema(who, 'SCH')) as { create: Shape; update: Shape };
+    const assignees = (s: Shape) => s.properties.assignee.anyOf?.find((a) => a.enum)?.enum;
+
+    // A viewer sees who can be assigned (editors, managers and admins) but is not offered `me`.
+    const viewer = await schemaFor(t.member);
+    expect(assignees(viewer.create)).toEqual(['admin', 'bot']);
+    expect(assignees(viewer.update)).toEqual(['admin', 'bot']);
+    expect(viewer.create.properties.customFields.properties.owner!.examples).toEqual([
+      'admin',
+      'bot',
+    ]);
+
+    // An editor is offered `me` and appears in the list.
+    await grant(t, 'SCH', t.member, 'editor');
+    const editor = await schemaFor(t.member);
+    expect(assignees(editor.create)).toEqual(['me', 'admin', 'bot', 'member']);
+    expect(assignees(editor.update)).toEqual(['me', 'admin', 'bot', 'member']);
+
+    // Anonymous readers get the schema without any user handles.
+    const anon = await schemaFor(withActor(t.ctx, ANONYMOUS_ACTOR));
+    for (const s of [anon.create, anon.update]) {
+      expect(assignees(s)).toBeUndefined();
+      expect(s.properties.customFields.properties.owner!.examples).toBeUndefined();
+    }
+    const text = JSON.stringify(anon);
+    for (const handle of ['admin', 'bot', 'member', 'outsider'])
+      expect(text).not.toContain(`"${handle}"`);
+
+    // Linked repos are part of the readable project, so everyone gets them as an enum.
+    for (const s of [viewer.create, editor.update, anon.create, anon.update])
+      expect(s.properties.repo.anyOf).toEqual([{ enum: ['acme/app'] }, { type: 'null' }]);
+  });
+
   it('applies the event log rules to events read elsewhere (the live stream)', async () => {
     const { filterEventsForViewer, listEvents } = await import('./services/events.ts');
     const { SYSTEM_ACTOR } = await import('./context.ts');
