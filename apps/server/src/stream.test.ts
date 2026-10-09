@@ -6,8 +6,10 @@ import {
   createToken,
   createUser,
   EventTailer,
+  listEvents,
   removeMember,
 } from '@poietic-tech/issues-core';
+import type { TrackerEvent } from '@poietic-tech/issues-schema';
 import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -48,9 +50,10 @@ async function collect(
   done: (m: Message[]) => boolean,
   act?: () => Promise<void>,
   bearer: string | null = token,
+  via: ReturnType<typeof createApp> = app,
 ) {
   const controller = new AbortController();
-  const res = await app.request(`http://t/api/v1/events/stream${query}`, {
+  const res = await via.request(`http://t/api/v1/events/stream${query}`, {
     headers: { ...(bearer && { authorization: `Bearer ${bearer}` }), ...headers },
     signal: controller.signal,
   });
@@ -174,6 +177,54 @@ describe(`SSE /events/stream (${testDialect()})`, () => {
       memberToken,
     );
     expect(titles(messages)).toEqual(['after grant', 'after removal marker']);
+  });
+
+  it('picks up projects created while the stream is open', async () => {
+    const messages = await collect(
+      '',
+      {},
+      sawTitle('in a new public project'),
+      async () => {
+        await createProject(t.ctx, { key: 'NEWP', name: 'New', visibility: 'public' });
+        await createIssue(t.ctx, 'NEWP', { title: 'in a new public project' });
+      },
+      null,
+    );
+    expect(messages.some((m) => m.event === 'project.created')).toBe(true);
+    expect(titles(messages)).toEqual(['in a new public project']);
+  });
+
+  it('loses nothing committed while the stream sets up, and honours a revoke from then', async () => {
+    await addMember(t.ctx, 'OTH', { user: 'member', role: 'viewer' });
+    const before = (await listEvents(t.ctx, { limit: 1000 })).data.at(-1)!.seq;
+    await removeMember(t.ctx, 'OTH', 'member');
+    await createIssue(t.ctx, 'OTH', { title: 'after setup revoke' });
+    await createIssue(t.ctx, 'PUB', { title: 'setup marker' });
+    const pending = (await listEvents(t.ctx, { after: before })).data;
+    // A tailer that delivers these events the moment the route reads its position, i.e. while the
+    // connection is still setting up: anything not subscribed by then misses them.
+    const listeners = new Set<(e: TrackerEvent) => void>();
+    const racing = {
+      get lastSeq() {
+        for (const e of pending.splice(0)) for (const l of listeners) l(e);
+        return before;
+      },
+      subscribe(l: (e: TrackerEvent) => void) {
+        listeners.add(l);
+        return () => listeners.delete(l);
+      },
+    } as unknown as EventTailer;
+    const racingApp = createApp({ db: t.db, tailer: racing });
+    const messages = await collect(
+      '',
+      {},
+      sawTitle('setup marker'),
+      undefined,
+      memberToken,
+      racingApp,
+    );
+    expect(titles(messages)).toEqual(['setup marker']);
+    expect(messages.some((m) => m.event === 'project.member_removed')).toBe(false);
   });
 
   it('lets anonymous viewers stream public projects, and hides private ones', async () => {
