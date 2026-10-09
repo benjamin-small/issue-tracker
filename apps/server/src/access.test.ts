@@ -69,6 +69,14 @@ describe(`anonymous HTTP access (${testDialect()})`, () => {
     expect(admin.myAccess).toBe('manage');
   });
 
+  it('does not reveal whether a user exists through their tokens', async () => {
+    for (const user of ['admin', 'member', 'nobody-here']) {
+      const res = await app.request(`${BASE}/api/v1/users/${user}/tokens`);
+      expect(res.status, user).toBe(401);
+      expect(((await res.json()) as { code: string }).code).toBe('UNAUTHENTICATED');
+    }
+  });
+
   it('still rejects an invalid bearer token instead of falling back to anonymous', async () => {
     const res = await app.request(`${BASE}/api/v1/projects`, {
       headers: { authorization: 'Bearer trk_nope' },

@@ -7,19 +7,15 @@ import {
   type User,
 } from '@poietic-tech/issues-schema';
 import type { z } from 'zod';
-import { type Actor, isAnonymous, nowIso, type ServiceContext } from '../context.ts';
-import { conflict, DomainError, forbidden, isUniqueViolation, parseInput } from '../errors.ts';
+import { type Actor, nowIso, type ServiceContext } from '../context.ts';
+import { conflict, forbidden, isUniqueViolation, parseInput } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';
 import { toUser } from '../mappers.ts';
-import { isAdmin, requireAdmin } from '../permissions.ts';
+import { isAdmin, requireAdmin, requireSignedIn } from '../permissions.ts';
 import { getUserRow } from '../refs.ts';
 
 export function toActor(user: Pick<User, 'id' | 'handle' | 'name' | 'kind' | 'role'>): Actor {
   return { id: user.id, handle: user.handle, name: user.name, kind: user.kind, role: user.role };
-}
-
-function requireSignedIn(ctx: ServiceContext): void {
-  if (isAnonymous(ctx)) throw new DomainError('UNAUTHENTICATED', 'Sign in to see users');
 }
 
 /** Emails are private: only admins and the user themselves see them. */
@@ -34,7 +30,7 @@ export async function listUsers(
   ctx: ServiceContext,
   opts: { includeDeactivated?: boolean } = {},
 ): Promise<User[]> {
-  requireSignedIn(ctx);
+  requireSignedIn(ctx, 'see users');
   let q = ctx.db.kysely
     .selectFrom('users')
     .selectAll()
@@ -46,7 +42,7 @@ export async function listUsers(
 
 /** Gets a user by id, handle, `@handle` or `me`. */
 export async function getUser(ctx: ServiceContext, ref: string): Promise<User> {
-  requireSignedIn(ctx);
+  requireSignedIn(ctx, 'see users');
   return redact(ctx, toUser(await getUserRow(ctx, ctx.db.kysely, ref)));
 }
 
