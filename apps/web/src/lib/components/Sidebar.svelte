@@ -14,7 +14,7 @@
   import type { Project } from '../api.ts';
   import { live } from '../live.svelte.ts';
   import { current, href } from '../nav.ts';
-  import { canManage, canWrite, isSignedIn, type Me } from '../queries.ts';
+  import { canWrite, isSignedIn, type Me } from '../queries.ts';
   import { signOut } from '../session.ts';
   import { applyTheme } from '../theme.ts';
   import { openCreateIssue, ui } from '../ui.svelte.ts';
@@ -121,7 +121,7 @@
               class={link(path === `/p/${p.key}/board`)}
               data-testid="nav-board"><KanbanSquare size={14} /> Board</a
             >
-            {#if canManage(p.myAccess)}
+            {#if canWrite(p.myAccess)}
               <a
                 href={href(`/p/${p.key}/settings`)}
                 class={link(path.startsWith(`/p/${p.key}/settings`))}

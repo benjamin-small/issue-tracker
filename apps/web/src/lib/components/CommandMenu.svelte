@@ -8,7 +8,7 @@
   import { bulkUpdate, cachedIssues, deleteIssues, projectKeyOf, toggleLabel } from '../issues.ts';
   import { navigate, shareUrl, signInPath } from '../nav.ts';
   import { useProjectData } from '../project-data.svelte.ts';
-  import { canManage, canWrite, fetchers, isSignedIn, keys } from '../queries.ts';
+  import { canWrite, fetchers, isSignedIn, keys } from '../queries.ts';
   import { signOut } from '../session.ts';
   import { clearSelection } from '../selection.svelte.ts';
   import { applyTheme } from '../theme.ts';
@@ -290,7 +290,7 @@
                     >{p.name}: Board{#if p.key === currentProject}<Kbd class="ml-auto">G B</Kbd
                       >{/if}</Command.Item
                   >
-                  {#if canManage(p.myAccess)}
+                  {#if canWrite(p.myAccess)}
                     <Command.Item
                       class={item}
                       value={`${p.name} settings`}

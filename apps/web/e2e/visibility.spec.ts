@@ -198,7 +198,9 @@ test('viewers see the members read-only and signed-out visitors cannot open sett
   expect(login.ok()).toBe(true);
   const p = await ctx.newPage();
   await p.goto(`${origin}/p/${key}/settings`);
-  await expect(p.getByText('Only project managers can change these settings.')).toBeVisible();
+  await expect(
+    p.getByText('Only project editors and managers can change these settings.'),
+  ).toBeVisible();
   await expect(p.getByTestId('settings-access').getByText('@grace')).toBeVisible();
   await expect(p.getByRole('button', { name: 'Add member' })).toHaveCount(0);
   await expect(p.getByRole('radio')).toHaveCount(0);
@@ -211,6 +213,52 @@ test('viewers see the members read-only and signed-out visitors cannot open sett
   await expect(a.getByTestId('settings-forbidden')).toBeVisible();
   await expect(a.getByTestId('settings-access')).toHaveCount(0);
   await anon.close();
+});
+
+test('editors change the workflow, labels and fields, and see access read-only', async ({
+  page,
+  browser,
+}) => {
+  const key = unique('ED');
+  await post(page.request, '/projects', { key, name: 'Edited' });
+  await post(page.request, `/projects/${key}/members`, { user: 'grace', role: 'editor' });
+
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  const errors: string[] = [];
+  p.on('pageerror', (error) => errors.push(error.message));
+  await p.goto(`${origin}/p/${key}`);
+  await p.getByRole('link', { name: 'Settings' }).click();
+  await expect(p).toHaveURL(new RegExp(`/p/${key}/settings$`));
+
+  // Manager-only sections are absent or read-only.
+  await expect(p.getByTestId('settings-editor-note')).toBeVisible();
+  await expect(p.getByTestId('settings-access').getByText('@grace')).toBeVisible();
+  await expect(p.getByRole('button', { name: 'Add member' })).toHaveCount(0);
+  await expect(p.getByRole('radio')).toHaveCount(0);
+  await expect(p.getByTestId('settings-repos')).toHaveCount(0);
+  await expect(p.getByTestId('settings-general')).toHaveCount(0);
+
+  // Workflow, labels and custom fields are editable.
+  const statuses = p.getByTestId('settings-statuses');
+  await statuses.getByLabel('New status name').fill('Editor review');
+  await statuses.getByRole('button', { name: 'Add status' }).click();
+  await expect(statuses.getByLabel('Status name', { exact: true }).last()).toHaveValue(
+    'Editor review',
+  );
+  await p.getByPlaceholder('New label').fill('editor-label');
+  await p.getByRole('button', { name: 'Add label' }).click();
+  await expect(
+    p.getByTestId('settings-labels').locator('li[data-label="editor-label"]'),
+  ).toBeVisible();
+  await expect(p.getByTestId('settings-fields')).toBeVisible();
+  await expect(p.getByTestId('new-field')).toBeVisible();
+  expect(errors, 'uncaught errors in the page').toEqual([]);
+  await ctx.close();
 });
 
 test('an issue can be linked to one of the project repos and filtered by it', async ({ page }) => {

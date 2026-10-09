@@ -3,7 +3,7 @@
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { connectLive } from '$lib/live.svelte.ts';
   import { ApiError } from '$lib/api.ts';
-  import { canManage, canWrite, fetchers, isSignedIn, keys } from '$lib/queries.ts';
+  import { canWrite, fetchers, isSignedIn, keys } from '$lib/queries.ts';
   import { openCommand, openCreateIssue, ui } from '$lib/ui.svelte.ts';
   import { PRIORITY_LABELS } from '$lib/format.ts';
   import { bulkUpdate, cachedIssues, deleteIssues } from '$lib/issues.ts';
@@ -142,7 +142,7 @@
       clearTimeout(pendingG);
       pendingG = undefined;
       const suffix = GO[event.key.toLowerCase()];
-      if (suffix === '/settings' && !canManage(access)) return;
+      if (suffix === '/settings' && !canWrite(access)) return;
       if (suffix !== undefined && currentProject) {
         event.preventDefault();
         void navigate(`/p/${currentProject}${suffix}`);

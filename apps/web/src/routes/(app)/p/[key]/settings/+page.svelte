@@ -25,9 +25,12 @@
   const project = useProjectData(() => key);
   const qc = useQueryClient();
   const me = createQuery(() => ({ queryKey: keys.me, queryFn: fetchers.me, staleTime: 300_000 }));
-  /** Signed-in readers who cannot manage see the members read-only; signed-out visitors get a dead end. */
+  /**
+   * Editors change the workflow, labels and custom fields; managers also change access, repos and the project's
+   * details. Signed-in viewers see the members read-only; signed-out visitors get a dead end.
+   */
   const readerOnly = $derived(
-    project.access !== undefined && !project.canManage && me.isSuccess && isSignedIn(me.data),
+    project.access !== undefined && !project.canWrite && me.isSuccess && isSignedIn(me.data),
   );
   const CATEGORY_ITEMS = [
     { value: 'backlog', label: 'Backlog', hint: 'not planned yet' },
@@ -149,11 +152,11 @@
 
 <svelte:head><title>{key} · Settings</title></svelte:head>
 
-{#if project.notFound || (project.access !== undefined && !project.canManage && me.isSuccess && !readerOnly)}
-  <!-- The settings link is shown to managers only; this covers typed or shared URLs of signed-out visitors. -->
+{#if project.notFound || (project.access !== undefined && !project.canWrite && me.isSuccess && !readerOnly)}
+  <!-- The settings link is shown to editors and managers only; this covers typed or shared URLs of signed-out visitors. -->
   <EmptyState
     icon={Lock}
-    title={project.notFound ? `Project ${key} not found` : 'Project settings are for managers'}
+    title={project.notFound ? `Project ${key} not found` : 'Project settings are for members'}
     testid="settings-forbidden"
   >
     {project.notFound
@@ -170,21 +173,29 @@
     <div class="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <h1 class="text-lg font-semibold">Project settings</h1>
       <p class="text-sm text-fg-muted" data-testid="settings-readonly">
-        Only project managers can change these settings.
+        Only project editors and managers can change these settings.
       </p>
       <ProjectAccessSettings projectKey={key} readonly />
     </div>
   </div>
-{:else if project.canManage}
+{:else if project.canWrite}
   <div class="overflow-y-auto">
     <div class="mx-auto max-w-3xl space-y-10 px-4 py-6 sm:px-6 sm:py-8">
       <h1 class="text-lg font-semibold">Project settings</h1>
 
-      <ProjectAccessSettings projectKey={key} />
+      {#if project.canManage}
+        <ProjectAccessSettings projectKey={key} />
 
-      <ProjectReposSettings projectKey={key} />
+        <ProjectReposSettings projectKey={key} />
 
-      <ProjectGeneralSettings projectKey={key} />
+        <ProjectGeneralSettings projectKey={key} />
+      {:else}
+        <p class="text-sm text-fg-muted" data-testid="settings-editor-note">
+          You can change the workflow, labels and custom fields. Only project managers can change
+          access, repositories and the project's details.
+        </p>
+        <ProjectAccessSettings projectKey={key} readonly />
+      {/if}
 
       <section data-testid="settings-statuses">
         <h2 class="mb-1 font-medium">Workflow</h2>
