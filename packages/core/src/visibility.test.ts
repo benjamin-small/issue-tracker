@@ -475,4 +475,24 @@ describe(`project visibility (${testDialect()})`, () => {
     );
     expect((adminEvents[0]!.data.user as { email: string }).email).toBe('o@x.io');
   });
+
+  it('applies the event log rules to events read elsewhere (the live stream)', async () => {
+    const { filterEventsForViewer, listEvents } = await import('./services/events.ts');
+    const { SYSTEM_ACTOR } = await import('./context.ts');
+    const all = (await listEvents(withActor(t.ctx, SYSTEM_ACTOR), { limit: 1000 })).data;
+    const intoPrivate = (e: { type: string; data: unknown }) =>
+      e.type === 'link.created' && JSON.stringify(e.data).includes('PRV-1');
+    expect(all.some(intoPrivate)).toBe(true);
+    expect(all.some((e) => e.type.startsWith('user.'))).toBe(true);
+    await revoke('PRV', t.member);
+    const anon = withActor(t.ctx, ANONYMOUS_ACTOR);
+    for (const who of [anon, t.member, t.ctx]) {
+      const expected = (await listEvents(who, { limit: 1000 })).data;
+      expect(await filterEventsForViewer(who, all), who.actor.handle).toEqual(expected);
+    }
+    const forMember = await filterEventsForViewer(t.member, all);
+    expect(forMember.some(intoPrivate)).toBe(false);
+    expect(forMember.some((e) => e.projectId === null)).toBe(true);
+    expect((await filterEventsForViewer(anon, all)).some((e) => e.projectId === null)).toBe(false);
+  });
 });

@@ -100,6 +100,27 @@ async function dropUnreadableLinks(
   return events.filter((e) => !e.type.startsWith('link.') || linkEnds(e).every((id) => ok.has(id)));
 }
 
+/**
+ * Applies `listEvents`' per-viewer rules to events read some other way (the live stream reads every event as
+ * the system actor and fans it out): only readable projects, project-less (`user.*`) events only for signed-in
+ * viewers, link events only when both issues are readable, and user events redacted. Pass `readable` to reuse
+ * a `readableProjectIds` result.
+ */
+export async function filterEventsForViewer(
+  ctx: ServiceContext,
+  events: TrackerEvent[],
+  readable?: 'all' | string[],
+): Promise<TrackerEvent[]> {
+  const access = readable ?? (await readableProjectIds(ctx, ctx.db.kysely));
+  const redacted = (list: TrackerEvent[]) => list.map((e) => redactEventForViewer(ctx, e));
+  if (access === 'all') return redacted(events);
+  const signedIn = !isAnonymous(ctx);
+  const visible = events.filter((e) =>
+    e.projectId === null ? signedIn : access.includes(e.projectId),
+  );
+  return dropUnreadableLinks(ctx.db.kysely, redacted(visible), access);
+}
+
 /** Loads events by seq (in seq order); missing seqs are skipped. */
 export async function getEventsBySeq(db: Tx, seqs: number[]): Promise<TrackerEvent[]> {
   if (seqs.length === 0) return [];
