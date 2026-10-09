@@ -181,6 +181,8 @@ Store the file somewhere other than R2. Copy the attachments bucket at the same 
 
 The workflow sets the R2 credentials as Worker secrets, deploys, and smoke-checks `/readyz` for up to about 10 minutes (a cold start includes the restore).
 
+**Environment changes:** The new Worker goes live before the container rollout replaces the image, so for a short window the old image can run with the new Worker's environment. Any change to the container's environment contract (`deploy/cloudflare/src/container-env.ts`) must therefore work with both the previous and the new image for one deploy. For example, send both the old and the new variable names for a release, then drop the old ones. See [ADR 0019](adr/0019-cloudflare-containers-with-litestream.md#consequences) for the 2026-10-08 incident.
+
 **Admin:** There is no `docker exec` on a remote container. Use the CLI in remote mode:
 
 ```sh
