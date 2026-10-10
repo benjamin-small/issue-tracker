@@ -14,8 +14,7 @@ import {
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, isUniqueViolation, notFound, parseInput, validationError } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';
-import { requireAdmin } from '../permissions.ts';
-import { getProjectRow } from '../refs.ts';
+import { getProjectRow, requireProjectId } from '../refs.ts';
 
 const SELECT_TYPES = new Set(['select', 'multi_select']);
 const PALETTE = [
@@ -88,12 +87,14 @@ export async function listCustomFields(
   projectRef: string,
   opts: { includeArchived?: boolean } = {},
 ): Promise<CustomField[]> {
-  const project = await getProjectRow(ctx.db.kysely, projectRef);
+  const project = await getProjectRow(ctx, ctx.db.kysely, projectRef, 'read');
   return loadFields(ctx.db.kysely, { projectId: project.id }, opts.includeArchived ?? false);
 }
 
 export async function getCustomField(ctx: ServiceContext, id: string): Promise<CustomField> {
-  return fieldById(ctx.db.kysely, id);
+  const field = await fieldById(ctx.db.kysely, id);
+  await requireProjectId(ctx, ctx.db.kysely, field.projectId, 'read', 'Custom field', id);
+  return field;
 }
 
 async function insertOption(
@@ -137,7 +138,7 @@ export async function createCustomField(
     throw validationError(`Options are only allowed for select and multi_select fields`);
   try {
     return await withWriteTx(ctx.db, async (tx) => {
-      const project = await getProjectRow(tx, projectRef);
+      const project = await getProjectRow(ctx, tx, projectRef, 'write');
       const count = await tx
         .selectFrom('custom_fields')
         .select((eb) => eb.fn.countAll<number>().as('n'))
@@ -182,6 +183,7 @@ export async function updateCustomField(
   const patch = parseInput(UpdateCustomFieldInputSchema, input);
   return withWriteTx(ctx.db, async (tx) => {
     const before = await fieldById(tx, id);
+    await requireProjectId(ctx, tx, before.projectId, 'write', 'Custom field', id);
     const now = nowIso(ctx);
     await tx
       .updateTable('custom_fields')
@@ -214,11 +216,11 @@ export async function updateCustomField(
   });
 }
 
-/** Deletes a field and all its values permanently (admin). Prefer archiving. */
+/** Deletes a field and all its values permanently (project managers). Prefer archiving. */
 export async function deleteCustomField(ctx: ServiceContext, id: string): Promise<CustomField> {
-  requireAdmin(ctx, 'delete custom fields (archive them instead)');
   return withWriteTx(ctx.db, async (tx) => {
     const field = await fieldById(tx, id);
+    await requireProjectId(ctx, tx, field.projectId, 'manage', 'Custom field', id);
     await tx.deleteFrom('custom_fields').where('id', '=', field.id).execute();
     await recordEvent(tx, ctx, 'field.deleted', { projectId: field.projectId, data: { field } });
     return field;
@@ -233,6 +235,7 @@ export async function addFieldOption(
 ): Promise<CustomField> {
   return withWriteTx(ctx.db, async (tx) => {
     const before = await fieldById(tx, fieldId);
+    await requireProjectId(ctx, tx, before.projectId, 'write', 'Custom field', fieldId);
     if (!SELECT_TYPES.has(before.type))
       throw validationError(`"${before.key}" is a ${before.type} field; it has no options`);
     await insertOption(tx, ctx, before.id, input, before.options.length);
@@ -262,6 +265,7 @@ export async function updateFieldOption(
       : undefined;
     if (!row) throw notFound('Option', optionId);
     const before = await fieldById(tx, row.field_id);
+    await requireProjectId(ctx, tx, before.projectId, 'write', 'Option', optionId);
     const now = nowIso(ctx);
     await tx
       .updateTable('custom_field_options')

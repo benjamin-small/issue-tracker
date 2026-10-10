@@ -1,5 +1,5 @@
 import { createToken } from '@poietic-tech/issues-core';
-import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
+import { createTestContext, grant, type TestContext } from '@poietic-tech/issues-core/testing';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
@@ -41,7 +41,7 @@ afterAll(() => t.destroy());
 
 describe(`HTTP API (${testDialect()})`, () => {
   it('requires authentication and answers with problem+json', async () => {
-    const res = await call('GET', '/projects', { token: null });
+    const res = await call('GET', '/users', { token: null });
     expect(res.status).toBe(401);
     expect(res.headers.get('content-type')).toBe('application/problem+json');
     expect(res.body).toMatchObject({
@@ -55,6 +55,7 @@ describe(`HTTP API (${testDialect()})`, () => {
 
   it('creates projects and issues and resolves human refs', async () => {
     const project = await call('POST', '/projects', { body: { key: 'api', name: 'API' } });
+    await grant(t, 'API', t.member, 'editor');
     expect(project.status).toBe(201);
     expect(project.body.key).toBe('API');
     expect(
@@ -354,7 +355,9 @@ describe(`HTTP API (${testDialect()})`, () => {
     expect(crossSite.status).toBe(403);
 
     await call('POST', '/auth/logout', { token: null, headers: { cookie, origin: BASE } });
-    expect((await call('GET', '/me', { token: null, headers: { cookie } })).status).toBe(401);
+    expect((await call('GET', '/me', { token: null, headers: { cookie } })).body).toEqual({
+      anonymous: true,
+    });
 
     const tokenLogin = await call('POST', '/auth/token-login', {
       token: null,

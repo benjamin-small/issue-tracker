@@ -5,7 +5,9 @@ import { createCustomField } from './custom-fields.ts';
 import { createIssue, moveIssue, updateIssue } from './issues.ts';
 import { createLabel } from './labels.ts';
 import { createLink } from './links.ts';
+import { addMember } from './members.ts';
 import { createProject } from './projects.ts';
+import { addRepo } from './repos.ts';
 import { createUserUnchecked, toActor } from './users.ts';
 
 export interface SeedResult {
@@ -16,8 +18,9 @@ export interface SeedResult {
 }
 
 /**
- * Creates demo data for development: an admin (`ada`), a member (`grace`), an agent (`claude`)
- * and an `ENG` project with labels, issues in every column, sub-issues, links and comments.
+ * Creates demo data for development: an admin (`ada`), members (`grace`, `margaret`), an agent (`claude`),
+ * a public `ENG` project (one linked repo; labels, issues in every column, sub-issues, links and comments)
+ * and a private `OPS` project where margaret manages, grace edits and claude only views.
  * Not idempotent — run it on an empty database.
  */
 export async function seedDemoData(ctx: ServiceContext): Promise<SeedResult> {
@@ -38,6 +41,11 @@ export async function seedDemoData(ctx: ServiceContext): Promise<SeedResult> {
     name: 'Claude',
     kind: 'agent',
   });
+  const margaret = await createUserUnchecked(sys, {
+    handle: 'margaret',
+    name: 'Margaret Hamilton',
+    email: 'margaret@example.com',
+  });
   const asAda = withActor(ctx, toActor(ada));
   const asClaude = withActor(ctx, toActor(claude));
 
@@ -45,7 +53,13 @@ export async function seedDemoData(ctx: ServiceContext): Promise<SeedResult> {
     key: 'ENG',
     name: 'Engineering',
     description: 'Product engineering: the web app, API and CLI.',
+    visibility: 'public',
   });
+  // ENG is public: anyone can read it. The non-admin demo users edit it (as migration 0004's backfill
+  // would make them).
+  await addMember(asAda, 'ENG', { user: 'grace', role: 'editor' });
+  await addMember(asAda, 'ENG', { user: 'claude', role: 'editor' });
+  await addRepo(asAda, 'ENG', { repo: 'poietic-tech/poietic-issues' });
   for (const [name, color] of [
     ['bug', '#eb5757'],
     ['feature', '#5e6ad2'],
@@ -76,6 +90,7 @@ export async function seedDemoData(ctx: ServiceContext): Promise<SeedResult> {
     status: 'In Progress',
     assignee: 'ada',
     labels: ['feature'],
+    repo: 'poietic-tech/poietic-issues',
   });
   const kanban = await createIssue(asAda, 'ENG', {
     title: 'Kanban board with customizable cards',
@@ -95,6 +110,7 @@ export async function seedDemoData(ctx: ServiceContext): Promise<SeedResult> {
     assignee: 'claude',
     labels: ['feature'],
     estimate: 3,
+    repo: 'poietic-tech/poietic-issues',
   });
   const bug = await createIssue(asAda, 'ENG', {
     title: 'Dragging a card to an empty column loses its position',
@@ -103,6 +119,7 @@ export async function seedDemoData(ctx: ServiceContext): Promise<SeedResult> {
     labels: ['bug'],
     dueDate: '2026-10-15',
     customFields: { severity: 'high' },
+    repo: 'poietic-tech/poietic-issues',
   });
   await createIssue(asAda, 'ENG', {
     title: 'Write the API guide',
@@ -128,6 +145,29 @@ export async function seedDemoData(ctx: ServiceContext): Promise<SeedResult> {
   });
   await updateIssue(asClaude, cli.key, { addLabels: ['docs'] });
   await moveIssue(asAda, bug.key, { position: 'top' });
+
+  // OPS is private: only members (and admins) can see it, at three different roles.
+  await createProject(asAda, {
+    key: 'OPS',
+    name: 'Operations',
+    description: 'Private: infrastructure, on-call and incident follow-ups.',
+    visibility: 'private',
+  });
+  await addMember(asAda, 'OPS', { user: 'margaret', role: 'manager' });
+  await addMember(asAda, 'OPS', { user: 'grace', role: 'editor' });
+  await addMember(asAda, 'OPS', { user: 'claude', role: 'viewer' });
+  const asMargaret = withActor(ctx, toActor(margaret));
+  await createIssue(asMargaret, 'OPS', {
+    title: 'Rotate the production database credentials',
+    priority: 1,
+    status: 'Todo',
+  });
+  await createIssue(asMargaret, 'OPS', {
+    title: 'Write the on-call runbook',
+    description: 'Only members of this project can see this issue.',
+    priority: 2,
+    status: 'In Progress',
+  });
 
   const agentToken = (await createToken(asClaude, 'claude', { name: 'dev seed' })).token;
   const adminToken = (await createToken(asAda, 'ada', { name: 'dev seed' })).token;

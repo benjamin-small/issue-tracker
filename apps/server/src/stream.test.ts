@@ -1,4 +1,15 @@
-import { createIssue, createProject, createToken, EventTailer } from '@poietic-tech/issues-core';
+import {
+  addMember,
+  createIssue,
+  createLink,
+  createProject,
+  createToken,
+  createUser,
+  EventTailer,
+  listEvents,
+  removeMember,
+} from '@poietic-tech/issues-core';
+import type { TrackerEvent } from '@poietic-tech/issues-schema';
 import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -8,15 +19,18 @@ let t: TestContext;
 let tailer: EventTailer;
 let app: ReturnType<typeof createApp>;
 let token: string;
+let memberToken: string;
 
 beforeAll(async () => {
   t = await createTestContext();
   await createProject(t.ctx, { key: 'SSE', name: 'SSE' });
   await createProject(t.ctx, { key: 'OTH', name: 'Other' });
+  await createProject(t.ctx, { key: 'PUB', name: 'Public', visibility: 'public' });
   tailer = new EventTailer(t.db, { intervalMs: 50 });
   await tailer.start();
   app = createApp({ db: t.db, tailer });
   token = (await createToken(t.ctx, 'admin', { name: 'sse' })).token;
+  memberToken = (await createToken(t.member, 'member', { name: 'sse' })).token;
 });
 afterAll(async () => {
   await tailer.stop();
@@ -35,10 +49,12 @@ async function collect(
   headers: Record<string, string>,
   done: (m: Message[]) => boolean,
   act?: () => Promise<void>,
+  bearer: string | null = token,
+  via: ReturnType<typeof createApp> = app,
 ) {
   const controller = new AbortController();
-  const res = await app.request(`http://t/api/v1/events/stream${query}`, {
-    headers: { authorization: `Bearer ${token}`, ...headers },
+  const res = await via.request(`http://t/api/v1/events/stream${query}`, {
+    headers: { ...(bearer && { authorization: `Bearer ${bearer}` }), ...headers },
     signal: controller.signal,
   });
   expect(res.status).toBe(200);
@@ -108,8 +124,144 @@ describe(`SSE /events/stream (${testDialect()})`, () => {
     expect(titles).toEqual(['missed 1', 'missed 2']);
   });
 
-  it('requires authentication', async () => {
-    const res = await app.request('http://t/api/v1/events/stream');
-    expect(res.status).toBe(401);
+  /** Issue titles of the `issue.created` messages received. */
+  const titles = (messages: Message[]) =>
+    messages
+      .filter((m) => m.event === 'issue.created')
+      .map((m) => JSON.parse(m.data!).data.issue.title as string);
+  const sawTitle = (title: string) => (m: Message[]) => titles(m).includes(title);
+
+  it('streams only what the viewer can read', async () => {
+    let seq = 0;
+    const act = async () => {
+      const n = ++seq;
+      const prv = await createIssue(t.ctx, 'OTH', { title: `private ${n}` });
+      const pub = await createIssue(t.ctx, 'PUB', { title: `public ${n}` });
+      await createLink(t.ctx, pub.key, { type: 'relates', target: prv.key });
+      await createUser(t.ctx, { handle: `sse-user-${n}`, name: 'SSE', email: `u${n}@x.io` });
+      await createIssue(t.ctx, 'PUB', { title: `done ${n}` });
+    };
+
+    const member = await collect('', {}, sawTitle('done 1'), act, memberToken);
+    expect(titles(member)).toEqual(['public 1', 'done 1']);
+    expect(member.some((m) => m.event?.startsWith('link.'))).toBe(false);
+    const users = member.filter((m) => m.event === 'user.created');
+    expect(users).toHaveLength(1);
+    expect(JSON.parse(users[0]!.data!).data.user.email).toBeNull();
+
+    const anonymous = await collect('', {}, sawTitle('done 2'), act, null);
+    expect(titles(anonymous)).toEqual(['public 2', 'done 2']);
+    expect(anonymous.some((m) => m.event?.startsWith('link.'))).toBe(false);
+    expect(anonymous.some((m) => m.event?.startsWith('user.'))).toBe(false);
+
+    const admin = await collect('', {}, sawTitle('done 3'), act);
+    expect(titles(admin)).toEqual(['private 3', 'public 3', 'done 3']);
+    expect(admin.some((m) => m.event === 'link.created')).toBe(true);
+    const adminUsers = admin.filter((m) => m.event === 'user.created');
+    expect(JSON.parse(adminUsers[0]!.data!).data.user.email).toBe('u3@x.io');
+  });
+
+  it('follows membership changes while the stream is open', async () => {
+    const messages = await collect(
+      '',
+      {},
+      sawTitle('after removal marker'),
+      async () => {
+        await createIssue(t.ctx, 'OTH', { title: 'before grant' });
+        await addMember(t.ctx, 'OTH', { user: 'member', role: 'viewer' });
+        await createIssue(t.ctx, 'OTH', { title: 'after grant' });
+        await removeMember(t.ctx, 'OTH', 'member');
+        await createIssue(t.ctx, 'OTH', { title: 'after removal' });
+        await createIssue(t.ctx, 'PUB', { title: 'after removal marker' });
+      },
+      memberToken,
+    );
+    expect(titles(messages)).toEqual(['after grant', 'after removal marker']);
+  });
+
+  it('picks up projects created while the stream is open', async () => {
+    const messages = await collect(
+      '',
+      {},
+      sawTitle('in a new public project'),
+      async () => {
+        await createProject(t.ctx, { key: 'NEWP', name: 'New', visibility: 'public' });
+        await createIssue(t.ctx, 'NEWP', { title: 'in a new public project' });
+      },
+      null,
+    );
+    expect(messages.some((m) => m.event === 'project.created')).toBe(true);
+    expect(titles(messages)).toEqual(['in a new public project']);
+  });
+
+  it('loses nothing committed while the stream sets up, and honours a revoke from then', async () => {
+    await addMember(t.ctx, 'OTH', { user: 'member', role: 'viewer' });
+    const before = (await listEvents(t.ctx, { limit: 1000 })).data.at(-1)!.seq;
+    await removeMember(t.ctx, 'OTH', 'member');
+    await createIssue(t.ctx, 'OTH', { title: 'after setup revoke' });
+    await createIssue(t.ctx, 'PUB', { title: 'setup marker' });
+    const pending = (await listEvents(t.ctx, { after: before })).data;
+    // A tailer that delivers these events the moment the route reads its position, i.e. while the
+    // connection is still setting up: anything not subscribed by then misses them.
+    const listeners = new Set<(e: TrackerEvent) => void>();
+    const racing = {
+      get lastSeq() {
+        for (const e of pending.splice(0)) for (const l of listeners) l(e);
+        return before;
+      },
+      subscribe(l: (e: TrackerEvent) => void) {
+        listeners.add(l);
+        return () => listeners.delete(l);
+      },
+    } as unknown as EventTailer;
+    const racingApp = createApp({ db: t.db, tailer: racing });
+    const messages = await collect(
+      '',
+      {},
+      sawTitle('setup marker'),
+      undefined,
+      memberToken,
+      racingApp,
+    );
+    expect(titles(messages)).toEqual(['setup marker']);
+    expect(messages.some((m) => m.event === 'project.member_removed')).toBe(false);
+  });
+
+  it('drops its subscription when setting up the stream fails', async () => {
+    const listeners = new Set<(e: TrackerEvent) => void>();
+    const counting = {
+      lastSeq: 0,
+      subscribe(l: (e: TrackerEvent) => void) {
+        listeners.add(l);
+        return () => listeners.delete(l);
+      },
+    } as unknown as EventTailer;
+    // The access read is the first database call of an anonymous stream; make it fail.
+    const broken = new Proxy(t.db, {
+      get(target, prop, receiver) {
+        if (prop === 'kysely') throw new Error('database unavailable');
+        return Reflect.get(target, prop, receiver) as unknown;
+      },
+    });
+    const brokenApp = createApp({ db: broken, tailer: counting });
+    const res = await brokenApp.request('http://t/api/v1/events/stream');
+    const reader = res.body!.getReader();
+    while (!(await reader.read()).done);
+    expect(listeners.size).toBe(0);
+  });
+
+  it('lets anonymous viewers stream public projects, and hides private ones', async () => {
+    const res = await app.request('http://t/api/v1/events/stream?project=OTH');
+    expect(res.status).toBe(404);
+    const messages = await collect(
+      '?project=PUB',
+      {},
+      sawTitle('anonymous live'),
+      async () => {
+        await createIssue(t.ctx, 'PUB', { title: 'anonymous live' });
+      },
+      null,
+    );
+    expect(titles(messages)).toEqual(['anonymous live']);
   });
 });

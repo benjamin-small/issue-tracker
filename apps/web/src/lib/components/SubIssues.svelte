@@ -7,7 +7,11 @@
   import { openCreateIssue } from '../ui.svelte.ts';
   import StatusIcon from './StatusIcon.svelte';
 
-  let { issue, onopen }: { issue: Issue; onopen: (key: string) => void } = $props();
+  let {
+    issue,
+    onopen,
+    canWrite,
+  }: { issue: Issue; onopen: (key: string) => void; canWrite: boolean } = $props();
   const children = createQuery(() => ({
     queryKey: keys.children(issue.key),
     queryFn: () => fetchers.children(issue.key),
@@ -24,11 +28,13 @@
     {#if children.data?.length}<span class="text-xs text-fg-subtle"
         >{done}/{children.data.length}</span
       >{/if}
-    <button
-      class="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-fg-muted hover:bg-bg-hover"
-      onclick={() => openCreateIssue(projectKeyOf(issue.key), { parent: issue.key })}
-      data-testid="add-sub-issue"><Plus size={12} /> Add</button
-    >
+    {#if canWrite}
+      <button
+        class="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-fg-muted hover:bg-bg-hover"
+        onclick={() => openCreateIssue(projectKeyOf(issue.key), { parent: issue.key })}
+        data-testid="add-sub-issue"><Plus size={12} /> Add</button
+      >
+    {/if}
   </div>
   {#if children.data?.length}
     <div
@@ -59,6 +65,8 @@
       {/each}
     </ul>
   {:else if children.data}
-    <p class="text-sm text-fg-subtle">No sub-issues. Break the work down with Add.</p>
+    <p class="text-sm text-fg-subtle">
+      {canWrite ? 'No sub-issues. Break the work down with Add.' : 'No sub-issues.'}
+    </p>
   {/if}
 </section>

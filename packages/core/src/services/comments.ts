@@ -12,8 +12,8 @@ import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, forbidden, notFound, parseInput } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { toComment, toUserSummary } from '../mappers.ts';
-import { isAdmin } from '../permissions.ts';
-import { getIssueRow } from '../refs.ts';
+import { atLeast, projectLevel } from '../access.ts';
+import { getIssueRow, requireProjectId } from '../refs.ts';
 
 async function loadComment(db: Tx, id: string): Promise<Comment | undefined> {
   const row = await db
@@ -56,7 +56,7 @@ export async function listComments(
   issueRef: string,
   opts: { includeDeleted?: boolean } = {},
 ): Promise<Comment[]> {
-  const issue = await getIssueRow(ctx.db.kysely, issueRef);
+  const issue = await getIssueRow(ctx, ctx.db.kysely, issueRef, 'read');
   let q = ctx.db.kysely
     .selectFrom('comments as c')
     .innerJoin('users as u', 'u.id', 'c.author_id')
@@ -88,7 +88,7 @@ export async function createComment(
 ): Promise<Comment> {
   const data = parseInput(CreateCommentInputSchema, input);
   return withWriteTx(ctx.db, async (tx) => {
-    const issue = await getIssueRow(tx, issueRef);
+    const issue = await getIssueRow(ctx, tx, issueRef, 'write');
     if (issue.deleted_at) throw conflict('Cannot comment on a deleted issue');
     const now = nowIso(ctx);
     const id = ctx.ids('comment');
@@ -120,7 +120,9 @@ export async function createComment(
 async function editableComment(tx: Tx, ctx: ServiceContext, id: string) {
   const comment = isIdOf('comment', id) ? await loadComment(tx, id) : undefined;
   if (!comment || comment.deletedAt) throw notFound('Comment', id);
-  if (comment.authorId !== ctx.actor.id && !isAdmin(ctx))
+  const { projectId } = await issueRefFor(tx, comment.issueId);
+  const project = await requireProjectId(ctx, tx, projectId, 'write', 'Comment', id);
+  if (comment.authorId !== ctx.actor.id && !atLeast(await projectLevel(ctx, tx, project), 'manage'))
     throw forbidden('You can only change your own comments');
   return comment;
 }

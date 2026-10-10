@@ -3,7 +3,7 @@
   import GitBranch from '@lucide/svelte/icons/git-branch';
   import MessageSquare from '@lucide/svelte/icons/message-square';
   import type { Issue } from '../api.ts';
-  import { isOverdue, relativeTime, shortDate } from '../format.ts';
+  import { isOverdue, relativeTime, repoUrl, shortDate } from '../format.ts';
   import type { ProjectData } from '../project-data.svelte.ts';
   import AssigneePicker from './AssigneePicker.svelte';
   import CustomFieldValue from './CustomFieldValue.svelte';
@@ -14,7 +14,8 @@
 
   /**
    * Renders one field-registry field of an issue compactly — used for list columns and board card fields.
-   * Status, priority and assignee are editable in place; custom fields (`cf:<key>`) render their value.
+   * Status, priority and assignee are editable in place (given write access); custom fields (`cf:<key>`)
+   * render their value.
    */
   let {
     issue,
@@ -37,11 +38,16 @@
 {:else if field === 'title'}
   <span class="truncate">{issue.title}</span>
 {:else if field === 'status'}
-  <StatusPicker {issue} statuses={project.statuses} showLabel={!compact} />
+  <StatusPicker
+    {issue}
+    statuses={project.statuses}
+    showLabel={!compact}
+    readonly={!project.canWrite}
+  />
 {:else if field === 'priority'}
-  <PriorityPicker {issue} showLabel={!compact} />
+  <PriorityPicker {issue} showLabel={!compact} readonly={!project.canWrite} />
 {:else if field === 'assignee'}
-  <AssigneePicker {issue} users={project.users} showLabel={!compact} />
+  <AssigneePicker {issue} users={project.users} showLabel={!compact} readonly={!project.canWrite} />
 {:else if field === 'creator'}
   <span class="inline-flex items-center gap-1.5 text-xs text-fg-muted"
     ><Avatar user={issue.creator} size={16} />{#if !compact}{issue.creator.name}{/if}</span
@@ -50,6 +56,15 @@
   {#if issue.labels.length}<span
       class="flex min-w-0 gap-1 {nowrap ? 'overflow-hidden' : 'flex-wrap'}"
       >{#each issue.labels as l (l.id)}<LabelChip label={l} />{/each}</span
+    >{/if}
+{:else if field === 'repo'}
+  {#if issue.repo}<a
+      href={repoUrl(project.repos, issue.repo)}
+      target="_blank"
+      rel="noreferrer"
+      onclick={(e) => e.stopPropagation()}
+      class="truncate text-xs text-fg-muted hover:text-fg hover:underline"
+      title="Open on GitHub">{issue.repo}</a
     >{/if}
 {:else if field === 'estimate'}
   {#if issue.estimate !== null}<span

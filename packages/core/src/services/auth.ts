@@ -10,7 +10,7 @@ import {
 import { type Actor, nowIso, type ServiceContext } from '../context.ts';
 import { forbidden, notFound, parseInput } from '../errors.ts';
 import { toApiToken, toUser } from '../mappers.ts';
-import { isAdmin } from '../permissions.ts';
+import { isAdmin, requireSignedIn } from '../permissions.ts';
 import { getUserRow } from '../refs.ts';
 import { toActor } from './users.ts';
 
@@ -37,6 +37,7 @@ export async function createToken(
   userRef: string,
   input: CreateTokenInput,
 ): Promise<CreatedApiToken> {
+  requireSignedIn(ctx, 'create tokens');
   const data = parseInput(CreateTokenInputSchema, input);
   return withWriteTx(ctx.db, async (tx) => {
     const user = await getUserRow(ctx, tx, userRef);
@@ -65,6 +66,7 @@ export async function createToken(
 
 /** Lists a user's tokens (never includes secrets). */
 export async function listTokens(ctx: ServiceContext, userRef: string): Promise<ApiToken[]> {
+  requireSignedIn(ctx, 'see tokens');
   const user = await getUserRow(ctx, ctx.db.kysely, userRef);
   if (user.id !== ctx.actor.id && !isAdmin(ctx))
     throw forbidden("Only admins can list other users' tokens");
@@ -78,6 +80,7 @@ export async function listTokens(ctx: ServiceContext, userRef: string): Promise<
 }
 
 export async function revokeToken(ctx: ServiceContext, tokenId: string): Promise<ApiToken> {
+  requireSignedIn(ctx, 'revoke tokens');
   return withWriteTx(ctx.db, async (tx) => {
     const row = await tx
       .selectFrom('api_tokens')

@@ -30,13 +30,15 @@ import {
   updateLabel,
   updateView,
 } from './index.ts';
-import { createTestContext, type TestContext } from './testing.ts';
+import { createTestContext, grant, type TestContext } from './testing.ts';
 
 let t: TestContext;
 
 beforeAll(async () => {
   t = await createTestContext();
   await createProject(t.ctx, { key: 'eng', name: 'Engineering' });
+  await grant(t, 'ENG', t.member, 'editor');
+  await grant(t, 'ENG', t.agent, 'editor');
   await createLabel(t.ctx, 'ENG', { name: 'bug', color: '#ff0000' });
   await createLabel(t.ctx, 'ENG', { name: 'feature' });
 });
@@ -248,6 +250,7 @@ describe(`issues (${testDialect()})`, () => {
 describe(`listing, filtering, pagination (${testDialect()})`, () => {
   it('filters with human-friendly refs', async () => {
     await createProject(t.ctx, { key: 'FLT', name: 'Filters' });
+    await grant(t, 'FLT', t.member, 'editor');
     await createLabel(t.ctx, 'FLT', { name: 'bug' });
     await createIssue(t.ctx, 'FLT', {
       title: 'Crash on 100% load',

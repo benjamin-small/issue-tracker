@@ -4,8 +4,8 @@ import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, DomainError, forbidden, notFound } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { toUserSummary } from '../mappers.ts';
-import { isAdmin } from '../permissions.ts';
-import { getIssueRow } from '../refs.ts';
+import { atLeast, projectLevel } from '../access.ts';
+import { getIssueRow, requireProjectId } from '../refs.ts';
 import { type BlobStore, newBlobKey, sha256Hex } from '../storage/blob-store.ts';
 import { sanitizeFilename, sniffContentType } from '../storage/content-type.ts';
 
@@ -107,7 +107,7 @@ export async function uploadAttachment(
       'PAYLOAD_TOO_LARGE',
       `Files are limited to ${Math.round(maxBytes / 1024 / 1024)} MB`,
     );
-  const issue = await getIssueRow(ctx.db.kysely, issueRefOrId);
+  const issue = await getIssueRow(ctx, ctx.db.kysely, issueRefOrId, 'write');
   if (issue.deleted_at) throw conflict('Cannot attach files to a deleted issue');
   const filename = sanitizeFilename(input.filename);
   const contentType = sniffContentType(input.data, filename);
@@ -159,7 +159,7 @@ export async function listAttachments(
   ctx: ServiceContext,
   issueRefOrId: string,
 ): Promise<Attachment[]> {
-  const issue = await getIssueRow(ctx.db.kysely, issueRefOrId);
+  const issue = await getIssueRow(ctx, ctx.db.kysely, issueRefOrId, 'read');
   const rows = await ctx.db.kysely
     .selectFrom('attachments as a')
     .innerJoin('users as u', 'u.id', 'a.uploader_id')
@@ -178,6 +178,8 @@ export async function getAttachment(
 ): Promise<Attachment & { storageKey: string }> {
   const attachment = await loadAttachment(ctx.db.kysely, id);
   if (!attachment || attachment.deletedAt) throw notFound('Attachment', id);
+  const { projectId } = await issueRef(ctx.db.kysely, attachment.issueId);
+  await requireProjectId(ctx, ctx.db.kysely, projectId, 'read', 'Attachment', id);
   return attachment;
 }
 
@@ -190,12 +192,16 @@ export async function deleteAttachment(
   const deleted = await withWriteTx(ctx.db, async (tx) => {
     const attachment = await loadAttachment(tx, id);
     if (!attachment || attachment.deletedAt) throw notFound('Attachment', id);
-    if (attachment.uploader.id !== ctx.actor.id && !isAdmin(ctx))
+    const { ref, projectId } = await issueRef(tx, attachment.issueId);
+    const project = await requireProjectId(ctx, tx, projectId, 'write', 'Attachment', id);
+    if (
+      attachment.uploader.id !== ctx.actor.id &&
+      !atLeast(await projectLevel(ctx, tx, project), 'manage')
+    )
       throw forbidden('You can only delete your own attachments');
     const now = nowIso(ctx);
     await tx.updateTable('attachments').set({ deleted_at: now }).where('id', '=', id).execute();
     const view = { ...publicView(attachment), deletedAt: now };
-    const { ref, projectId } = await issueRef(tx, attachment.issueId);
     await recordEvent(tx, ctx, 'attachment.deleted', {
       projectId,
       issueId: attachment.issueId,

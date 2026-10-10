@@ -86,7 +86,8 @@ describe(`SSO sign-in (${testDialect()})`, () => {
     });
     expect(out.status).toBe(204);
     expect(out.headers.get('set-cookie')).toMatch(/^tracker_session=;/);
-    expect((await app.request(`${BASE}/api/v1/me`, { headers: legacy })).status).toBe(401);
+    const after = await app.request(`${BASE}/api/v1/me`, { headers: legacy });
+    expect(await after.json()).toEqual({ anonymous: true });
   });
 
   it('answers PENDING_APPROVAL for a new non-admin identity, without a session', async () => {

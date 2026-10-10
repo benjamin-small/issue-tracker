@@ -1,0 +1,323 @@
+import type { APIRequestContext } from '@playwright/test';
+import { choose, expect, test } from './fixtures.ts';
+
+const origin = `http://127.0.0.1:${process.env.E2E_PORT ?? 3100}`;
+/** Project keys unique per run, so retries and repeats don't collide with projects made earlier. */
+const unique = (prefix: string) => `${prefix}${Date.now().toString(36).toUpperCase().slice(-6)}`;
+
+async function post(request: APIRequestContext, path: string, data: Record<string, unknown>) {
+  const res = await request.post(`/api/v1${path}`, { data, headers: { origin } });
+  expect(res.ok(), await res.text()).toBe(true);
+  return (await res.json()) as { key: string };
+}
+
+test('anonymous visitors can read a public project but not a private one', async ({
+  page,
+  browser,
+}) => {
+  // `page` is signed in as an admin; its request context seeds the data.
+  const open = unique('OP');
+  const shut = unique('SH');
+  await post(page.request, '/projects', { key: open, name: 'Open', visibility: 'public' });
+  const { key } = await post(page.request, `/projects/${open}/issues`, {
+    title: 'Readable by anyone',
+  });
+  await post(page.request, '/projects', { key: shut, name: 'Shut' });
+
+  const anon = await browser.newContext(); // no session cookie
+  const p = await anon.newPage();
+  const errors: string[] = [];
+  p.on('pageerror', (error) => errors.push(error.message));
+
+  await p.goto(`/p/${open}`);
+  await expect(p.getByText('Readable by anyone')).toBeVisible();
+  await expect(p).not.toHaveURL(/\/login/);
+  await expect(p.getByRole('button', { name: 'Sign in' })).toBeVisible();
+  await expect(p.getByRole('button', { name: /new issue/i })).toHaveCount(0);
+  await expect(p.getByRole('link', { name: 'Settings' })).toHaveCount(0);
+  await expect(p.getByTestId('live-indicator')).toHaveAttribute('data-connected', 'true');
+
+  // Write shortcuts do nothing: no create dialog, no command sub-menu.
+  await p.keyboard.press('c');
+  await expect(p.getByTestId('create-issue-dialog')).toHaveCount(0);
+
+  // The issue reads, but its editing controls are gone.
+  await p.goto(`/i/${key}`);
+  const detail = p.getByTestId('issue-detail');
+  await expect(detail).toBeVisible();
+  await expect(p.getByTestId('issue-title')).toHaveAttribute('readonly', '');
+  await expect(p.getByRole('button', { name: 'Change status' })).toHaveCount(0);
+  await expect(p.getByTestId('delete-issue')).toHaveCount(0);
+  await expect(p.getByTestId('comment-input')).toHaveCount(0);
+  await expect(p.getByTestId('add-attachment')).toHaveCount(0);
+  await expect(p.getByTestId('add-link')).toHaveCount(0);
+  await expect(p.getByTestId('add-sub-issue')).toHaveCount(0);
+
+  // A private project looks like one that does not exist, with a way to sign in.
+  await p.goto(`/p/${shut}`);
+  await expect(p.getByText(/not found/i)).toBeVisible();
+
+  // Signing in from the header comes back to the same page.
+  await p.goto(`/p/${open}`);
+  await p.getByRole('button', { name: 'Sign in' }).click();
+  await expect(p).toHaveURL(new RegExp(`/login\\?next=%2Fp%2F${open}$`));
+  expect(errors, 'uncaught errors in the page').toEqual([]);
+  await anon.close();
+});
+
+test('read-only members see issues without editing controls', async ({ page, browser }) => {
+  const viewed = unique('VW');
+  await post(page.request, '/projects', { key: viewed, name: 'Viewed' });
+  const { key } = await post(page.request, `/projects/${viewed}/issues`, {
+    title: 'Look, no hands',
+  });
+  await post(page.request, `/projects/${viewed}/members`, { user: 'grace', role: 'viewer' });
+
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  await p.goto(`${origin}/p/${viewed}`);
+  await expect(p.getByText('Look, no hands')).toBeVisible();
+  await expect(p.getByRole('button', { name: 'Sign in' })).toHaveCount(0);
+  await expect(p.getByRole('button', { name: /new issue/i })).toHaveCount(0);
+  await expect(p.getByRole('button', { name: 'Change status' })).toHaveCount(0);
+
+  await p.goto(`${origin}/i/${key}`);
+  await expect(p.getByTestId('issue-detail')).toBeVisible();
+  await expect(p.getByTestId('comment-input')).toHaveCount(0);
+  await expect(p.getByTestId('delete-issue')).toHaveCount(0);
+  await ctx.close();
+});
+
+test('signed out, grouping by a person field keeps every issue on the board', async ({
+  page,
+  browser,
+}) => {
+  const key = unique('PF');
+  await post(page.request, '/projects', { key, name: 'People', visibility: 'public' });
+  await post(page.request, `/projects/${key}/fields`, {
+    key: 'owner',
+    name: 'Owner',
+    type: 'user',
+  });
+  const owned = await post(page.request, `/projects/${key}/issues`, {
+    title: 'Owned by Grace',
+    customFields: { owner: 'grace' },
+  });
+  const unowned = await post(page.request, `/projects/${key}/issues`, { title: 'Owned by nobody' });
+
+  const anon = await browser.newContext();
+  const p = await anon.newPage();
+  await p.goto(`/p/${key}/board`);
+  await p.getByTestId('display-options').click();
+  await choose(p, 'Group by', 'Owner');
+  await p.keyboard.press('Escape');
+  // Signed out, the user directory is unavailable, so Grace is an unnamed column; nothing drops out.
+  const column = (name: RegExp | string) =>
+    p.locator('[data-testid="board-column"]').filter({ has: p.getByText(name) });
+  await expect(column(/Unknown user/).locator(`[data-key="${owned.key}"]`)).toBeVisible();
+  await expect(column('No Owner').locator(`[data-key="${unowned.key}"]`)).toBeVisible();
+  await anon.close();
+});
+
+test('a manager makes a project public, adds a repo and a member', async ({ page }) => {
+  const key = unique('CF');
+  await post(page.request, '/projects', { key, name: 'Config' });
+  await page.goto(`/p/${key}/settings`);
+  await page
+    .getByTestId('settings-access')
+    .getByRole('radio', { name: /Public/ })
+    .check();
+  await expect(page.getByText('Saved')).toBeVisible();
+  await page
+    .getByTestId('settings-repos')
+    .getByPlaceholder('owner/name or GitHub URL')
+    .fill('acme/app');
+  await page.getByTestId('settings-repos').getByRole('button', { name: 'Link repository' }).click();
+  await expect(
+    page.getByTestId('settings-repos').getByRole('link', { name: 'acme/app' }),
+  ).toHaveAttribute('href', 'https://github.com/acme/app');
+  await page.getByTestId('settings-access').getByPlaceholder('@handle').fill('@member');
+  await page.getByTestId('settings-access').getByRole('button', { name: 'Add member' }).click();
+  await expect(page.getByTestId('settings-access').getByText('@member')).toBeVisible();
+});
+
+test('a manager changes a role, then removes a member', async ({ page }) => {
+  const key = unique('RL');
+  await post(page.request, '/projects', { key, name: 'Roles' });
+  await post(page.request, `/projects/${key}/members`, { user: 'member', role: 'viewer' });
+  await page.goto(`/p/${key}/settings`);
+  const access = page.getByTestId('settings-access');
+  const row = access.locator('[data-member="member"]');
+  await expect(row).toBeVisible();
+  await choose(row, 'Role of @member', 'Editor');
+  await expect(page.getByText('@member is now editor')).toBeVisible();
+  await expect(row.getByLabel('Role of @member')).toContainText('Editor');
+  await row.getByRole('button', { name: 'Remove @member' }).click();
+  await page.getByTestId('confirm-ok').click();
+  await expect(row).toHaveCount(0);
+});
+
+test('a manager who demotes themselves drops to read-only settings after confirming', async ({
+  page,
+  browser,
+}) => {
+  const key = unique('SD');
+  await post(page.request, '/projects', { key, name: 'Self' });
+  await post(page.request, `/projects/${key}/members`, { user: 'grace', role: 'manager' });
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  await p.goto(`${origin}/p/${key}/settings`);
+  const row = p.getByTestId('settings-access').locator('[data-member="grace"]');
+  await choose(row, 'Role of @grace', 'Viewer');
+  await p.getByTestId('confirm-ok').click();
+  await expect(p.getByTestId('settings-readonly')).toBeVisible();
+  await expect(p.getByTestId('settings-repos')).toHaveCount(0);
+  await ctx.close();
+});
+
+test('viewers see the members read-only and signed-out visitors cannot open settings', async ({
+  page,
+  browser,
+}) => {
+  const key = unique('RO');
+  await post(page.request, '/projects', { key, name: 'Readonly', visibility: 'public' });
+  await post(page.request, `/projects/${key}/members`, { user: 'grace', role: 'viewer' });
+
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  await p.goto(`${origin}/p/${key}/settings`);
+  await expect(
+    p.getByText('Only project editors and managers can change these settings.'),
+  ).toBeVisible();
+  await expect(p.getByTestId('settings-access').getByText('@grace')).toBeVisible();
+  await expect(p.getByRole('button', { name: 'Add member' })).toHaveCount(0);
+  await expect(p.getByRole('radio')).toHaveCount(0);
+  await expect(p.getByTestId('settings-statuses')).toHaveCount(0);
+  await ctx.close();
+
+  const anon = await browser.newContext();
+  const a = await anon.newPage();
+  await a.goto(`${origin}/p/${key}/settings`);
+  await expect(a.getByTestId('settings-forbidden')).toBeVisible();
+  await expect(a.getByTestId('settings-access')).toHaveCount(0);
+  await anon.close();
+});
+
+test('editors change the workflow, labels and fields, and see access read-only', async ({
+  page,
+  browser,
+}) => {
+  const key = unique('ED');
+  await post(page.request, '/projects', { key, name: 'Edited' });
+  await post(page.request, `/projects/${key}/members`, { user: 'grace', role: 'editor' });
+
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  const errors: string[] = [];
+  p.on('pageerror', (error) => errors.push(error.message));
+  await p.goto(`${origin}/p/${key}`);
+  await p.getByRole('link', { name: 'Settings' }).click();
+  await expect(p).toHaveURL(new RegExp(`/p/${key}/settings$`));
+
+  // Manager-only sections are absent or read-only.
+  await expect(p.getByTestId('settings-editor-note')).toBeVisible();
+  await expect(p.getByTestId('settings-access').getByText('@grace')).toBeVisible();
+  await expect(p.getByRole('button', { name: 'Add member' })).toHaveCount(0);
+  await expect(p.getByRole('radio')).toHaveCount(0);
+  await expect(p.getByTestId('settings-repos')).toHaveCount(0);
+  await expect(p.getByTestId('settings-general')).toHaveCount(0);
+
+  // Workflow, labels and custom fields are editable.
+  const statuses = p.getByTestId('settings-statuses');
+  await statuses.getByLabel('New status name').fill('Editor review');
+  await statuses.getByRole('button', { name: 'Add status' }).click();
+  await expect(statuses.getByLabel('Status name', { exact: true }).last()).toHaveValue(
+    'Editor review',
+  );
+  await p.getByPlaceholder('New label').fill('editor-label');
+  await p.getByRole('button', { name: 'Add label' }).click();
+  await expect(
+    p.getByTestId('settings-labels').locator('li[data-label="editor-label"]'),
+  ).toBeVisible();
+  await expect(p.getByTestId('settings-fields')).toBeVisible();
+  await expect(p.getByTestId('new-field')).toBeVisible();
+  expect(errors, 'uncaught errors in the page').toEqual([]);
+  await ctx.close();
+});
+
+test('an issue can be linked to one of the project repos and filtered by it', async ({ page }) => {
+  const key = unique('RP');
+  await post(page.request, '/projects', { key, name: 'Repos' });
+  await post(page.request, `/projects/${key}/repos`, { repo: 'acme/app' });
+  await post(page.request, `/projects/${key}/repos`, { repo: 'acme/docs' });
+  await post(page.request, `/projects/${key}/issues`, { title: 'Needs a repo' });
+  await post(page.request, `/projects/${key}/issues`, { title: 'Other issue' });
+
+  await page.goto(`/i/${key}-1`);
+  await page.getByRole('button', { name: 'Repository' }).click();
+  await page.getByRole('option', { name: 'acme/app' }).click();
+  await expect(page.getByRole('link', { name: 'acme/app' })).toHaveAttribute(
+    'href',
+    'https://github.com/acme/app',
+  );
+  await expect(page.getByRole('link', { name: 'acme/app' })).toHaveAttribute('target', '_blank');
+
+  // Filter the list by repository, then clear the link again.
+  await page.goto(`/p/${key}`);
+  await expect(page.getByTestId('issue-row')).toHaveCount(2);
+  await page.getByTestId('filter-repo').click();
+  await page.getByRole('option', { name: 'acme/app' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('issue-row')).toHaveCount(1);
+  await expect(page.getByTestId('issue-row')).toContainText('Needs a repo');
+
+  await page.goto(`/i/${key}-1`);
+  await page.getByRole('button', { name: 'Repository' }).click();
+  await page.getByRole('option', { name: 'No repository' }).click();
+  await expect(page.getByRole('link', { name: 'acme/app' })).toHaveCount(0);
+});
+
+test('the create dialog offers the project repos and projects without repos hide the row', async ({
+  page,
+}) => {
+  const key = unique('RC');
+  const bare = unique('RB');
+  await post(page.request, '/projects', { key, name: 'With repos' });
+  await post(page.request, `/projects/${key}/repos`, { repo: 'acme/app' });
+  await post(page.request, '/projects', { key: bare, name: 'No repos' });
+  await post(page.request, `/projects/${bare}/issues`, { title: 'Plain' });
+
+  await page.goto(`/i/${bare}-1`);
+  await expect(page.getByTestId('issue-properties')).toBeVisible();
+  await expect(page.getByText('Repository', { exact: true })).toHaveCount(0);
+
+  await page.goto(`/p/${key}`);
+  await expect(page.getByTestId('filter-bar')).toBeVisible();
+  await page.keyboard.press('c');
+  await expect(page.getByTestId('create-issue-dialog')).toBeVisible();
+  await page.getByTestId('create-title').fill('Born with a repo');
+  await page
+    .getByTestId('create-issue-dialog')
+    .getByRole('button', { name: 'Repository', exact: true })
+    .click();
+  await page.getByRole('option', { name: 'acme/app' }).click();
+  await page.getByTestId('create-submit').click();
+  await page.goto(`/i/${key}-1`);
+  await expect(page.getByRole('link', { name: 'acme/app' })).toBeVisible();
+});

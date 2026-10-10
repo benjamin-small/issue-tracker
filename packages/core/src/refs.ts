@@ -1,9 +1,11 @@
 import type { Kysely, Database, Selectable } from '@poietic-tech/issues-db';
 import { isIdOf, parseIssueKey } from '@poietic-tech/issues-schema';
+import { type AccessLevel, projectLevel, requireLevel } from './access.ts';
 import type { ServiceContext } from './context.ts';
 import { notFound } from './errors.ts';
 
 type Exec = Kysely<Database>;
+type Need = Exclude<AccessLevel, 'none'>;
 
 /** Resolves a project by id (`prj_…`) or key (`ENG`, case-insensitive). */
 export async function findProject(
@@ -16,9 +18,30 @@ export async function findProject(
     : q.where('key', '=', ref.trim().toUpperCase()).executeTakeFirst();
 }
 
-export async function getProjectRow(db: Exec, ref: string) {
+/** Resolves a project the actor may access at `level`; unreadable projects are NOT_FOUND (ADR 0021). */
+export async function getProjectRow(ctx: ServiceContext, db: Exec, ref: string, level: Need) {
   const row = await findProject(db, ref);
   if (!row) throw notFound('Project', ref);
+  requireLevel(ctx, await projectLevel(ctx, db, row), level, 'Project', ref);
+  return row;
+}
+
+/**
+ * Access check for a row found by its own id (a label, a comment, …) that belongs to `projectId`.
+ * Failures are reported about the row (`what` and `ref`, e.g. `'Label'`, `lbl_…`), never the project, so an
+ * unreadable row is indistinguishable from one that doesn't exist.
+ */
+export async function requireProjectId(
+  ctx: ServiceContext,
+  db: Exec,
+  projectId: string,
+  level: Need,
+  what: string,
+  ref: string,
+) {
+  const row = await findProject(db, projectId);
+  if (!row) throw notFound(what, ref);
+  requireLevel(ctx, await projectLevel(ctx, db, row), level, what, ref);
   return row;
 }
 
@@ -40,9 +63,12 @@ export async function findIssue(
     .executeTakeFirst();
 }
 
-export async function getIssueRow(db: Exec, ref: string) {
+/** Resolves an issue whose project the actor may access at `level`. Includes soft-deleted issues. */
+export async function getIssueRow(ctx: ServiceContext, db: Exec, ref: string, level: Need) {
   const row = await findIssue(db, ref);
   if (!row) throw notFound('Issue', ref);
+  const project = await findProject(db, row.project_id);
+  requireLevel(ctx, await projectLevel(ctx, db, project!), level, 'Issue', ref);
   return row;
 }
 

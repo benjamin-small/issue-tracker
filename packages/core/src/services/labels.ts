@@ -11,10 +11,10 @@ import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, isUniqueViolation, notFound, parseInput } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';
 import { toLabel } from '../mappers.ts';
-import { getProjectRow } from '../refs.ts';
+import { getProjectRow, requireProjectId } from '../refs.ts';
 
 export async function listLabels(ctx: ServiceContext, projectRef: string): Promise<Label[]> {
-  const project = await getProjectRow(ctx.db.kysely, projectRef);
+  const project = await getProjectRow(ctx, ctx.db.kysely, projectRef, 'read');
   const rows = await ctx.db.kysely
     .selectFrom('labels')
     .selectAll()
@@ -33,7 +33,7 @@ export async function createLabel(
   const data = parseInput(CreateLabelInputSchema, input);
   try {
     return await withWriteTx(ctx.db, async (tx) => {
-      const project = await getProjectRow(tx, projectRef);
+      const project = await getProjectRow(ctx, tx, projectRef, 'write');
       const now = nowIso(ctx);
       const row = await tx
         .insertInto('labels')
@@ -76,6 +76,7 @@ export async function updateLabel(
   try {
     return await withWriteTx(ctx.db, async (tx) => {
       const row = await labelRow(tx, labelId);
+      await requireProjectId(ctx, tx, row.project_id, 'write', 'Label', labelId);
       const before = toLabel(row);
       const updated = await tx
         .updateTable('labels')
@@ -103,6 +104,7 @@ export async function updateLabel(
 export async function deleteLabel(ctx: ServiceContext, labelId: string): Promise<Label> {
   return withWriteTx(ctx.db, async (tx) => {
     const row = await labelRow(tx, labelId);
+    await requireProjectId(ctx, tx, row.project_id, 'write', 'Label', labelId);
     await tx.deleteFrom('labels').where('id', '=', row.id).execute();
     const label = toLabel(row);
     await recordEvent(tx, ctx, 'label.deleted', { projectId: label.projectId, data: { label } });

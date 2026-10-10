@@ -11,7 +11,13 @@
   import Markdown from './Markdown.svelte';
   import MarkdownEditor from './MarkdownEditor.svelte';
 
-  let { issue, me }: { issue: Issue; me: User | undefined } = $props();
+  /** `me` is undefined for signed-out visitors; `canWrite`/`canManage` come from the project's `myAccess`. */
+  let {
+    issue,
+    me,
+    canWrite,
+    canManage,
+  }: { issue: Issue; me: User | undefined; canWrite: boolean; canManage: boolean } = $props();
   const qc = useQueryClient();
   const upload = markdownUploader(qc, () => issue.key);
   const comments = createQuery(() => ({
@@ -185,7 +191,7 @@
             <span class="text-fg-subtle" title={c.createdAt}
               >{relativeTime(c.createdAt)}{c.editedAt ? ' · edited' : ''}</span
             >
-            {#if me && (me.id === c.authorId || me.role === 'admin') && editing !== c.id}
+            {#if me && canWrite && (me.id === c.authorId || canManage) && editing !== c.id}
               <span class="ml-auto flex gap-2 text-fg-subtle">
                 {#if me.id === c.authorId}
                   <button
@@ -221,22 +227,24 @@
       {/if}
     {/each}
   </ol>
-  <div class="mt-4">
-    <MarkdownEditor
-      bind:value={draft}
-      rows={3}
-      placeholder="Leave a comment…"
-      onsubmit={post}
-      testid="comment-input"
-      {upload}
-    />
-    <div class="mt-2 flex justify-end">
-      <button
-        class={btn.primary}
-        disabled={!draft.trim() || posting}
-        onclick={post}
-        data-testid="comment-submit">Comment</button
-      >
+  {#if canWrite}
+    <div class="mt-4">
+      <MarkdownEditor
+        bind:value={draft}
+        rows={3}
+        placeholder="Leave a comment…"
+        onsubmit={post}
+        testid="comment-input"
+        {upload}
+      />
+      <div class="mt-2 flex justify-end">
+        <button
+          class={btn.primary}
+          disabled={!draft.trim() || posting}
+          onclick={post}
+          data-testid="comment-submit">Comment</button
+        >
+      </div>
     </div>
-  </div>
+  {/if}
 </section>

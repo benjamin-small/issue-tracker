@@ -26,6 +26,7 @@ import { loadIssue, queryIssues } from '../issue-query.ts';
 import { requireAdmin } from '../permissions.ts';
 import { getIssueRow, getProjectRow, getStatusRow, getUserRow } from '../refs.ts';
 import { listEvents } from './events.ts';
+import { findRepo } from './repos.ts';
 
 /** Fields compared to build `changes` in `issue.updated` events. */
 const TRACKED_FIELDS = [
@@ -35,6 +36,7 @@ const TRACKED_FIELDS = [
   'priority',
   'assignee',
   'parent',
+  'repo',
   'labels',
   'estimate',
   'dueDate',
@@ -49,7 +51,7 @@ const TRACKED_FIELDS = [
 
 /** Gets an issue by key (`ENG-42`) or id, including issues in the trash. */
 export async function getIssue(ctx: ServiceContext, ref: string): Promise<Issue> {
-  const row = await getIssueRow(ctx.db.kysely, ref);
+  const row = await getIssueRow(ctx, ctx.db.kysely, ref, 'read');
   return loadIssue(ctx.db.kysely, row.id);
 }
 
@@ -67,13 +69,15 @@ export async function listIssues(
   ctx: ServiceContext,
   input: ListIssuesInput = {},
 ): Promise<Page<Issue>> {
-  const project = input.project ? await getProjectRow(ctx.db.kysely, input.project) : undefined;
+  const project = input.project
+    ? await getProjectRow(ctx, ctx.db.kysely, input.project, 'read')
+    : undefined;
   return queryIssues(ctx, { ...input, projectId: project?.id });
 }
 
 /** Direct children (sub-issues) of an issue, in manual order. */
 export async function listChildren(ctx: ServiceContext, ref: string): Promise<Issue[]> {
-  const row = await getIssueRow(ctx.db.kysely, ref);
+  const row = await getIssueRow(ctx, ctx.db.kysely, ref, 'read');
   const page = await queryIssues(ctx, {
     projectId: row.project_id,
     filter: { conditions: [{ field: 'parent', op: 'eq', value: row.id }] },
@@ -89,7 +93,7 @@ export async function listIssueActivity(
   ref: string,
   opts: { after?: number; limit?: number } = {},
 ): Promise<Page<TrackerEvent>> {
-  const row = await getIssueRow(ctx.db.kysely, ref);
+  const row = await getIssueRow(ctx, ctx.db.kysely, ref, 'read');
   return listEvents(ctx, {
     issue: row.id,
     after: opts.after,
@@ -161,6 +165,7 @@ async function rebalanceColumn(tx: Tx, items: Array<{ id: string; rank: string }
  * or at the top/bottom. Ids refer to issues already in the column.
  */
 async function rankForPlacement(
+  ctx: ServiceContext,
   tx: Tx,
   projectId: string,
   statusId: string,
@@ -169,7 +174,7 @@ async function rankForPlacement(
 ): Promise<string> {
   const items = await columnItems(tx, projectId, statusId, movingId);
   const indexOf = async (ref: string) => {
-    const row = await getIssueRow(tx, ref);
+    const row = await getIssueRow(ctx, tx, ref, 'write');
     const idx = items.findIndex((i) => i.id === row.id);
     if (idx < 0) throw validationError(`Issue "${ref}" is not in the target column`);
     return idx;
@@ -225,12 +230,13 @@ async function resolveAssignee(
 }
 
 async function resolveParent(
+  ctx: ServiceContext,
   tx: Tx,
   issue: { id?: string; projectId: string },
   ref: string | null,
 ) {
   if (ref === null) return null;
-  const parent = await getIssueRow(tx, ref);
+  const parent = await getIssueRow(ctx, tx, ref, 'write');
   if (parent.project_id !== issue.projectId)
     throw invalidRelation('A parent must be in the same project');
   if (parent.deleted_at) throw invalidRelation('The parent issue is deleted');
@@ -249,6 +255,42 @@ async function resolveParent(
     }
   }
   return parent.id;
+}
+
+/** Resolves a repo ref (`rpo_` id, `owner/name` or URL) to one of the project's linked repos. */
+async function resolveRepoId(
+  tx: Tx,
+  project: { id: string; key: string },
+  ref: string | null,
+): Promise<string | null> {
+  if (ref === null) return null;
+  const repo = await findRepo(tx, project.id, ref);
+  if (!repo) throw invalidRelation(`"${ref}" is not linked to project ${project.key}`);
+  return repo.id;
+}
+
+/**
+ * Clears an issue's repo (used when its repo is unlinked), recording `issue.updated`. Trashed issues
+ * can't go through a normal update, so they are cleared directly with the same event.
+ */
+export async function clearIssueRepo(ctx: ServiceContext, tx: Tx, issueId: string): Promise<void> {
+  const row = await getIssueRow(ctx, tx, issueId, 'write');
+  if (!row.deleted_at) {
+    await updateIssueInTx(tx, ctx, issueId, { repo: null });
+    return;
+  }
+  const before = await loadIssue(tx, row.id);
+  await tx
+    .updateTable('issues')
+    .set({ repo_id: null, version: row.version + 1, updated_at: nowIso(ctx) })
+    .where('id', '=', row.id)
+    .execute();
+  const issue = await loadIssue(tx, row.id);
+  await recordEvent(tx, ctx, 'issue.updated', {
+    projectId: row.project_id,
+    issueId: row.id,
+    data: { issue, changes: diff(before, issue, TRACKED_FIELDS) },
+  });
 }
 
 async function setLabels(tx: Tx, ctx: ServiceContext, issueId: string, labelIds: string[]) {
@@ -282,13 +324,14 @@ export async function createIssue(
 ): Promise<Issue> {
   const data = parseInput(CreateIssueInputSchema, input);
   return withWriteTx(ctx.db, async (tx) => {
-    const project = await getProjectRow(tx, projectRef);
+    const project = await getProjectRow(ctx, tx, projectRef, 'write');
     if (project.archived_at) throw conflict(`Project ${project.key} is archived`);
     const status = data.status
       ? await getStatusRow(tx, project.id, data.status)
       : await defaultStatus(tx, project.id);
     const assigneeId = await resolveAssignee(ctx, tx, data.assignee ?? null);
-    const parentId = await resolveParent(tx, { projectId: project.id }, data.parent ?? null);
+    const parentId = await resolveParent(ctx, tx, { projectId: project.id }, data.parent ?? null);
+    const repoId = await resolveRepoId(tx, project, data.repo ?? null);
     const labelIds = await resolveLabelIds(tx, project.id, data.labels);
     const customValues = await resolveCustomFieldValues(tx, ctx, project.id, data.customFields);
     const { next_issue_number } = await tx
@@ -299,7 +342,9 @@ export async function createIssue(
       .executeTakeFirstOrThrow();
     const now = nowIso(ctx);
     const id = ctx.ids('issue');
-    const rank = await rankForPlacement(tx, project.id, status.id, undefined, { position: 'top' });
+    const rank = await rankForPlacement(ctx, tx, project.id, status.id, undefined, {
+      position: 'top',
+    });
     await tx
       .insertInto('issues')
       .values({
@@ -313,6 +358,7 @@ export async function createIssue(
         assignee_id: assigneeId,
         creator_id: ctx.actor.id,
         parent_id: parentId,
+        repo_id: repoId,
         estimate: data.estimate ?? null,
         due_date: data.dueDate ?? null,
         rank,
@@ -351,7 +397,7 @@ export async function updateIssueInTx(
   input: UpdateIssueInput,
 ): Promise<Issue> {
   const patch = parseInput(UpdateIssueInputSchema, input);
-  const row = await getIssueRow(tx, ref);
+  const row = await getIssueRow(ctx, tx, ref, 'write');
   if (row.deleted_at) throw conflict(`Issue ${ref} is deleted; restore it first`);
   checkVersion(row.version, patch.expectedVersion);
   const before = await loadIssue(tx, row.id);
@@ -384,11 +430,17 @@ export async function updateIssueInTx(
   }
   if (patch.parent !== undefined) {
     const parentId = await resolveParent(
+      ctx,
       tx,
       { id: row.id, projectId: row.project_id },
       patch.parent,
     );
     if (parentId !== row.parent_id) set.parent_id = parentId;
+  }
+  if (patch.repo !== undefined) {
+    const project = await getProjectRow(ctx, tx, row.project_id, 'read');
+    const repoId = await resolveRepoId(tx, project, patch.repo);
+    if (repoId !== row.repo_id) set.repo_id = repoId;
   }
 
   let labelIds: string[] | undefined;
@@ -473,13 +525,13 @@ export async function moveIssue(
 ): Promise<Issue> {
   const data = parseInput(MoveIssueInputSchema, input);
   return withWriteTx(ctx.db, async (tx) => {
-    const row = await getIssueRow(tx, ref);
+    const row = await getIssueRow(ctx, tx, ref, 'write');
     if (row.deleted_at) throw conflict(`Issue ${ref} is deleted; restore it first`);
     checkVersion(row.version, data.expectedVersion);
     const before = await loadIssue(tx, row.id);
     const status = data.status ? await getStatusRow(tx, row.project_id, data.status) : undefined;
     const statusId = status?.id ?? row.status_id;
-    const rank = await rankForPlacement(tx, row.project_id, statusId, row.id, data);
+    const rank = await rankForPlacement(ctx, tx, row.project_id, statusId, row.id, data);
     const now = nowIso(ctx);
     await tx
       .updateTable('issues')
@@ -516,7 +568,7 @@ export async function deleteIssue(
 ): Promise<Issue> {
   if (opts.permanent) requireAdmin(ctx, 'permanently delete issues');
   return withWriteTx(ctx.db, async (tx) => {
-    const row = await getIssueRow(tx, ref);
+    const row = await getIssueRow(ctx, tx, ref, 'write');
     checkVersion(row.version, opts.expectedVersion);
     if (opts.permanent) {
       const issue = await loadIssue(tx, row.id);
@@ -548,7 +600,7 @@ export async function deleteIssue(
 /** Restores an issue from the trash. */
 export async function restoreIssue(ctx: ServiceContext, ref: string): Promise<Issue> {
   return withWriteTx(ctx.db, async (tx) => {
-    const row = await getIssueRow(tx, ref);
+    const row = await getIssueRow(ctx, tx, ref, 'write');
     if (!row.deleted_at) return loadIssue(tx, row.id);
     const now = nowIso(ctx);
     await tx

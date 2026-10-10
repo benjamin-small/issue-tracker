@@ -85,6 +85,7 @@ Aliases: `new`
 | `--parent <issue>` | parent issue key, or none |
 | `-e, --estimate <points>` | estimate, or none |
 | `--due <date>` | due date YYYY-MM-DD, or none |
+| `--repo <owner/name>` | one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it |
 | `--set <field=value>` | custom field (repeatable), e.g. --set severity=high --set points=3 |
 | `--meta <key=value>` | metadata entry (repeatable; merged) |
 | `--input <json|@file|->` | full JSON payload (CreateIssueInput / UpdateIssueInput); flags override it |
@@ -111,6 +112,7 @@ Aliases: `update`
 | `--parent <issue>` | parent issue key, or none |
 | `-e, --estimate <points>` | estimate, or none |
 | `--due <date>` | due date YYYY-MM-DD, or none |
+| `--repo <owner/name>` | one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it |
 | `--set <field=value>` | custom field (repeatable), e.g. --set severity=high --set points=3 |
 | `--meta <key=value>` | metadata entry (repeatable; merged) |
 | `--input <json|@file|->` | full JSON payload (CreateIssueInput / UpdateIssueInput); flags override it |
@@ -349,6 +351,7 @@ Create a project with the default workflow (admin)
 | `-k, --key <KEY>` | issue key prefix, e.g. ENG (immutable) **(required)** |
 | `-n, --name <name>` | name **(required)** |
 | `--description <text>` | description |
+| `--visibility <visibility>` | public: anyone can read; private (default): members and admins |
 
 ### `tracker project edit [project]`
 
@@ -362,16 +365,81 @@ Edit a project
 | --- | --- |
 | `-n, --name <name>` | name |
 | `--description <text>` | description |
+| `--visibility <visibility>` | public: anyone can read; private: members and admins |
 | `--archive` | archive the project (admin) |
 | `--unarchive` | unarchive the project (admin) |
 
 ### `tracker project schema [project]`
 
-JSON Schema for issue create/update in this project, with live enums (statuses, labels, users, custom fields)
+JSON Schema for issue create/update in this project, with live enums (statuses, labels, repos, assignable users, custom fields)
 
 | Argument | Description |
 | --- | --- |
 | `project` | project key or id (optional) |
+
+### `tracker project members list`
+
+List the project members
+
+Aliases: `ls`
+
+### `tracker project members add <user>`
+
+Give a user a role on the project (needs manage)
+
+| Argument | Description |
+| --- | --- |
+| `user` | handle, @handle or user id |
+
+| Option | Description |
+| --- | --- |
+| `--role <role>` | viewer reads, editor also writes, manager also manages the project **(required)** |
+
+### `tracker project members set <user>`
+
+Change a member's role (needs manage)
+
+| Argument | Description |
+| --- | --- |
+| `user` | handle, @handle or user id |
+
+| Option | Description |
+| --- | --- |
+| `--role <role>` | the new role **(required)** |
+
+### `tracker project members remove <user>`
+
+Remove a user's role on the project (needs manage)
+
+Aliases: `rm`
+
+| Argument | Description |
+| --- | --- |
+| `user` | handle, @handle or user id |
+
+### `tracker project repo list`
+
+List the linked repositories
+
+Aliases: `ls`
+
+### `tracker project repo add <repo>`
+
+Link a GitHub repository to the project (needs manage)
+
+| Argument | Description |
+| --- | --- |
+| `repo` | owner/name or a github.com URL |
+
+### `tracker project repo remove <repo>`
+
+Unlink a repository (needs manage); issues that named it are cleared. Takes owner/name, a URL or an rpo_ id
+
+Aliases: `rm`
+
+| Argument | Description |
+| --- | --- |
+| `repo` | owner/name, github.com URL or repo id |
 
 ### `tracker status list`
 
@@ -822,6 +890,10 @@ Write .poietic-issues.json here from the global --server/--database, --project a
 
 Apply pending migrations
 
+| Option | Description |
+| --- | --- |
+| `--down` | revert the newest applied migration instead (one step; drops its tables and columns, so back up first; never reverts the first migration) |
+
 ### `tracker db status`
 
 Show applied and pending migrations
@@ -838,7 +910,7 @@ Create the first admin of a fresh installation (migrating if needed) and print t
 
 ### `tracker db seed`
 
-Create demo users (ada, grace, claude), project ENG and sample issues; prints API tokens
+Create demo users (ada admin, grace, margaret, claude agent), public ENG with a linked repo, private OPS and sample issues; prints API tokens
 
 ### `tracker serve`
 

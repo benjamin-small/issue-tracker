@@ -36,6 +36,7 @@ export type FieldType =
   | 'user'
   | 'labels'
   | 'issue'
+  | 'repo'
   | 'select'
   | 'multiSelect';
 
@@ -156,6 +157,16 @@ export const CORE_FIELDS: readonly FieldDescriptor[] = [
     filterOps: NULLABLE_EQUALITY,
     displayable: true,
     get: (i) => i.parentId,
+  }),
+  field({
+    key: 'repo',
+    label: 'Repository',
+    type: 'repo',
+    sortable: false,
+    groupable: true,
+    filterOps: NULLABLE_EQUALITY,
+    displayable: true,
+    get: (i) => i.repo,
   }),
   field({
     key: 'estimate',

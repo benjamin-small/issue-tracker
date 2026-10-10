@@ -278,8 +278,12 @@ export function registerCollaborationRoutes(app: TrackerApp) {
     async (c) => {
       const q = c.req.valid('query');
       const ctx = c.get('ctx');
-      const project = q.project ? (await getProjectRow(ctx.db.kysely, q.project)).id : undefined;
-      const issue = q.issue ? (await getIssueRow(ctx.db.kysely, q.issue)).id : undefined;
+      const project = q.project
+        ? (await getProjectRow(ctx, ctx.db.kysely, q.project, 'read')).id
+        : undefined;
+      const issue = q.issue
+        ? (await getIssueRow(ctx, ctx.db.kysely, q.issue, 'read')).id
+        : undefined;
       const types = q.types?.split(',').map((t) => t.trim()) as
         (typeof EVENT_TYPES)[number][] | undefined;
       return c.json(

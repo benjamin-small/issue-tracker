@@ -1,6 +1,6 @@
 import type { Db } from '@poietic-tech/issues-db';
 import type { TrackerEvent } from '@poietic-tech/issues-schema';
-import type { ServiceContext } from '../context.ts';
+import { type ServiceContext, SYSTEM_ACTOR } from '../context.ts';
 import { EVENTS_CHANNEL } from '../events.ts';
 import { latestEventSeq, listEvents } from '../services/events.ts';
 
@@ -91,7 +91,8 @@ export class EventTailer {
   }
 
   async #poll(): Promise<void> {
-    const ctx = { db: this.#db } as ServiceContext;
+    // The tailer reads the whole log; subscribers decide what each viewer may see.
+    const ctx = { db: this.#db, actor: SYSTEM_ACTOR } as ServiceContext;
     for (;;) {
       let page;
       try {

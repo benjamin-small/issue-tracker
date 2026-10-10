@@ -10,10 +10,10 @@ import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, isUniqueViolation, notFound, parseInput, validationError } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';
 import { toStatus } from '../mappers.ts';
-import { getProjectRow, getStatusRow } from '../refs.ts';
+import { getProjectRow, getStatusRow, requireProjectId } from '../refs.ts';
 
 export async function listStatuses(ctx: ServiceContext, projectRef: string): Promise<Status[]> {
-  const project = await getProjectRow(ctx.db.kysely, projectRef);
+  const project = await getProjectRow(ctx, ctx.db.kysely, projectRef, 'read');
   const rows = await ctx.db.kysely
     .selectFrom('statuses')
     .selectAll()
@@ -38,7 +38,7 @@ export async function createStatus(
   const data = parseInput(CreateStatusInputSchema, input);
   try {
     return await withWriteTx(ctx.db, async (tx) => {
-      const project = await getProjectRow(tx, projectRef);
+      const project = await getProjectRow(ctx, tx, projectRef, 'write');
       const existing = await tx
         .selectFrom('statuses')
         .select('id')
@@ -89,6 +89,7 @@ export async function updateStatus(
   try {
     return await withWriteTx(ctx.db, async (tx) => {
       const row = await statusRowById(tx, statusId);
+      await requireProjectId(ctx, tx, row.project_id, 'write', 'Status', statusId);
       const before = toStatus(row);
       const updated = await tx
         .updateTable('statuses')
@@ -123,6 +124,7 @@ export async function deleteStatus(
 ): Promise<Status> {
   return withWriteTx(ctx.db, async (tx) => {
     const row = await statusRowById(tx, statusId);
+    await requireProjectId(ctx, tx, row.project_id, 'write', 'Status', statusId);
     const count = await tx
       .selectFrom('statuses')
       .select((eb) => eb.fn.countAll<number>().as('n'))
@@ -180,7 +182,7 @@ export async function reorderStatuses(
   ids: string[],
 ): Promise<Status[]> {
   return withWriteTx(ctx.db, async (tx) => {
-    const project = await getProjectRow(tx, projectRef);
+    const project = await getProjectRow(ctx, tx, projectRef, 'write');
     const rows = await tx
       .selectFrom('statuses')
       .selectAll()

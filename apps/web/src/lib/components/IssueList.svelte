@@ -134,7 +134,7 @@
           <GroupHeader spec={group.header} />
           <span class="text-xs text-fg-subtle">{group.issues.length}</span>
         </button>
-        {#if config.list.groupBy === 'status'}
+        {#if config.list.groupBy === 'status' && project.canWrite}
           <button
             class="ml-auto rounded p-0.5 text-fg-subtle hover:bg-bg-hover hover:text-fg"
             aria-label="New issue in {group.label}"
@@ -178,7 +178,12 @@
             {/if}
             {#if narrow.current}
               <span class="flex items-center"
-                ><StatusPicker {issue} statuses={project.statuses} showLabel={false} /></span
+                ><StatusPicker
+                  {issue}
+                  statuses={project.statuses}
+                  showLabel={false}
+                  readonly={!project.canWrite}
+                /></span
               >
             {:else if showKey}
               <FieldValue {issue} field="key" {project} />

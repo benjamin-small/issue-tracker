@@ -64,10 +64,27 @@ export interface ProjectsTable {
   key: string;
   name: string;
   description: string;
+  visibility: 'public' | 'private';
   next_issue_number: number;
   created_at: Timestamp;
   updated_at: Timestamp;
   archived_at: Timestamp | null;
+}
+
+export interface ProjectMembersTable {
+  project_id: string;
+  user_id: string;
+  role: 'viewer' | 'editor' | 'manager';
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface ProjectReposTable {
+  id: string;
+  project_id: string;
+  owner: string;
+  name: string;
+  created_at: Timestamp;
 }
 
 export type StatusCategory = 'backlog' | 'unstarted' | 'started' | 'completed' | 'canceled';
@@ -105,6 +122,7 @@ export interface IssuesTable {
   assignee_id: string | null;
   creator_id: string;
   parent_id: string | null;
+  repo_id: string | null;
   estimate: number | null;
   due_date: DateOnly | null;
   rank: string;
@@ -295,6 +313,8 @@ export interface Database {
   sessions: SessionsTable;
   user_identities: UserIdentitiesTable;
   projects: ProjectsTable;
+  project_members: ProjectMembersTable;
+  project_repos: ProjectReposTable;
   statuses: StatusesTable;
   labels: LabelsTable;
   issues: IssuesTable;

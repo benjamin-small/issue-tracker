@@ -9,7 +9,8 @@
     issue,
     statuses,
     showLabel = true,
-  }: { issue: Issue; statuses: Status[]; showLabel?: boolean } = $props();
+    readonly = false,
+  }: { issue: Issue; statuses: Status[]; showLabel?: boolean; readonly?: boolean } = $props();
   const qc = useQueryClient();
   const items = $derived(statuses.map((s) => ({ value: s.id, label: s.name, status: s })));
 
@@ -34,6 +35,7 @@
   onselect={select}
   triggerLabel="Change status"
   testid="status-picker"
+  {readonly}
 >
   {#snippet trigger()}
     <StatusIcon category={issue.status.category} color={issue.status.color} />

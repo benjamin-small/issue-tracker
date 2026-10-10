@@ -1,5 +1,6 @@
 import {
   actorForUser,
+  ANONYMOUS_ACTOR,
   authenticateSession,
   authenticateToken,
   SYSTEM_ACTOR,
@@ -26,8 +27,9 @@ export const requestId = createMiddleware<AppEnv>(async (c, next) => {
 
 /**
  * Resolves the actor from a bearer token, a session cookie, or (trusted mode) configuration, and builds the
- * per-request ServiceContext. Cookie-authenticated unsafe requests must be same-origin (CSRF protection);
- * bearer requests carry no ambient credentials and are exempt.
+ * per-request ServiceContext. Without credentials (or with a stale session cookie) the context acts as the
+ * anonymous actor, which can read public projects only (ADR 0021). Cookie-authenticated unsafe requests must
+ * be same-origin (CSRF protection); bearer requests carry no ambient credentials and are exempt.
  */
 export function authenticate(deps: ResolvedDeps) {
   return createMiddleware<AppEnv>(async (c, next) => {
@@ -69,7 +71,7 @@ export function authenticate(deps: ResolvedDeps) {
     c.set('authVia', via);
     c.set('ctx', {
       db,
-      actor: actor ?? SYSTEM_ACTOR,
+      actor: actor ?? ANONYMOUS_ACTOR,
       clock,
       ids: deps.ids ?? newId,
       requestId: c.get('requestId'),
@@ -78,9 +80,9 @@ export function authenticate(deps: ResolvedDeps) {
   });
 }
 
-/** Requires an authenticated actor. */
+/** Anonymous requests may read (core decides what is visible, ADR 0021); everything else needs a user. */
 export const requireActor = createMiddleware<AppEnv>(async (c, next) => {
-  if (!c.get('actor'))
+  if (!c.get('actor') && c.req.method !== 'GET' && c.req.method !== 'HEAD')
     return problem(
       c,
       'UNAUTHENTICATED',

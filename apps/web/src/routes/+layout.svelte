@@ -1,6 +1,6 @@
 <script lang="ts">
   import '../app.css';
-  import { current, navigate } from '$lib/nav.ts';
+  import { current, navigate, signInPath } from '$lib/nav.ts';
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
   import { ApiError, setUnauthenticatedHandler } from '$lib/api.ts';
   import Toaster from '$components/Toaster.svelte';
@@ -18,11 +18,9 @@
   });
 
   setUnauthenticatedHandler(() => {
-    const { path, params } = current();
-    if (path !== '/login') {
+    if (current().path !== '/login') {
       queryClient.clear();
-      const query = params.toString();
-      void navigate(`/login?next=${encodeURIComponent(query ? `${path}?${query}` : path)}`);
+      void navigate(signInPath());
     }
   });
 </script>

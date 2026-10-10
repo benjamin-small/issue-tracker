@@ -19,9 +19,11 @@ import {
   SORTABLE_FIELDS,
   type SortSpec,
 } from '@poietic-tech/issues-schema';
+import { readableProjectIds, whereReadable } from './access.ts';
 import type { ServiceContext } from './context.ts';
-import { validationError } from './errors.ts';
-import { findIssue } from './refs.ts';
+import { DomainError, validationError } from './errors.ts';
+import { getIssueRow } from './refs.ts';
+import { parseRepoRef } from './services/repos.ts';
 import {
   customFieldSql,
   loadCustomFieldValues,
@@ -57,6 +59,7 @@ export async function loadIssues(db: Exec, ids: string[]): Promise<Issue[]> {
       .leftJoin('users as a', 'a.id', 'i.assignee_id')
       .leftJoin('issues as pi', 'pi.id', 'i.parent_id')
       .leftJoin('projects as pp', 'pp.id', 'pi.project_id')
+      .leftJoin('project_repos as rp', 'rp.id', 'i.repo_id')
       .selectAll('i')
       .select([
         'p.key as project_key',
@@ -74,6 +77,8 @@ export async function loadIssues(db: Exec, ids: string[]): Promise<Issue[]> {
         'pi.number as parent_number',
         'pi.title as parent_title',
         'pp.key as parent_project_key',
+        'rp.owner as repo_owner',
+        'rp.name as repo_name',
       ])
       .select((eb) => [
         eb
@@ -148,6 +153,7 @@ export async function loadIssues(db: Exec, ids: string[]): Promise<Issue[]> {
                 title: r.parent_title!,
               }
             : null,
+        repo: r.repo_owner ? `${r.repo_owner}/${r.repo_name}` : null,
         labelIds: labels.map((l) => l.id),
         labels,
         estimate: r.estimate,
@@ -262,6 +268,7 @@ const SCALAR_COLUMNS: Record<string, RawBuilder<unknown>> = {
   assignee: sql.ref('i.assignee_id'),
   creator: sql.ref('i.creator_id'),
   parent: sql.ref('i.parent_id'),
+  repo: sql.ref('i.repo_id'),
   estimate: sql.ref('i.estimate'),
   dueDate: sql.ref('i.due_date'),
   createdAt: sql.ref('i.created_at'),
@@ -391,6 +398,15 @@ export async function resolveFilterRefs(
   filter: IssueFilter,
   projectId: string | undefined,
 ): Promise<IssueFilter> {
+  // Without a project, names are looked up across projects: only the ones the actor can read, so an
+  // "Unknown ..." error never confirms that a private project has such a status or label.
+  const readable = projectId ? 'all' : await readableProjectIds(ctx, db);
+  const readableOnly = <QB extends { where(expr: Bool): QB }>(q: QB): QB =>
+    readable === 'all'
+      ? q
+      : q.where(
+          readable.length ? sql<boolean>`project_id in (${list(readable)})` : sql<boolean>`1 = 0`,
+        );
   const conditions = [];
   for (const c of filter.conditions) {
     const resolve = async (v: unknown): Promise<unknown[]> => {
@@ -403,6 +419,7 @@ export async function resolveFilterRefs(
             .select('id')
             .where(sql`lower(name)`, '=', v.toLowerCase());
           if (projectId) q = q.where('project_id', '=', projectId);
+          q = readableOnly(q);
           const ids = (await q.execute()).map((r) => r.id);
           if (!ids.length) throw validationError(`Unknown status "${v}"`);
           return ids;
@@ -414,6 +431,7 @@ export async function resolveFilterRefs(
             .select('id')
             .where(sql`lower(name)`, '=', v.toLowerCase());
           if (projectId) q = q.where('project_id', '=', projectId);
+          q = readableOnly(q);
           const ids = (await q.execute()).map((r) => r.id);
           if (!ids.length) throw validationError(`Unknown label "${v}"`);
           return ids;
@@ -432,10 +450,27 @@ export async function resolveFilterRefs(
           return [row.id];
         }
         case 'parent': {
-          if (isIdOf('issue', v)) return [v];
-          const row = await findIssue(db, v);
-          if (!row) throw validationError(`Unknown issue "${v}"`);
-          return [row.id];
+          try {
+            return [(await getIssueRow(ctx, db, v, 'read')).id];
+          } catch (error) {
+            if (error instanceof DomainError && error.code === 'NOT_FOUND')
+              throw validationError(`Unknown issue "${v}"`);
+            throw error;
+          }
+        }
+        case 'repo': {
+          if (isIdOf('projectRepo', v)) return [v];
+          const { owner, name } = parseRepoRef(v);
+          let q = db
+            .selectFrom('project_repos')
+            .select('id')
+            .where(sql`lower(owner)`, '=', owner.toLowerCase())
+            .where(sql`lower(name)`, '=', name.toLowerCase());
+          if (projectId) q = q.where('project_id', '=', projectId);
+          else q = readableOnly(q);
+          const ids = (await q.execute()).map((r) => r.id);
+          if (!ids.length) throw validationError(`Unknown repository "${v}"`);
+          return ids;
         }
         default:
           return [v];
@@ -492,6 +527,7 @@ export async function queryIssues(
   });
   q = q.orderBy('i.id', 'asc');
   if (params.projectId) q = q.where('i.project_id', '=', params.projectId);
+  else q = await whereReadable(ctx, db, q, 'i.project_id');
   if (!params.includeDeleted) q = q.where('i.deleted_at', 'is', null);
   if (params.cursor)
     q = q.where(keysetCondition(exprs, sorts, decodeCursor(params.cursor, sorts.length)));

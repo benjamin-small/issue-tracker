@@ -308,7 +308,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The authenticated user */
+        /**
+         * The authenticated user
+         * @description Signed-out visitors get `{ "anonymous": true }` instead of a user.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -318,13 +321,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Current user */
+                /** @description Current user, or { anonymous: true } */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["User"];
+                        "application/json": components["schemas"]["Me"];
                     };
                 };
                 /** @description Problem details. Codes: VALIDATION_FAILED. */
@@ -833,7 +836,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List projects */
+        /**
+         * List projects
+         * @description Projects the caller can read: public ones (also for signed-out visitors), private ones they are a member of, and every project for admins. `myAccess` is the caller's level on each.
+         */
         get: {
             parameters: {
                 query?: {
@@ -852,7 +858,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            data: components["schemas"]["Project"][];
+                            data: components["schemas"]["ProjectWithAccess"][];
                         };
                     };
                 };
@@ -879,7 +885,7 @@ export interface paths {
         put?: never;
         /**
          * Create a project
-         * @description Admin only. Creates the default workflow (Backlog → Canceled) and shared list and board views.
+         * @description Admin only. Creates the default workflow (Backlog → Canceled) and shared list and board views. `visibility` defaults to `private`.
          */
         post: {
             parameters: {
@@ -900,7 +906,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Project"];
+                        "application/json": components["schemas"]["ProjectWithAccess"];
                     };
                 };
                 /** @description Problem details. Codes: VALIDATION_FAILED. */
@@ -954,7 +960,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a project */
+        /**
+         * Get a project
+         * @description Public projects are readable by anyone, private ones by members and admins; others get `NOT_FOUND`.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -973,7 +982,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Project"];
+                        "application/json": components["schemas"]["ProjectWithAccess"];
                     };
                 };
                 /** @description Problem details. Codes: VALIDATION_FAILED. */
@@ -1012,7 +1021,7 @@ export interface paths {
         head?: never;
         /**
          * Update a project
-         * @description Archiving (`archived: true`) is admin only. Project keys are immutable.
+         * @description Name, description and visibility need manage. Archiving (`archived: true`) is admin only. Project keys are immutable.
          */
         patch: {
             parameters: {
@@ -1036,7 +1045,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Project"];
+                        "application/json": components["schemas"]["ProjectWithAccess"];
                     };
                 };
                 /** @description Problem details. Codes: VALIDATION_FAILED. */
@@ -1088,7 +1097,7 @@ export interface paths {
         };
         /**
          * JSON Schema for creating issues in this project
-         * @description Input JSON Schema for issue create/update with live enums: status names, label names, user handles and custom fields. Lets agents discover valid values in one call.
+         * @description Input JSON Schema for issue create/update with live enums: status names, label names, linked repos, assignable user handles (editors, managers and admins; `me` only for callers who can write; none for anonymous readers) and custom fields. Lets agents discover valid values in one call.
          */
         get: {
             parameters: {
@@ -1752,6 +1761,467 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/projects/{project}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List project members
+         * @description Anyone who can read the project can see its members.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project key (e.g. `ENG`) or id. */
+                    project: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Members */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["ProjectMember"][];
+                        };
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Add a project member
+         * @description Needs manage on the project. `CONFLICT` if the user is already a member.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project key (e.g. `ENG`) or id. */
+                    project: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AddProjectMemberInput"];
+                };
+            };
+            responses: {
+                /** @description Added */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProjectMember"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: CONFLICT. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/members/{user}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a project member
+         * @description Needs manage on the project.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project key (e.g. `ENG`) or id. */
+                    project: string;
+                    /** @description User id, handle or `@handle`. */
+                    user: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Change a member's role
+         * @description Needs manage on the project.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project key (e.g. `ENG`) or id. */
+                    project: string;
+                    /** @description User id, handle or `@handle`. */
+                    user: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateProjectMemberInput"];
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProjectMember"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/projects/{project}/repos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link a GitHub repository to a project
+         * @description Needs manage on the project. `repo` is `owner/name` or a github.com URL. `CONFLICT` if it is already linked.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project key (e.g. `ENG`) or id. */
+                    project: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AddProjectRepoInput"];
+                };
+            };
+            responses: {
+                /** @description Linked */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProjectRepo"];
+                    };
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: CONFLICT. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/repos/{repo}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unlink a repository from a project
+         * @description Needs manage on the project. Issues that named the repository have it cleared.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project key (e.g. `ENG`) or id. */
+                    project: string;
+                    /** @description Linked repository: its `rpo_` id, or `owner/name` with the slash URL-encoded (`acme%2Fapp`). */
+                    repo: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Problem details. Codes: VALIDATION_FAILED. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: UNAUTHENTICATED. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: FORBIDDEN. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Problem details. Codes: NOT_FOUND. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/projects/{project}/issues": {
@@ -3544,7 +4014,7 @@ export interface paths {
                     project?: string;
                     /** @description Issue key or id. */
                     issue?: string;
-                    /** @description Comma-separated event types: issue.created, issue.updated, issue.deleted, issue.restored, comment.created, comment.updated, comment.deleted, link.created, link.deleted, project.created, project.updated, status.created, status.updated, status.deleted, label.created, label.updated, label.deleted, user.created, user.updated, field.created, field.updated, field.deleted, attachment.created, attachment.deleted. */
+                    /** @description Comma-separated event types: issue.created, issue.updated, issue.deleted, issue.restored, comment.created, comment.updated, comment.deleted, link.created, link.deleted, project.created, project.updated, project.member_added, project.member_changed, project.member_removed, project.repo_added, project.repo_removed, status.created, status.updated, status.deleted, label.created, label.updated, label.deleted, user.created, user.updated, field.created, field.updated, field.deleted, attachment.created, attachment.deleted. */
                     types?: string;
                 };
                 header?: never;
@@ -5189,7 +5659,7 @@ export interface components {
             seq: number;
             id: string;
             /** @enum {string} */
-            type: "issue.created" | "issue.updated" | "issue.deleted" | "issue.restored" | "comment.created" | "comment.updated" | "comment.deleted" | "link.created" | "link.deleted" | "project.created" | "project.updated" | "status.created" | "status.updated" | "status.deleted" | "label.created" | "label.updated" | "label.deleted" | "user.created" | "user.updated" | "field.created" | "field.updated" | "field.deleted" | "attachment.created" | "attachment.deleted";
+            type: "issue.created" | "issue.updated" | "issue.deleted" | "issue.restored" | "comment.created" | "comment.updated" | "comment.deleted" | "link.created" | "link.deleted" | "project.created" | "project.updated" | "project.member_added" | "project.member_changed" | "project.member_removed" | "project.repo_added" | "project.repo_removed" | "status.created" | "status.updated" | "status.deleted" | "label.created" | "label.updated" | "label.deleted" | "user.created" | "user.updated" | "field.created" | "field.updated" | "field.deleted" | "attachment.created" | "attachment.deleted";
             actorId: string | null;
             actor: components["schemas"]["UserSummary"] | null;
             projectId: string | null;
@@ -5297,6 +5767,11 @@ export interface components {
              * @example ada
              */
             user: string;
+        };
+        Me: components["schemas"]["User"] | components["schemas"]["AnonymousMe"];
+        AnonymousMe: {
+            /** @enum {boolean} */
+            anonymous: true;
         };
         CreateUserInput: {
             handle: string;
@@ -5408,7 +5883,7 @@ export interface components {
              */
             expiresAt?: string | null;
         };
-        Project: {
+        ProjectWithAccess: {
             id: string;
             /**
              * @description Immutable issue-key prefix.
@@ -5417,6 +5892,8 @@ export interface components {
             key: string;
             name: string;
             description: string;
+            visibility: components["schemas"]["ProjectVisibility"];
+            repos: components["schemas"]["ProjectRepo"][];
             /**
              * Format: date-time
              * @description ISO-8601 UTC timestamp.
@@ -5435,6 +5912,34 @@ export interface components {
              * @example 2026-09-26T13:49:00.123Z
              */
             archivedAt: string | null;
+            /**
+             * @description The caller's access to this project.
+             * @enum {string}
+             */
+            myAccess: "read" | "write" | "manage";
+        };
+        /**
+         * @description `public`: anyone can read, even signed out. `private`: members and admins only.
+         * @enum {string}
+         */
+        ProjectVisibility: "public" | "private";
+        ProjectRepo: {
+            /** @example rpo_01h455vb4pex5vsknk084sn02q */
+            id: string;
+            /** @example acme */
+            owner: string;
+            /** @example app */
+            name: string;
+            /** @example acme/app */
+            fullName: string;
+            /** @example https://github.com/acme/app */
+            url: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            createdAt: string;
         };
         CreateProjectInput: {
             /** @example ENG */
@@ -5442,11 +5947,13 @@ export interface components {
             name: string;
             /** @default  */
             description?: string;
+            visibility?: components["schemas"]["ProjectVisibility"];
         };
         UpdateProjectInput: {
             name?: string;
             description?: string;
             archived?: boolean;
+            visibility?: components["schemas"]["ProjectVisibility"];
         };
         JsonSchema: {
             [key: string]: unknown;
@@ -5557,6 +6064,45 @@ export interface components {
             color?: string;
             description?: string;
         };
+        ProjectMember: {
+            user: components["schemas"]["UserSummary"];
+            role: components["schemas"]["ProjectRole"];
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 UTC timestamp.
+             * @example 2026-09-26T13:49:00.123Z
+             */
+            updatedAt: string;
+        };
+        /**
+         * @description `viewer` reads, `editor` also writes, `manager` also manages settings, repos and members.
+         * @enum {string}
+         */
+        ProjectRole: "viewer" | "editor" | "manager";
+        AddProjectMemberInput: {
+            /**
+             * @description User id, handle or `me`.
+             * @example @ada
+             */
+            user: string;
+            role: components["schemas"]["ProjectRole"];
+        };
+        UpdateProjectMemberInput: {
+            role: components["schemas"]["ProjectRole"];
+        };
+        AddProjectRepoInput: {
+            /**
+             * @description `owner/name` or a github.com URL.
+             * @example acme/app
+             */
+            repo: string;
+        };
         IssuePage: {
             data: components["schemas"]["Issue"][];
             /** @description Opaque cursor for the next page; null when this is the last page. */
@@ -5588,6 +6134,11 @@ export interface components {
             creator: components["schemas"]["UserSummary"];
             parentId: string | null;
             parent: components["schemas"]["IssueRef"] | null;
+            /**
+             * @description Linked GitHub repository (`owner/name`), one of the project's repos.
+             * @example acme/app
+             */
+            repo: string | null;
             labelIds: string[];
             labels: components["schemas"]["LabelSummary"][];
             estimate: number | null;
@@ -5762,6 +6313,8 @@ export interface components {
              * @example ENG-1
              */
             parent?: string | null;
+            /** @description One of the project's repos (`owner/name`, URL or id), or null. */
+            repo?: string | null;
             /**
              * @description Label ids or names; replaces the full set.
              * @default []
@@ -5815,6 +6368,8 @@ export interface components {
              * @example ENG-1
              */
             parent?: string | null;
+            /** @description One of the project's repos (`owner/name`, URL or id), or null. */
+            repo?: string | null;
             /** @description Label ids or names; replaces the full set. */
             labels?: string[];
             estimate?: number | null;
@@ -5884,6 +6439,8 @@ export interface components {
                  * @example ENG-1
                  */
                 parent?: string | null;
+                /** @description One of the project's repos (`owner/name`, URL or id), or null. */
+                repo?: string | null;
                 /** @description Label ids or names; replaces the full set. */
                 labels?: string[];
                 estimate?: number | null;
@@ -6459,12 +7016,16 @@ export type User = components['schemas']['User'];
 export type Problem = components['schemas']['Problem'];
 export type TokenLoginInput = components['schemas']['TokenLoginInput'];
 export type DevLoginInput = components['schemas']['DevLoginInput'];
+export type Me = components['schemas']['Me'];
+export type AnonymousMe = components['schemas']['AnonymousMe'];
 export type CreateUserInput = components['schemas']['CreateUserInput'];
 export type UpdateUserInput = components['schemas']['UpdateUserInput'];
 export type ApiToken = components['schemas']['ApiToken'];
 export type CreatedApiToken = components['schemas']['CreatedApiToken'];
 export type CreateTokenInput = components['schemas']['CreateTokenInput'];
-export type Project = components['schemas']['Project'];
+export type ProjectWithAccess = components['schemas']['ProjectWithAccess'];
+export type ProjectVisibility = components['schemas']['ProjectVisibility'];
+export type ProjectRepo = components['schemas']['ProjectRepo'];
 export type CreateProjectInput = components['schemas']['CreateProjectInput'];
 export type UpdateProjectInput = components['schemas']['UpdateProjectInput'];
 export type JsonSchema = components['schemas']['JsonSchema'];
@@ -6475,6 +7036,11 @@ export type UpdateStatusInput = components['schemas']['UpdateStatusInput'];
 export type Label = components['schemas']['Label'];
 export type CreateLabelInput = components['schemas']['CreateLabelInput'];
 export type UpdateLabelInput = components['schemas']['UpdateLabelInput'];
+export type ProjectMember = components['schemas']['ProjectMember'];
+export type ProjectRole = components['schemas']['ProjectRole'];
+export type AddProjectMemberInput = components['schemas']['AddProjectMemberInput'];
+export type UpdateProjectMemberInput = components['schemas']['UpdateProjectMemberInput'];
+export type AddProjectRepoInput = components['schemas']['AddProjectRepoInput'];
 export type IssuePage = components['schemas']['IssuePage'];
 export type Issue = components['schemas']['Issue'];
 export type StatusSummary = components['schemas']['StatusSummary'];

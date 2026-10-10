@@ -31,3 +31,9 @@ export function shortDate(value: string): string {
 export function isOverdue(dueDate: string | null, completed: boolean): boolean {
   return !!dueDate && !completed && dueDate < new Date().toISOString().slice(0, 10);
 }
+
+/** The GitHub page of a repo (`owner/name`): the linked repo's own url when the project has it. */
+export function repoUrl(repos: { fullName: string; url: string }[], fullName: string): string {
+  const linked = repos.find((r) => r.fullName.toLowerCase() === fullName.toLowerCase());
+  return linked?.url ?? `https://github.com/${fullName}`;
+}

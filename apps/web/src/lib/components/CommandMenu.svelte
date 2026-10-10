@@ -3,12 +3,13 @@
   import { Command, Dialog } from 'bits-ui';
   import Check from '@lucide/svelte/icons/check';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-  import { api, type Issue } from '../api.ts';
+  import type { Issue } from '../api.ts';
   import { PRIORITY_LABELS, PRIORITY_ORDER } from '../format.ts';
   import { bulkUpdate, cachedIssues, deleteIssues, projectKeyOf, toggleLabel } from '../issues.ts';
-  import { navigate, shareUrl } from '../nav.ts';
+  import { navigate, shareUrl, signInPath } from '../nav.ts';
   import { useProjectData } from '../project-data.svelte.ts';
-  import { fetchers, keys } from '../queries.ts';
+  import { canWrite, fetchers, isSignedIn, keys } from '../queries.ts';
+  import { signOut } from '../session.ts';
   import { clearSelection } from '../selection.svelte.ts';
   import { applyTheme } from '../theme.ts';
   import { toast } from '../toast.svelte.ts';
@@ -30,6 +31,11 @@
   const targets = $derived(cachedIssues(qc, ui.command.targets));
   const targetProject = $derived(targets[0] ? projectKeyOf(targets[0].key) : currentProject);
   const project = useProjectData(() => targetProject);
+  const isAdmin = $derived(isSignedIn(me.data) && me.data.role === 'admin');
+  /** New issues go to the current project, so creating needs write access there. */
+  const canCreateIssue = $derived(
+    canWrite(projects.data?.find((p) => p.key === currentProject)?.myAccess),
+  );
 
   const TITLES: Record<CommandMode, string> = {
     root: '',
@@ -82,6 +88,11 @@
   $effect(() => {
     if (ui.command.open) search = '';
   });
+  // Field shortcuts (s, a, p, l) are disabled without write access; never show their edit modes then.
+  const readOnly = $derived(project.access !== undefined && !project.canWrite);
+  $effect(() => {
+    if (mode !== 'root' && readOnly) ui.command.mode = 'root';
+  });
 
   const targetKeys = () => targets.map((t) => t.key);
   const allHaveLabel = (id: string) =>
@@ -133,32 +144,34 @@
               <Command.Group>
                 <Command.GroupHeading class={heading}>{describeTargets}</Command.GroupHeading>
                 <Command.GroupItems>
-                  <Command.Item
-                    class={item}
-                    value="Change status"
-                    onSelect={() => setMode('status')}
-                    >Change status…<Kbd class="ml-auto">S</Kbd></Command.Item
-                  >
-                  <Command.Item
-                    class={item}
-                    value="Assign to"
-                    keywords={['assignee', 'owner']}
-                    onSelect={() => setMode('assignee')}
-                    >Assign to…<Kbd class="ml-auto">A</Kbd></Command.Item
-                  >
-                  <Command.Item
-                    class={item}
-                    value="Set priority"
-                    onSelect={() => setMode('priority')}
-                    >Set priority…<Kbd class="ml-auto">P</Kbd></Command.Item
-                  >
-                  <Command.Item
-                    class={item}
-                    value="Labels"
-                    keywords={['tag']}
-                    onSelect={() => setMode('labels')}
-                    >Add or remove labels…<Kbd class="ml-auto">L</Kbd></Command.Item
-                  >
+                  {#if project.canWrite}
+                    <Command.Item
+                      class={item}
+                      value="Change status"
+                      onSelect={() => setMode('status')}
+                      >Change status…<Kbd class="ml-auto">S</Kbd></Command.Item
+                    >
+                    <Command.Item
+                      class={item}
+                      value="Assign to"
+                      keywords={['assignee', 'owner']}
+                      onSelect={() => setMode('assignee')}
+                      >Assign to…<Kbd class="ml-auto">A</Kbd></Command.Item
+                    >
+                    <Command.Item
+                      class={item}
+                      value="Set priority"
+                      onSelect={() => setMode('priority')}
+                      >Set priority…<Kbd class="ml-auto">P</Kbd></Command.Item
+                    >
+                    <Command.Item
+                      class={item}
+                      value="Labels"
+                      keywords={['tag']}
+                      onSelect={() => setMode('labels')}
+                      >Add or remove labels…<Kbd class="ml-auto">L</Kbd></Command.Item
+                    >
+                  {/if}
                   {#if targets.length === 1}
                     <Command.Item
                       class={item}
@@ -178,44 +191,49 @@
                         })}>Copy link</Command.Item
                     >
                   {/if}
-                  <Command.Item
-                    class="{item} text-danger"
-                    value="Delete"
-                    keywords={['trash', 'remove']}
-                    onSelect={() =>
-                      run(async () => {
-                        await deleteIssues(qc, targets);
-                        clearSelection();
-                      })}
-                    >Delete {targets.length === 1 ? 'issue' : `${targets.length} issues`}<Kbd
-                      class="ml-auto">⌫</Kbd
-                    ></Command.Item
-                  >
+                  {#if project.canWrite}
+                    <Command.Item
+                      class="{item} text-danger"
+                      value="Delete"
+                      keywords={['trash', 'remove']}
+                      onSelect={() =>
+                        run(async () => {
+                          await deleteIssues(qc, targets);
+                          clearSelection();
+                        })}
+                      >Delete {targets.length === 1 ? 'issue' : `${targets.length} issues`}<Kbd
+                        class="ml-auto">⌫</Kbd
+                      ></Command.Item
+                    >
+                  {/if}
                 </Command.GroupItems>
               </Command.Group>
             {/if}
 
-            <Command.Group>
-              <Command.GroupHeading class={heading}>Create</Command.GroupHeading>
-              <Command.GroupItems>
-                {#if currentProject}
-                  <Command.Item
-                    class={item}
-                    value="New issue"
-                    keywords={['create']}
-                    onSelect={() => run(() => openCreateIssue(currentProject))}
-                    >New issue<Kbd class="ml-auto">C</Kbd></Command.Item
-                  >
-                {/if}
-                {#if me.data?.role === 'admin'}
-                  <Command.Item
-                    class={item}
-                    value="New project"
-                    onSelect={() => run(() => (ui.createProject = true))}>New project</Command.Item
-                  >
-                {/if}
-              </Command.GroupItems>
-            </Command.Group>
+            {#if (currentProject && canCreateIssue) || isAdmin}
+              <Command.Group>
+                <Command.GroupHeading class={heading}>Create</Command.GroupHeading>
+                <Command.GroupItems>
+                  {#if currentProject && canCreateIssue}
+                    <Command.Item
+                      class={item}
+                      value="New issue"
+                      keywords={['create']}
+                      onSelect={() => run(() => openCreateIssue(currentProject))}
+                      >New issue<Kbd class="ml-auto">C</Kbd></Command.Item
+                    >
+                  {/if}
+                  {#if isAdmin}
+                    <Command.Item
+                      class={item}
+                      value="New project"
+                      onSelect={() => run(() => (ui.createProject = true))}
+                      >New project</Command.Item
+                    >
+                  {/if}
+                </Command.GroupItems>
+              </Command.Group>
+            {/if}
 
             {#if keyQuery}
               <Command.Group>
@@ -272,16 +290,18 @@
                     >{p.name}: Board{#if p.key === currentProject}<Kbd class="ml-auto">G B</Kbd
                       >{/if}</Command.Item
                   >
-                  <Command.Item
-                    class={item}
-                    value={`${p.name} settings`}
-                    keywords={[p.key, 'workflow', 'labels', 'fields']}
-                    onSelect={() => run(() => navigate(`/p/${p.key}/settings`))}
-                    >{p.name}: Settings{#if p.key === currentProject}<Kbd class="ml-auto">G S</Kbd
-                      >{/if}</Command.Item
-                  >
+                  {#if canWrite(p.myAccess)}
+                    <Command.Item
+                      class={item}
+                      value={`${p.name} settings`}
+                      keywords={[p.key, 'workflow', 'labels', 'fields']}
+                      onSelect={() => run(() => navigate(`/p/${p.key}/settings`))}
+                      >{p.name}: Settings{#if p.key === currentProject}<Kbd class="ml-auto">G S</Kbd
+                        >{/if}</Command.Item
+                    >
+                  {/if}
                 {/each}
-                {#if me.data?.role === 'admin'}
+                {#if isAdmin}
                   <Command.Item
                     class={item}
                     value="Webhooks"
@@ -314,19 +334,25 @@
                       ),
                     )}>Toggle dark mode</Command.Item
                 >
-                <Command.Item
-                  class={item}
-                  value="Sign out"
-                  keywords={['log out']}
-                  onSelect={() =>
-                    run(async () => {
-                      await api.POST('/auth/logout');
-                      qc.clear();
-                      await navigate('/login?signedout=1');
-                    })}>Sign out</Command.Item
-                >
+                {#if isSignedIn(me.data)}
+                  <Command.Item
+                    class={item}
+                    value="Sign out"
+                    keywords={['log out']}
+                    onSelect={() => run(() => signOut(qc))}>Sign out</Command.Item
+                  >
+                {:else}
+                  <Command.Item
+                    class={item}
+                    value="Sign in"
+                    keywords={['log in']}
+                    onSelect={() => run(() => navigate(signInPath()))}>Sign in</Command.Item
+                  >
+                {/if}
               </Command.GroupItems>
             </Command.Group>
+          {:else if readOnly}
+            <!-- Edit modes need write access (the effect above returns to the root). -->
           {:else if mode === 'status'}
             {#each project.statuses as s (s.id)}
               <Command.Item

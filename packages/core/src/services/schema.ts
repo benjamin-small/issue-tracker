@@ -1,8 +1,10 @@
 import { fromJson } from '@poietic-tech/issues-db';
 import { CreateIssueInputSchema, UpdateIssueInputSchema } from '@poietic-tech/issues-schema';
 import { z } from 'zod';
-import type { ServiceContext } from '../context.ts';
+import { atLeast, projectLevel } from '../access.ts';
+import { isAnonymous, type ServiceContext } from '../context.ts';
 import { getProjectRow } from '../refs.ts';
+import { reposOf } from './repos.ts';
 
 type JsonSchema = Record<string, unknown> & {
   properties?: Record<string, Record<string, unknown>>;
@@ -27,16 +29,22 @@ export function inputSchema(schema: z.ZodType): JsonSchema {
 
 /**
  * JSON Schema (draft 2020-12) for creating and updating issues in a project, with the project's live values
- * filled in as enums: status names, label names, assignable user handles and custom field definitions.
- * Designed for agents: one call tells them every valid value.
+ * filled in as enums: status names, label names, linked repos, assignable user handles and custom field
+ * definitions. Designed for agents: one call tells them every valid value.
+ *
+ * Assignable users are those who can write the project (its editors and managers, plus admins); `me` is offered
+ * only when the caller can write too. Anonymous callers get no user handles at all (ADR 0021: signed-out visitors
+ * see handles only where they are embedded in resources they can read).
  */
 export async function issueInputJsonSchema(
   ctx: ServiceContext,
   projectRef: string,
 ): Promise<Record<string, unknown>> {
   const db = ctx.db.kysely;
-  const project = await getProjectRow(db, projectRef);
-  const [statuses, labels, users, fields, options] = await Promise.all([
+  const project = await getProjectRow(ctx, db, projectRef, 'read');
+  const anonymous = isAnonymous(ctx);
+  const callerCanWrite = !anonymous && atLeast(await projectLevel(ctx, db, project), 'write');
+  const [statuses, labels, users, fields, options, repos] = await Promise.all([
     db
       .selectFrom('statuses')
       .select(['name', 'category'])
@@ -50,13 +58,29 @@ export async function issueInputJsonSchema(
       .where('archived_at', 'is', null)
       .orderBy('name')
       .execute(),
-    db
-      .selectFrom('users')
-      .select(['handle', 'kind'])
-      .where('kind', '!=', 'system')
-      .where('deactivated_at', 'is', null)
-      .orderBy('handle')
-      .execute(),
+    anonymous
+      ? Promise.resolve([])
+      : db
+          .selectFrom('users')
+          .select(['handle', 'kind'])
+          .where('kind', '!=', 'system')
+          .where('deactivated_at', 'is', null)
+          .where((eb) =>
+            eb.or([
+              eb('role', '=', 'admin'),
+              eb(
+                'id',
+                'in',
+                eb
+                  .selectFrom('project_members')
+                  .select('user_id')
+                  .where('project_id', '=', project.id)
+                  .where('role', 'in', ['editor', 'manager']),
+              ),
+            ]),
+          )
+          .orderBy('handle')
+          .execute(),
     db
       .selectFrom('custom_fields')
       .selectAll()
@@ -72,7 +96,9 @@ export async function issueInputJsonSchema(
       .where('o.archived_at', 'is', null)
       .orderBy('o.position')
       .execute(),
+    reposOf(db, [project.id]).then((m) => m.get(project.id) ?? []),
   ]);
+  const handles = users.map((u) => u.handle);
 
   const customFieldProperties: Record<string, Record<string, unknown>> = {};
   for (const f of fields) {
@@ -96,7 +122,7 @@ export async function issueInputJsonSchema(
           return {
             type: ['string', 'null'],
             description: 'User handle or id',
-            examples: users.map((u) => u.handle),
+            ...(!anonymous && { examples: handles }),
           };
         default:
           return { type: ['string', 'null'] };
@@ -118,10 +144,15 @@ export async function issueInputJsonSchema(
     for (const key of ['labels', 'addLabels', 'removeLabels']) {
       if (props[key]) props[key] = { ...props[key], items: labelEnum };
     }
-    if (props.assignee)
+    if (props.assignee && !anonymous)
       props.assignee = {
         ...props.assignee,
-        anyOf: [{ enum: ['me', ...users.map((u) => u.handle)] }, { type: 'null' }],
+        anyOf: [{ enum: [...(callerCanWrite ? ['me'] : []), ...handles] }, { type: 'null' }],
+      };
+    if (props.repo)
+      props.repo = {
+        ...props.repo,
+        anyOf: [{ enum: repos.map((r) => r.fullName) }, { type: 'null' }],
       };
     if (props.customFields)
       props.customFields = {

@@ -3,6 +3,7 @@
   import { navigate } from '$lib/nav.ts';
   import { useQueryClient } from '@tanstack/svelte-query';
   import { Dialog } from 'bits-ui';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
   import X from '@lucide/svelte/icons/x';
   import { PRIORITY_LABELS, PRIORITY_ORDER } from '../format.ts';
   import { createIssue } from '../issues.ts';
@@ -24,6 +25,7 @@
   let statusId = $state<string | undefined>(undefined);
   let priority = $state(0);
   let assigneeId = $state<string | null>(null);
+  let repo = $state<string | null>(null);
   let labelIds = $state<string[]>([]);
   let createMore = $state(false);
   let busy = $state(false);
@@ -58,6 +60,7 @@
       priority,
       assignee: assigneeId,
       labels: labelIds,
+      ...(repo && { repo }),
       ...(ui.createIssue.parent && { parent: ui.createIssue.parent }),
     });
     busy = false;
@@ -158,6 +161,22 @@
               >{/snippet}
             {#snippet item(it)}<Avatar user={it.u} size={16} /><span>{it.label}</span>{/snippet}
           </Picker>
+          {#if project.repos.length}
+            <Picker
+              items={[
+                { value: '', label: 'No repository' },
+                ...project.repos.map((r) => ({ value: r.fullName, label: r.fullName })),
+              ]}
+              selected={[repo ?? '']}
+              onselect={(v) => (repo = v || null)}
+              triggerLabel="Repository"
+              triggerClass="border border-border"
+            >
+              {#snippet trigger()}<GitBranch size={14} /><span class={repo ? '' : 'text-fg-muted'}
+                  >{repo ?? 'Repository'}</span
+                >{/snippet}
+            </Picker>
+          {/if}
           <Picker
             items={project.labels.map((l) => ({ value: l.id, label: l.name, l }))}
             selected={labelIds}

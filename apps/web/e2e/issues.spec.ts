@@ -2,10 +2,13 @@ import { apiCreateIssue, choose, expect, openList, row, test } from './fixtures.
 
 test('signs in with the dev user picker', async ({ browser }) => {
   const page = await (await browser.newContext()).newPage();
-  await page.goto('/p/ENG');
+  await page.goto('/p/OPS');
+  // OPS is private: signed out it reads as not found, with a way to sign in (ADR 0021).
+  await expect(page.getByTestId('project-not-found')).toBeVisible();
+  await page.getByTestId('project-not-found').getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/login\?next=/);
   await page.getByRole('button', { name: /Grace Hopper/ }).click();
-  await expect(page).toHaveURL(/\/p\/ENG/);
+  await expect(page).toHaveURL(/\/p\/OPS/);
   await expect(page.getByText('Grace Hopper')).toBeVisible();
 });
 
@@ -95,6 +98,9 @@ test('links issues and shows both perspectives', async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/i/${blocked}$`));
   await expect(page.getByTestId('links')).toContainText('is blocked by');
   await expect(page.getByTestId('links')).toContainText('The blocker');
+  // The link is stored from the blocker; removing it from the blocked side works too.
+  await page.getByTestId('links').getByRole('button', { name: 'Remove link' }).click();
+  await expect(page.getByTestId('links')).toContainText('No linked issues.');
 });
 
 test('adds sub-issues', async ({ page }) => {

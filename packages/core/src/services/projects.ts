@@ -1,19 +1,29 @@
-import { type Tx, toJson, withWriteTx } from '@poietic-tech/issues-db';
+import {
+  type Database,
+  type Kysely,
+  type Selectable,
+  type Tx,
+  toJson,
+  withWriteTx,
+} from '@poietic-tech/issues-db';
 import {
   type CreateProjectInput,
   CreateProjectInputSchema,
   defaultViewConfig,
-  type Project,
+  type ProjectRepo,
+  type ProjectWithAccess,
   type StatusCategory,
   type UpdateProjectInput,
   UpdateProjectInputSchema,
 } from '@poietic-tech/issues-schema';
+import { projectLevel, whereReadable } from '../access.ts';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, isUniqueViolation, parseInput } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';
 import { toProject, toStatus } from '../mappers.ts';
 import { requireAdmin } from '../permissions.ts';
 import { getProjectRow } from '../refs.ts';
+import { reposOf } from './repos.ts';
 
 /** Workflow every new project starts with. Statuses are fully editable afterwards. */
 export const DEFAULT_STATUSES: ReadonlyArray<{
@@ -29,24 +39,44 @@ export const DEFAULT_STATUSES: ReadonlyArray<{
   { name: 'Canceled', category: 'canceled', color: '#95a2b3' },
 ];
 
+type Exec = Kysely<Database>;
+
+/** The project plus the actor's access to it. A readable project never has level `none`; `read` is the type-only fallback. */
+async function withAccess(
+  ctx: ServiceContext,
+  db: Exec,
+  row: Selectable<Database['projects']>,
+  repos?: ProjectRepo[],
+): Promise<ProjectWithAccess> {
+  const level = await projectLevel(ctx, db, row);
+  const linked = repos ?? (await reposOf(db, [row.id])).get(row.id) ?? [];
+  return { ...toProject(row, linked), myAccess: level === 'none' ? 'read' : level };
+}
+
 export async function listProjects(
   ctx: ServiceContext,
   opts: { includeArchived?: boolean } = {},
-): Promise<Project[]> {
+): Promise<ProjectWithAccess[]> {
   let q = ctx.db.kysely.selectFrom('projects').selectAll().orderBy('key');
   if (!opts.includeArchived) q = q.where('archived_at', 'is', null);
-  return (await q.execute()).map(toProject);
+  q = await whereReadable(ctx, ctx.db.kysely, q, 'id');
+  const rows = await q.execute();
+  const repos = await reposOf(
+    ctx.db.kysely,
+    rows.map((r) => r.id),
+  );
+  return Promise.all(rows.map((r) => withAccess(ctx, ctx.db.kysely, r, repos.get(r.id) ?? [])));
 }
 
-export async function getProject(ctx: ServiceContext, ref: string): Promise<Project> {
-  return toProject(await getProjectRow(ctx.db.kysely, ref));
+export async function getProject(ctx: ServiceContext, ref: string): Promise<ProjectWithAccess> {
+  return withAccess(ctx, ctx.db.kysely, await getProjectRow(ctx, ctx.db.kysely, ref, 'read'));
 }
 
 /** Creates a project with the default workflow and two shared views (list + board). Admin only. */
 export async function createProject(
   ctx: ServiceContext,
   input: CreateProjectInput,
-): Promise<Project> {
+): Promise<ProjectWithAccess> {
   requireAdmin(ctx, 'create projects');
   const data = parseInput(CreateProjectInputSchema, input);
   const now = nowIso(ctx);
@@ -59,6 +89,7 @@ export async function createProject(
           key: data.key,
           name: data.name,
           description: data.description,
+          visibility: data.visibility,
           next_issue_number: 1,
           created_at: now,
           updated_at: now,
@@ -69,7 +100,7 @@ export async function createProject(
       const project = toProject(row);
       await recordEvent(tx, ctx, 'project.created', { projectId: project.id, data: { project } });
       await createDefaults(tx, ctx, project.id);
-      return project;
+      return withAccess(ctx, tx, row, project.repos);
     });
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict(`A project with key "${data.key}" already exists`);
@@ -122,18 +153,22 @@ export async function updateProject(
   ctx: ServiceContext,
   ref: string,
   input: UpdateProjectInput,
-): Promise<Project> {
+): Promise<ProjectWithAccess> {
   const patch = parseInput(UpdateProjectInputSchema, input);
   if (patch.archived !== undefined) requireAdmin(ctx, 'archive projects');
   return withWriteTx(ctx.db, async (tx) => {
-    const row = await getProjectRow(tx, ref);
-    const before = toProject(row);
+    const needsManage =
+      patch.name !== undefined || patch.description !== undefined || patch.visibility !== undefined;
+    const row = await getProjectRow(ctx, tx, ref, needsManage ? 'manage' : 'write');
+    const repos = (await reposOf(tx, [row.id])).get(row.id) ?? [];
+    const before = toProject(row, repos);
     const now = nowIso(ctx);
     const updated = await tx
       .updateTable('projects')
       .set({
         ...(patch.name !== undefined && { name: patch.name }),
         ...(patch.description !== undefined && { description: patch.description }),
+        ...(patch.visibility !== undefined && { visibility: patch.visibility }),
         ...(patch.archived !== undefined && {
           archived_at: patch.archived ? (row.archived_at ?? now) : null,
         }),
@@ -142,13 +177,13 @@ export async function updateProject(
       .where('id', '=', row.id)
       .returningAll()
       .executeTakeFirstOrThrow();
-    const project = toProject(updated);
-    const changes = diff(before, project, ['name', 'description', 'archivedAt']);
+    const project = toProject(updated, repos);
+    const changes = diff(before, project, ['name', 'description', 'visibility', 'archivedAt']);
     if (Object.keys(changes).length > 0)
       await recordEvent(tx, ctx, 'project.updated', {
         projectId: project.id,
         data: { project, changes },
       });
-    return project;
+    return withAccess(ctx, tx, updated, repos);
   });
 }

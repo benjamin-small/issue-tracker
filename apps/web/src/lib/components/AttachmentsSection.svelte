@@ -10,7 +10,9 @@
   import { toast } from '../toast.svelte.ts';
 
   /** Files attached to an issue: image thumbnails, download links, upload (picker or drop) and delete. */
-  let { issue }: { issue: Issue } = $props();
+  let { issue, canWrite }: { issue: Issue; canWrite: boolean } = $props();
+  /** Uploads and deletes need write access, and a live (not trashed) issue. */
+  const editable = $derived(canWrite && !issue.deletedAt);
   const qc = useQueryClient();
   const attachments = createQuery(() => ({
     queryKey: keys.attachments(issue.key),
@@ -59,7 +61,7 @@
   class="rounded-md {dragOver ? 'outline-2 outline-offset-4 outline-accent outline-dashed' : ''}"
   aria-label="Attachments"
   ondragover={(e) => {
-    if (!issue.deletedAt && e.dataTransfer?.types.includes('Files')) {
+    if (editable && e.dataTransfer?.types.includes('Files')) {
       e.preventDefault();
       dragOver = true;
     }
@@ -68,7 +70,7 @@
   ondrop={(e) => {
     dragOver = false;
     const files = [...(e.dataTransfer?.files ?? [])];
-    if (files.length && !issue.deletedAt) {
+    if (files.length && editable) {
       e.preventDefault();
       void upload(files);
     }
@@ -80,7 +82,7 @@
           >· uploading {uploading}…</span
         >{/if}
     </h3>
-    {#if !issue.deletedAt}
+    {#if editable}
       <button
         class="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-fg-muted hover:bg-bg-hover"
         onclick={() => input?.click()}
@@ -128,7 +130,7 @@
               </p>
             </div>
           </a>
-          {#if !issue.deletedAt}
+          {#if editable}
             <button
               class="absolute top-1 right-1 rounded bg-bg/80 p-0.5 text-fg-muted opacity-0 group-hover:opacity-100 hover:text-fg focus:opacity-100"
               aria-label="Delete {file.filename}"
@@ -138,7 +140,9 @@
         </li>
       {/each}
     </ul>
-  {:else if !issue.deletedAt}
+  {:else if editable}
     <p class="text-xs text-fg-subtle">Drop files here, or paste them into the description.</p>
+  {:else if attachments.data}
+    <p class="text-xs text-fg-subtle">No attachments.</p>
   {/if}
 </section>

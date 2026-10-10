@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createProject, LocalDiskBlobStore } from '@poietic-tech/issues-core';
 import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
+import { latestMigrationName } from '@poietic-tech/issues-db';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { createApp } from '@poietic-tech/issues-server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -414,6 +415,100 @@ describe(`tracker CLI (${testDialect()})`, () => {
   });
 });
 
+describe(`project access commands (${testDialect()})`, () => {
+  it('manages members, repos, visibility and issue repos', async () => {
+    const added = await cli([
+      'project',
+      'members',
+      'add',
+      '@member',
+      '--role',
+      'editor',
+      '-P',
+      'CLI',
+      '--json',
+    ]);
+    expect(added.stderr).toBe('');
+    expect(added.code).toBe(0);
+    expect(added.json()).toMatchObject({ user: { handle: 'member' }, role: 'editor' });
+    expect((await cli(['project', 'members', 'add', 'member', '--role', 'viewer'])).code).toBe(4);
+    expect((await cli(['project', 'members', 'add', 'member'])).code).toBe(2);
+    expect((await cli(['project', 'members', 'add', 'member', '--role', 'boss'])).code).toBe(2);
+
+    const set = await cli(['project', 'members', 'set', 'member', '--role', 'manager', '--json']);
+    expect(set.json()).toMatchObject({ user: { handle: 'member' }, role: 'manager' });
+    const table = await cli(['project', 'members', 'list']);
+    expect(table.stdout.split('\n')[0]).toMatch(/^USER\s+ROLE\s+SINCE$/);
+    expect(table.stdout).toMatch(/@member\s+manager/);
+    expect((await cli(['project', 'members', 'list', '-q'])).stdout).toBe('member\n');
+    expect((await cli(['project', 'members', 'list', '--json'])).json().data).toHaveLength(1);
+
+    const repo = await cli([
+      'project',
+      'repo',
+      'add',
+      'https://github.com/acme/app',
+      '-P',
+      'CLI',
+      '--json',
+    ]);
+    expect(repo.json()).toMatchObject({ fullName: 'acme/app', url: 'https://github.com/acme/app' });
+    expect((await cli(['project', 'repo', 'add', 'acme/app'])).code).toBe(4);
+    await cli(['project', 'repo', 'add', 'acme/docs']);
+    const repos = await cli(['project', 'repo', 'list', '--json']);
+    expect(repos.json().data.map((r: { fullName: string }) => r.fullName)).toEqual([
+      'acme/app',
+      'acme/docs',
+    ]);
+    expect((await cli(['project', 'repo', 'list'])).stdout).toMatch(/^ID\s+REPO\s+URL/);
+
+    const vis = await cli(['project', 'edit', 'CLI', '--visibility', 'public', '--json']);
+    expect(vis.json()).toMatchObject({ visibility: 'public' });
+    expect((await cli(['project', 'edit', 'CLI', '--visibility', 'secret'])).code).toBe(2);
+    const created = await cli([
+      'project',
+      'create',
+      '-k',
+      'PUB',
+      '-n',
+      'Public',
+      '--visibility',
+      'public',
+      '--json',
+    ]);
+    expect(created.json()).toMatchObject({ key: 'PUB', visibility: 'public' });
+
+    const issue = await cli([
+      'issue',
+      'create',
+      '-t',
+      'Needs a repo',
+      '--repo',
+      'acme/app',
+      '--json',
+    ]);
+    expect(issue.json()).toMatchObject({ repo: 'acme/app' });
+    const key = issue.json().key as string;
+    const moved = await cli(['issue', 'edit', key, '--repo', 'acme/docs', '--json']);
+    expect(moved.json()).toMatchObject({ repo: 'acme/docs' });
+    const cleared = await cli(['issue', 'edit', key, '--repo', '', '--json']);
+    expect(cleared.json()).toMatchObject({ repo: null });
+    expect((await cli(['issue', 'edit', key, '--repo', 'acme/nope'])).code).toBe(2);
+
+    const removedRepo = await cli(['project', 'repo', 'remove', 'acme/docs']);
+    expect(removedRepo.stdout).toMatch(/Unlinked/);
+    expect(removedRepo.code).toBe(0);
+    expect((await cli(['project', 'repo', 'remove', 'acme/docs'])).code).toBe(3);
+    const byUrl = await cli(['project', 'repo', 'remove', 'https://github.com/acme/app', '--json']);
+    expect(byUrl.json()).toEqual({ id: 'https://github.com/acme/app', removed: true });
+    expect((await cli(['project', 'repo', 'list', '--json'])).json().data).toEqual([]);
+    const removed = await cli(['project', 'members', 'remove', '@member']);
+    expect(removed.code).toBe(0);
+    expect((await cli(['project', 'members', 'remove', '@member'])).code).toBe(3);
+    expect((await cli(['project', 'members', 'list', '--json'])).json().data).toEqual([]);
+  });
+});
+
 describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transports)', () => {
   it('runs in-process against a local SQLite file', async () => {
     const db = join(dir, 'local.db');
@@ -449,6 +544,88 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
       fetch: null,
     });
     expect(me.json()).toMatchObject({ handle: 'claude', kind: 'agent' });
+  });
+
+  it('manages project access in local mode too', async () => {
+    const env = { POIETIC_ISSUES_DATABASE_URL: `sqlite:${join(dir, 'access.db')}` };
+    const local = (args: string[]) => cli(args, { env, fetch: null });
+    expect((await local(['db', 'migrate'])).code).toBe(0);
+    expect((await local(['db', 'seed'])).code).toBe(0);
+    expect((await local(['user', 'create', '--handle', 'zed', '--name', 'Zed'])).code).toBe(0);
+    const added = await local([
+      'project',
+      'members',
+      'add',
+      '@zed',
+      '--role',
+      'editor',
+      '-P',
+      'ENG',
+      '--json',
+    ]);
+    expect(added.stderr).toBe('');
+    expect(added.json()).toMatchObject({ user: { handle: 'zed' }, role: 'editor' });
+    expect((await local(['project', 'repo', 'add', 'acme/app', '-P', 'ENG', '-q'])).code).toBe(0);
+    // The seeded ENG project is already public (and has the demo repo), so flip it to private.
+    const project = await local(['project', 'edit', 'ENG', '--visibility', 'private', '--json']);
+    expect(project.json()).toMatchObject({
+      visibility: 'private',
+      repos: expect.arrayContaining([expect.objectContaining({ fullName: 'acme/app' })]),
+      myAccess: 'manage',
+    });
+    expect((await local(['project', 'members', 'list', '-P', 'ENG', '-q'])).stdout).toContain(
+      'zed',
+    );
+  });
+
+  it('reverts the newest migration one step at a time, keeping the data', async () => {
+    const env = { POIETIC_ISSUES_DATABASE_URL: `sqlite:${join(dir, 'down.db')}` };
+    const local = (args: string[]) => cli(args, { env, fetch: null });
+    const latest = latestMigrationName();
+    expect((await local(['db', 'seed'])).code).toBe(0);
+    const down = await local(['db', 'migrate', '--down', '--json']);
+    expect(down.stderr).toBe('');
+    expect(down.code).toBe(0);
+    expect(down.json()).toMatchObject({ reverted: [latest], latest });
+    expect((await local(['db', 'status', '--json'])).json()).toMatchObject({
+      pending: [latest],
+      upToDate: false,
+    });
+    // Commands refuse to run on a database that is behind, then migrating forward again works.
+    expect((await local(['issue', 'list', '-P', 'ENG'])).code).toBe(6);
+    expect((await local(['db', 'migrate'])).stdout).toBe(`Applied: ${latest}\n`);
+    const issues = await local(['issue', 'list', '-P', 'ENG', '-q', '--sort', 'key']);
+    expect(issues.stdout.trim().split('\n')[0]).toBe('ENG-1');
+    expect((await local(['db', 'migrate', '--down'])).stdout).toBe(`Reverted: ${latest}\n`);
+  });
+
+  it('never reverts the first migration, and never creates a database to revert', async () => {
+    const file = join(dir, 'floor.db');
+    const local = (args: string[], url = `sqlite:${file}`) =>
+      cli(args, { env: { POIETIC_ISSUES_DATABASE_URL: url }, fetch: null });
+    expect((await local(['db', 'migrate'])).code).toBe(0);
+    for (;;) {
+      const { applied } = (await local(['db', 'status', '--json'])).json() as { applied: string[] };
+      if (applied.length === 1) break;
+      expect((await local(['db', 'migrate', '--down'])).code).toBe(0);
+    }
+    const refused = await local(['db', 'migrate', '--down']);
+    expect(refused.code).toBe(2);
+    expect(refused.stderr).toContain('Refusing to revert 0001_init');
+    expect((await local(['db', 'status', '--json'])).json()).toMatchObject({
+      applied: ['0001_init'],
+    });
+
+    const missing = join(dir, 'no-such', 'typo.db');
+    for (const args of [
+      ['db', 'migrate', '--down'],
+      ['db', 'status'],
+    ]) {
+      const result = await local(args, `sqlite:${missing}`);
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain('No database at');
+    }
+    expect(existsSync(missing)).toBe(false);
   });
 
   it('creates the SQLite file’s directory, like the server does', async () => {
@@ -501,6 +678,13 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
           })
         ).code,
       ).toBe(5);
+      // Without a token the server answers as an anonymous visitor; the CLI reports "not signed in".
+      const anonymous = await cli(['whoami', '--json'], {
+        env: { POIETIC_ISSUES_SERVER: server.url },
+        fetch: null,
+      });
+      expect(anonymous.code).toBe(5);
+      expect(anonymous.stderr).toMatch(/not signed in/i);
 
       const login = await cli(['auth', 'login', '--server', server.url, '--with-token'], {
         stdin: token,

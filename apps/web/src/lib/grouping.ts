@@ -1,11 +1,11 @@
-import type { Issue, User } from './api.ts';
+import type { Issue } from './api.ts';
 import { PRIORITY_LABELS, PRIORITY_ORDER } from './format.ts';
 import type { ProjectData } from './project-data.svelte.ts';
 
 export type GroupHeaderSpec =
   | { kind: 'status'; label: string; category: string; color: string }
   | { kind: 'priority'; label: string; priority: number }
-  | { kind: 'user'; label: string; user: User | null }
+  | { kind: 'user'; label: string; user: Issue['creator'] | null }
   | { kind: 'option'; label: string; color: string }
   | { kind: 'plain'; label: string };
 
@@ -25,10 +25,43 @@ function group(id: string, header: GroupHeaderSpec, match: (i: Issue) => boolean
   return { id, label: header.label, header, match };
 }
 
-function userGroups(project: ProjectData, value: (i: Issue) => unknown): GroupSpec[] {
-  return [...project.users]
+/**
+ * One group per user: the project's users, plus anyone the issues mention that the directory lacks. Signed-out
+ * visitors cannot list users, so they know people only from the issues themselves (`user` reads the embedded
+ * summary); a value no one describes (a user-type custom field, a deactivated user) still gets its own group,
+ * so no issue ever drops out of the list or board.
+ */
+function userGroups(
+  project: ProjectData,
+  issues: Issue[],
+  value: (i: Issue) => unknown,
+  user?: (i: Issue) => Issue['creator'] | null,
+): GroupSpec[] {
+  const users = new Map<string, Issue['creator']>(project.users.map((u) => [u.id, u]));
+  if (user)
+    for (const issue of issues) {
+      const u = user(issue);
+      if (u && !users.has(u.id)) users.set(u.id, u);
+    }
+  const known = [...users.values()]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((u) => group(u.id, { kind: 'user', label: u.name, user: u }, (i) => value(i) === u.id));
+  const unknown = [
+    ...new Set(
+      issues
+        .map(value)
+        .filter((v): v is string => typeof v === 'string' && v !== '' && !users.has(v)),
+    ),
+  ]
+    .sort()
+    .map((id) =>
+      group(
+        id,
+        { kind: 'user', label: `Unknown user (${id.slice(-4)})`, user: null },
+        (i) => value(i) === id,
+      ),
+    );
+  return [...known, ...unknown];
 }
 
 function customFieldGroups(issues: Issue[], key: string, project: ProjectData): GroupSpec[] {
@@ -58,7 +91,7 @@ function customFieldGroups(issues: Issue[], key: string, project: ProjectData): 
         group('false', { kind: 'plain', label: `${field.name}: no` }, (i) => value(i) === false),
       ];
     case 'user':
-      return [none, ...userGroups(project, value)];
+      return [none, ...userGroups(project, issues, value)];
     default: {
       const values = [
         ...new Set(issues.filter((i) => !isNone(i)).map((i) => String(value(i)))),
@@ -107,10 +140,30 @@ export function groupIssues(
   } else if (groupBy === 'assignee') {
     groups = [
       group(NONE, { kind: 'user', label: 'No assignee', user: null }, (i) => i.assigneeId === null),
-      ...userGroups(project, (i) => i.assigneeId),
+      ...userGroups(
+        project,
+        issues,
+        (i) => i.assigneeId,
+        (i) => i.assignee,
+      ),
     ];
   } else if (groupBy === 'creator') {
-    groups = userGroups(project, (i) => i.creatorId);
+    groups = userGroups(
+      project,
+      issues,
+      (i) => i.creatorId,
+      (i) => i.creator,
+    );
+  } else if (groupBy === 'repo') {
+    const names = new Set(project.repos.map((r) => r.fullName));
+    // Repos the project no longer links can still appear on a stale snapshot; keep those issues visible.
+    for (const issue of issues) if (issue.repo) names.add(issue.repo);
+    groups = [
+      group(NONE, { kind: 'plain', label: 'No repository' }, (i) => i.repo === null),
+      ...[...names]
+        .sort((a, b) => a.localeCompare(b))
+        .map((n) => group(n, { kind: 'plain', label: n }, (i) => i.repo === n)),
+    ];
   } else if (groupBy.startsWith('cf:')) {
     groups = customFieldGroups(issues, groupBy.slice(3), project);
   } else {

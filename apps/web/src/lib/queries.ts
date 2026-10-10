@@ -1,5 +1,18 @@
+import type { Schemas } from '@poietic-tech/issues-client';
 import type { IssueFilter, SortSpec } from '@poietic-tech/issues-schema';
-import { api, call, type Issue } from './api.ts';
+import { api, call, type Issue, type Project } from './api.ts';
+
+/** `GET /me`: the signed-in user, or `{ anonymous: true }` for a signed-out visitor. */
+export type Me = Schemas['Me'];
+
+export function isSignedIn(me: Me | undefined): me is Schemas['User'] {
+  return !!me && !('anonymous' in me);
+}
+
+/** The caller's level on a project (`myAccess`); anything below `write` is read-only (ADR 0021). */
+export type Access = Project['myAccess'];
+export const canWrite = (access: Access | undefined) => access === 'write' || access === 'manage';
+export const canManage = (access: Access | undefined) => access === 'manage';
 
 /** Query keys. Issues are cached by key (`ENG-42`), lists by project + query. */
 export const keys = {
@@ -10,6 +23,7 @@ export const keys = {
   statuses: (key: string) => ['statuses', key] as const,
   labels: (key: string) => ['labels', key] as const,
   views: (key: string) => ['views', key] as const,
+  members: (key: string) => ['members', key] as const,
   users: ['users'] as const,
   linkTypes: ['link-types'] as const,
   fields: (key: string) => ['fields', key] as const,
@@ -32,11 +46,14 @@ export interface IssueListQuery {
 }
 
 export const fetchers = {
-  me: () => call(api.GET('/me')),
+  me: (): Promise<Me> => call(api.GET('/me')),
   authConfig: () => call(api.GET('/auth/config')),
   projects: async () => (await call(api.GET('/projects', { params: { query: {} } }))).data,
   project: (key: string) =>
     call(api.GET('/projects/{project}', { params: { path: { project: key } } })),
+  members: async (key: string) =>
+    (await call(api.GET('/projects/{project}/members', { params: { path: { project: key } } })))
+      .data,
   statuses: async (key: string) =>
     (await call(api.GET('/projects/{project}/statuses', { params: { path: { project: key } } })))
       .data,
@@ -53,20 +70,27 @@ export const fetchers = {
         api.GET('/projects/{project}/fields', { params: { path: { project: key }, query: {} } }),
       )
     ).data,
-  /** Every issue matching a query (pages through the results; views show whole projects). */
+  /**
+   * Every issue matching a query (pages through the results; views show whole projects). Uses the `GET` listing,
+   * which signed-out visitors may call too (anonymous requests are `GET`-only).
+   */
   issues: async (project: string, query: IssueListQuery): Promise<Issue[]> => {
     const all: Issue[] = [];
     let cursor: string | null = null;
     do {
       const page: { data: Issue[]; nextCursor: string | null } = await call(
-        api.POST('/issues/search', {
-          body: {
-            project,
-            filter: query.filter,
-            sort: query.sort,
-            limit: 200,
-            includeDeleted: query.includeDeleted ?? false,
-            ...(cursor && { cursor }),
+        api.GET('/projects/{project}/issues', {
+          params: {
+            path: { project },
+            query: {
+              limit: 200,
+              ...(query.filter.conditions.length > 0 && { filter: JSON.stringify(query.filter) }),
+              ...(query.sort.length > 0 && {
+                sort: query.sort.map((s) => `${s.dir === 'desc' ? '-' : ''}${s.field}`).join(','),
+              }),
+              ...(query.includeDeleted && { includeDeleted: 'true' as const }),
+              ...(cursor && { cursor }),
+            },
           },
         }),
       );

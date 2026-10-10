@@ -8,12 +8,15 @@
   import Avatar from './Avatar.svelte';
   import DateInput from './DateInput.svelte';
   import LabelPicker from './LabelPicker.svelte';
+  import RepoPicker from './RepoPicker.svelte';
   import PriorityPicker from './PriorityPicker.svelte';
   import StatusPicker from './StatusPicker.svelte';
   import type { Snippet } from 'svelte';
 
   let { issue, project, extra }: { issue: Issue; project: ProjectData; extra?: Snippet } = $props();
   const qc = useQueryClient();
+  /** Without write access the properties read as plain text (the server would refuse edits anyway). */
+  const readonly = $derived(!project.canWrite);
 
   function setEstimate(event: Event) {
     const raw = (event.target as HTMLInputElement).value.trim();
@@ -35,30 +38,37 @@
 {/snippet}
 
 <div class="space-y-0.5 text-sm" data-testid="issue-properties">
-  {#snippet status()}<StatusPicker {issue} statuses={project.statuses} />{/snippet}
-  {#snippet priority()}<PriorityPicker {issue} />{/snippet}
-  {#snippet assignee()}<AssigneePicker {issue} users={project.users} />{/snippet}
-  {#snippet labels()}<LabelPicker {issue} labels={project.labels} />{/snippet}
+  {#snippet status()}<StatusPicker {issue} statuses={project.statuses} {readonly} />{/snippet}
+  {#snippet priority()}<PriorityPicker {issue} {readonly} />{/snippet}
+  {#snippet assignee()}<AssigneePicker {issue} users={project.users} {readonly} />{/snippet}
+  {#snippet labels()}<LabelPicker {issue} labels={project.labels} {readonly} />{/snippet}
+  {#snippet repo()}<RepoPicker {issue} repos={project.repos} {readonly} />{/snippet}
   {#snippet estimate()}
-    <input
-      type="number"
-      min="0"
-      step="0.5"
-      value={issue.estimate ?? ''}
-      placeholder="Set estimate"
-      aria-label="Estimate"
-      onchange={setEstimate}
-      class="w-full rounded bg-transparent px-1.5 py-1 placeholder:text-fg-subtle hover:bg-bg-hover focus:bg-bg-hover focus:outline-none"
-    />
+    {#if readonly}
+      <span class="px-1.5 {issue.estimate === null ? 'text-fg-subtle' : ''}"
+        >{issue.estimate ?? 'No estimate'}</span
+      >
+    {:else}
+      <input
+        type="number"
+        min="0"
+        step="0.5"
+        value={issue.estimate ?? ''}
+        placeholder="Set estimate"
+        aria-label="Estimate"
+        onchange={setEstimate}
+        class="w-full rounded bg-transparent px-1.5 py-1 placeholder:text-fg-subtle hover:bg-bg-hover focus:bg-bg-hover focus:outline-none"
+      />
+    {/if}
   {/snippet}
   {#snippet due()}
     <DateInput
       value={issue.dueDate}
       label="Due date"
-      placeholder="Set due date"
+      placeholder={readonly ? 'No due date' : 'Set due date'}
       testid="due-date"
       overdue={!['completed', 'canceled'].includes(issue.status.category)}
-      disabled={!!issue.deletedAt}
+      disabled={!!issue.deletedAt || readonly}
       onchange={setDue}
     />
   {/snippet}
@@ -73,6 +83,7 @@
   {@render row('Priority', priority)}
   {@render row('Assignee', assignee)}
   {@render row('Labels', labels)}
+  {#if project.repos.length || issue.repo}{@render row('Repository', repo)}{/if}
   {@render row('Estimate', estimate)}
   {@render row('Due date', due)}
   {@render extra?.()}

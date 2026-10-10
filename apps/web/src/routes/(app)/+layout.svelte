@@ -2,15 +2,18 @@
   import { page } from '$app/state';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { connectLive } from '$lib/live.svelte.ts';
-  import { fetchers, keys } from '$lib/queries.ts';
+  import { ApiError } from '$lib/api.ts';
+  import { canWrite, fetchers, isSignedIn, keys } from '$lib/queries.ts';
   import { openCommand, openCreateIssue, ui } from '$lib/ui.svelte.ts';
   import { PRIORITY_LABELS } from '$lib/format.ts';
   import { bulkUpdate, cachedIssues, deleteIssues } from '$lib/issues.ts';
-  import { navigate } from '$lib/nav.ts';
+  import { navigate, signInPath } from '$lib/nav.ts';
+  import { attemptSso, markSilentSsoDone, silentSsoAllowed } from '$lib/session.ts';
   import { clearSelection, moveFocus, selection, toggleSelected } from '$lib/selection.svelte.ts';
   import CommandMenu from '$components/CommandMenu.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import ShortcutsDialog from '$components/ShortcutsDialog.svelte';
+  import LogIn from '@lucide/svelte/icons/log-in';
   import Menu from '@lucide/svelte/icons/menu';
   import Plus from '@lucide/svelte/icons/plus';
   import CreateIssueDialog from '$components/CreateIssueDialog.svelte';
@@ -22,6 +25,37 @@
   const me = createQuery(() => ({ queryKey: keys.me, queryFn: fetchers.me, staleTime: 300_000 }));
   const projects = createQuery(() => ({ queryKey: keys.projects, queryFn: fetchers.projects }));
 
+  const qc = useQueryClient();
+
+  // A signed-out visitor may still be signed in to the SSO issuer: make one silent attempt per browser session
+  // (never after signing out), as the login page's automatic attempt does. The page waits for it, so a private
+  // project doesn't flash "not found" before the visitor is signed in; if it fails they browse anonymously.
+  let silentSso = $state<'pending' | 'running' | 'done'>(silentSsoAllowed() ? 'pending' : 'done');
+  const anonymous = $derived(!!me.data && !isSignedIn(me.data));
+  const authConfig = createQuery(() => ({
+    queryKey: keys.authConfig,
+    queryFn: fetchers.authConfig,
+    enabled: anonymous && silentSso === 'pending',
+  }));
+  $effect(() => {
+    if (!anonymous || silentSso !== 'pending') return;
+    const { isError, data } = authConfig;
+    if (!isError && !data) return;
+    markSilentSsoDone();
+    const sso = data?.sso;
+    if (!sso) {
+      silentSso = 'done';
+      return;
+    }
+    silentSso = 'running';
+    void attemptSso(sso)
+      // Signed in: drop everything cached for the anonymous visitor and fetch it again as the user.
+      .then((result) => (result.ok ? qc.resetQueries() : undefined))
+      .catch(() => undefined)
+      .finally(() => (silentSso = 'done'));
+  });
+  const waitingForSso = $derived(anonymous && silentSso !== 'done');
+
   /** Current project from the URL (`/p/ENG…` or `/i/ENG-42`), else the first project. */
   const currentProject = $derived(
     (page.params.key && /^[A-Za-z][A-Za-z0-9]*$/.test(page.params.key)
@@ -32,16 +66,25 @@
       '',
   );
 
+  /** The caller's level on the current project: write shortcuts and create actions need `write`. */
+  const access = $derived(projects.data?.find((p) => p.key === currentProject)?.myAccess);
+  const writable = $derived(canWrite(access));
+
+  /** Signed-out visitors browse public projects; signing in comes back to the same page. */
+  function signIn() {
+    void navigate(signInPath());
+  }
+
   // Close the navigation drawer whenever the page changes.
   $effect(() => {
     void page.url.href;
     ui.sidebarOpen = false;
   });
 
-  const qc = useQueryClient();
-  // One live event stream for the project in view; reconnects when the project changes.
+  // One live event stream for the project in view; reconnects when the project changes. Signed-out visitors
+  // get one too: the server sends each viewer only what they may read.
   $effect(() => {
-    if (!me.data || !currentProject) return;
+    if (!me.data || waitingForSso || !currentProject) return;
     return connectLive(qc, currentProject);
   });
 
@@ -85,6 +128,7 @@
       return;
 
     if (mod && (event.key === 'Backspace' || event.key === 'Delete')) {
+      if (!writable) return;
       const targets = cachedIssues(qc, issueTargets());
       if (targets.length) {
         event.preventDefault();
@@ -98,6 +142,7 @@
       clearTimeout(pendingG);
       pendingG = undefined;
       const suffix = GO[event.key.toLowerCase()];
+      if (suffix === '/settings' && !canWrite(access)) return;
       if (suffix !== undefined && currentProject) {
         event.preventDefault();
         void navigate(`/p/${currentProject}${suffix}`);
@@ -108,7 +153,7 @@
     const targets = issueTargets();
     switch (event.key) {
       case 'c':
-        if (!currentProject) return;
+        if (!currentProject || !writable) return;
         openCreateIssue(currentProject);
         break;
       case 'g':
@@ -154,7 +199,7 @@
       case 'a':
       case 'p':
       case 'l':
-        if (!targets.length) return;
+        if (!targets.length || !writable) return;
         openCommand(
           ({ s: 'status', a: 'assignee', p: 'priority', l: 'labels' } as const)[event.key],
           targets,
@@ -165,7 +210,7 @@
       case '2':
       case '3':
       case '4': {
-        if (!targets.length) return;
+        if (!targets.length || !writable) return;
         const priority = Number(event.key);
         void bulkUpdate(qc, targets, { priority }, `Priority → ${PRIORITY_LABELS[priority]}`);
         break;
@@ -179,9 +224,9 @@
 
 <svelte:window {onkeydown} />
 
-{#if me.data}
+{#if me.data && !waitingForSso}
   <div class="flex h-dvh overflow-hidden">
-    <Sidebar me={me.data} projects={projects.data ?? []} {currentProject} />
+    <Sidebar me={me.data} projects={projects.data ?? []} {currentProject} onsignin={signIn} />
     {#if ui.sidebarOpen}
       <button
         class="fixed inset-0 z-30 bg-black/30 md:hidden"
@@ -202,7 +247,12 @@
         <span class="truncate text-sm font-medium"
           >{projects.data?.find((p) => p.key === currentProject)?.name ?? 'Issues'}</span
         >
-        {#if currentProject}
+        {#if !isSignedIn(me.data)}
+          <button
+            class="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-fg-muted hover:bg-bg-hover hover:text-fg"
+            onclick={signIn}><LogIn size={16} /> Sign in</button
+          >
+        {:else if currentProject && writable}
           <button
             class="ml-auto rounded-md p-1.5 text-fg-muted hover:bg-bg-hover hover:text-fg"
             aria-label="New issue"
@@ -214,12 +264,17 @@
     </main>
   </div>
   {#if ui.createIssue.open}<CreateIssueDialog />{/if}
-  {#if ui.createProject}<CreateProjectDialog />{/if}
+  {#if ui.createProject && isSignedIn(me.data) && me.data.role === 'admin'}<CreateProjectDialog
+    />{/if}
   <CommandMenu {currentProject} />
   <ShortcutsDialog />
   <ConfirmDialog />
 {:else if me.isError}
-  <div class="p-8 text-sm text-fg-muted">Redirecting to sign in…</div>
+  <div class="p-8 text-sm text-fg-muted">
+    {me.error instanceof ApiError && me.error.status === 401
+      ? 'Redirecting to sign in…'
+      : `Couldn’t load: ${me.error.message}`}
+  </div>
 {:else}
   <div class="p-8 text-sm text-fg-subtle">Loading…</div>
 {/if}

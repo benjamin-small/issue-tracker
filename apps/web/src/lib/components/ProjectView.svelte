@@ -1,7 +1,7 @@
 <script lang="ts">
   import { btn } from '../styles.ts';
   import { page } from '$app/state';
-  import { current, navigate, pushPageState } from '$lib/nav.ts';
+  import { current, href, navigate, pushPageState, signInPath } from '$lib/nav.ts';
   import { createQuery } from '@tanstack/svelte-query';
   import type { View } from '../api.ts';
   import { useProjectData } from '../project-data.svelte.ts';
@@ -20,6 +20,7 @@
   import Board from './Board.svelte';
   import FilterBar from './FilterBar.svelte';
   import IssueDetail from './IssueDetail.svelte';
+  import FolderX from '@lucide/svelte/icons/folder-x';
   import Inbox from '@lucide/svelte/icons/inbox';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import EmptyState from './EmptyState.svelte';
@@ -128,7 +129,20 @@
   </header>
 
   <div class="relative flex min-h-0 flex-1">
-    {#if issues.isError}
+    {#if project.notFound}
+      <EmptyState icon={FolderX} title="Project {projectKey} not found" testid="project-not-found">
+        {project.signedIn
+          ? 'It may not exist, or it may be private to its members.'
+          : 'It may not exist, or it may be private. Sign in to see the projects you belong to.'}
+        {#snippet actions()}
+          {#if !project.signedIn}
+            <button class={btn.primary} onclick={() => navigate(signInPath())}>Sign in</button>
+          {:else}
+            <a href={href('/')} class={btn.secondary}>Go to your projects</a>
+          {/if}
+        {/snippet}
+      </EmptyState>
+    {:else if issues.isError}
       <EmptyState icon={TriangleAlert} tone="danger" title="Couldn’t load issues">
         {issues.error.message}
         {#snippet actions()}
@@ -155,16 +169,22 @@
             : 'No issues yet'}
           testid="empty-list"
         >
-          {config.filter.conditions.length
-            ? 'Try removing a filter, or create an issue that fits.'
-            : 'Create the first issue for this project.'}
+          {#if !project.canWrite}
+            {config.filter.conditions.length ? 'Try removing a filter.' : 'Nothing here yet.'}
+          {:else}
+            {config.filter.conditions.length
+              ? 'Try removing a filter, or create an issue that fits.'
+              : 'Create the first issue for this project.'}
+          {/if}
           {#snippet actions()}
             {#if dirty}
               <button class={btn.secondary} onclick={() => setConfig(saved)}>Reset view</button>
             {/if}
-            <button class={btn.primary} onclick={() => openCreateIssue(projectKey)}
-              >New issue</button
-            >
+            {#if project.canWrite}
+              <button class={btn.primary} onclick={() => openCreateIssue(projectKey)}
+                >New issue</button
+              >
+            {/if}
           {/snippet}
         </EmptyState>
       {:else}
@@ -172,7 +192,7 @@
       {/if}
     {/if}
 
-    <SelectionBar />
+    {#if project.canWrite}<SelectionBar />{/if}
 
     {#if peek}
       <aside

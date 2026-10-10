@@ -30,6 +30,13 @@ export function current(): { path: string; params: URLSearchParams } {
   return { path: page.url.pathname, params: page.url.searchParams };
 }
 
+/** The sign-in page, set to come back to the current page (path and query) afterwards. */
+export function signInPath(): string {
+  const { path, params } = current();
+  const query = params.toString();
+  return `/login?next=${encodeURIComponent(query ? `${path}?${query}` : path)}`;
+}
+
 /** Absolute URL of an app path, for sharing. */
 export function shareUrl(path: string): string {
   return new URL(href(path), location.href).href;

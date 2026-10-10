@@ -4,6 +4,7 @@ import type { Db, Dialect } from './dialect.ts';
 import { migration0001 } from './migrations/0001_init.ts';
 import { migration0002 } from './migrations/0002_webhook_delivery_details.ts';
 import { migration0003 } from './migrations/0003_user_identities.ts';
+import { migration0004 } from './migrations/0004_project_access.ts';
 
 /**
  * All migrations, in order. Migrations are registered in code (not discovered from the filesystem)
@@ -14,6 +15,7 @@ function allMigrations(dialect: Dialect): Record<string, Migration> {
     '0001_init': migration0001(dialect),
     '0002_webhook_delivery_details': migration0002(dialect),
     '0003_user_identities': migration0003(dialect),
+    '0004_project_access': migration0004(dialect),
   };
 }
 

@@ -1,5 +1,11 @@
 import { z } from '@hono/zod-openapi';
-import { type EventTailer, getProjectRow, listEvents } from '@poietic-tech/issues-core';
+import {
+  type EventTailer,
+  filterEventsForViewer,
+  getProjectRow,
+  listEvents,
+  readableProjectIds,
+} from '@poietic-tech/issues-core';
 import type { TrackerEvent } from '@poietic-tech/issues-schema';
 import { streamSSE } from 'hono/streaming';
 import type { ResolvedDeps, TrackerApp } from '../env.ts';
@@ -8,12 +14,22 @@ import { problem } from '../problem.ts';
 const HEARTBEAT_MS = 15_000;
 const MAX_REPLAY = 1000;
 
+/** Events after which a viewer's readable projects may differ (membership, visibility, a new project). */
+const changesAccess = (e: TrackerEvent) =>
+  e.type.startsWith('project.member_') ||
+  e.type === 'project.updated' ||
+  e.type === 'project.created';
+
 /**
  * `GET /events/stream` — live events as Server-Sent Events.
  *
  * Each message has `id: <seq>`, `event: <type>` and the event JSON as `data`. Browsers reconnect automatically
  * and send `Last-Event-ID`; the server replays what was missed (up to 1000 events — beyond that it sends a
  * `reset` event, telling the client to refetch). Optional `?project=` filters to one project.
+ *
+ * The tailer fans out every event, so each connection applies its viewer's access (the same rules as
+ * `GET /events`): only readable projects, and the readable set is re-read when memberships or a project's
+ * visibility change.
  */
 export function registerStreamRoute(
   app: TrackerApp,
@@ -55,7 +71,9 @@ export function registerStreamRoute(
     if (!tailer) return problem(c, 'UNAVAILABLE', 'Live events are not enabled on this server');
     const ctx = c.get('ctx');
     const projectRef = c.req.query('project');
-    const projectId = projectRef ? (await getProjectRow(ctx.db.kysely, projectRef)).id : undefined;
+    const projectId = projectRef
+      ? (await getProjectRow(ctx, ctx.db.kysely, projectRef, 'read')).id
+      : undefined;
     const resumeRaw = c.req.header('last-event-id') ?? c.req.query('after');
     const resume =
       resumeRaw !== undefined && /^\d+$/.test(resumeRaw) ? Number(resumeRaw) : undefined;
@@ -63,18 +81,28 @@ export function registerStreamRoute(
     c.header('X-Accel-Buffering', 'no');
     c.header('Cache-Control', 'no-cache');
     return streamSSE(c, async (stream) => {
-      let last = resume ?? tailer.lastSeq;
       const queue: TrackerEvent[] = [];
       let wake: (() => void) | undefined;
       const matches = (e: TrackerEvent) => !projectId || e.projectId === projectId;
-      // Subscribe before replaying so nothing committed in between is lost; duplicates are dropped by seq.
+      // Subscribe and read the position together, before any await, so nothing committed afterwards is
+      // missed (replay and live may overlap; duplicates are dropped by seq).
       const unsubscribe = tailer.subscribe((e) => {
         if (matches(e)) {
           queue.push(e);
           wake?.();
         }
       });
+      let last = resume ?? tailer.lastSeq;
       stream.onAbort(unsubscribe);
+      let readable: Awaited<ReturnType<typeof readableProjectIds>> = [];
+      const refresh = async (events: TrackerEvent[]) => {
+        if (events.some(changesAccess)) readable = await readableProjectIds(ctx, ctx.db.kysely);
+      };
+      /** Filters and redacts one live event for this viewer, first catching up on access changes. */
+      const visible = async (e: TrackerEvent) => {
+        await refresh([e]);
+        return filterEventsForViewer(ctx, [e], readable);
+      };
 
       const send = async (e: TrackerEvent) => {
         if (e.seq <= last) return;
@@ -82,7 +110,11 @@ export function registerStreamRoute(
         await stream.writeSSE({ id: String(e.seq), event: e.type, data: JSON.stringify(e) });
       };
 
+      // Everything after subscribing runs inside this try, so a failure (even in the access read) unsubscribes.
       try {
+        // Read access only after subscribing: any change committed after this read is queued, and
+        // re-reads it before the events that follow are filtered.
+        readable = await readableProjectIds(ctx, ctx.db.kysely);
         if (resume !== undefined) {
           const replay = await listEvents(ctx, {
             after: resume,
@@ -99,6 +131,8 @@ export function registerStreamRoute(
           } else {
             for (const e of replay.data) await send(e);
           }
+          // Replayed events are filtered by listEvents; catch the live filter up on access they changed.
+          await refresh(replay.data);
         }
         await stream.writeSSE({ event: 'ready', data: JSON.stringify({ seq: last }) });
         const stopping = () => stream.aborted || deps.shutdownSignal?.aborted === true;
@@ -106,7 +140,7 @@ export function registerStreamRoute(
         deps.shutdownSignal?.addEventListener('abort', onShutdown);
         stream.onAbort(() => deps.shutdownSignal?.removeEventListener('abort', onShutdown));
         while (!stopping()) {
-          while (queue.length) await send(queue.shift()!);
+          while (queue.length) for (const e of await visible(queue.shift()!)) await send(e);
           await new Promise<void>((resolve) => {
             wake = resolve;
             setTimeout(resolve, HEARTBEAT_MS);

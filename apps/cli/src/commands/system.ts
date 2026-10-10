@@ -1,6 +1,6 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createClient, unwrap } from '@poietic-tech/issues-client';
+import { createClient, type Schemas, unwrap } from '@poietic-tech/issues-client';
 import {
   bootstrapAdmin,
   createContext,
@@ -9,7 +9,13 @@ import {
   seedDemoData,
   SYSTEM_ACTOR,
 } from '@poietic-tech/issues-core';
-import { latestMigrationName, migrateToLatest, migrationStatus } from '@poietic-tech/issues-db';
+import {
+  latestMigrationName,
+  migrateDown,
+  migrateToLatest,
+  migrationStatus,
+  parseDatabaseUrl,
+} from '@poietic-tech/issues-db';
 import {
   CommentSchema,
   CreateCommentInputSchema,
@@ -77,6 +83,16 @@ function jsonSchema(name: string): Record<string, unknown> {
   }) as Record<string, unknown>;
 }
 
+/** `GET /me` answers `{ anonymous: true }` without credentials; the CLI treats that as not signed in. */
+function signedIn(me: Schemas['Me']): Schemas['User'] {
+  if ('anonymous' in me)
+    throw new CliError(
+      'UNAUTHENTICATED',
+      'Not signed in: set POIETIC_ISSUES_TOKEN or run `poietic-issues auth login`',
+    );
+  return me;
+}
+
 export function authCommand(io: CliIO): Command {
   const act = actFor(io);
   const cmd = new Command('auth').description(
@@ -99,7 +115,7 @@ export function authCommand(io: CliIO): Command {
           token,
           ...(rt.io.fetch && { fetch: rt.io.fetch }),
         });
-        const me = unwrap(await client.GET('/me'));
+        const me = signedIn(unwrap(await client.GET('/me')));
         const config = readUserConfig(rt.io.env);
         config.tokens[server] = token;
         config.defaultServer = server;
@@ -131,7 +147,7 @@ export function authCommand(io: CliIO): Command {
     .action(
       act(async (rt) => {
         const api = await rt.api();
-        const me = await rt.call(api.GET('/me'));
+        const me = signedIn(await rt.call(api.GET('/me')));
         const status = {
           mode: rt.config.mode,
           transport: await rt.describeTransport(),
@@ -161,7 +177,7 @@ export function whoamiCommand(io: CliIO): Command {
       const api = await rt.api();
       rt.out.item(
         'user',
-        await rt.call(api.GET('/me')),
+        signedIn(await rt.call(api.GET('/me'))),
         (u) => `@${String(u.handle)} (${String(u.kind)}, ${String(u.role)})\n`,
       );
     }),
@@ -188,22 +204,54 @@ export function initCommand(io: CliIO): Command {
     });
 }
 
+/** `db migrate --down` stops above this one: reverting it would drop every table. */
+const FIRST_MIGRATION = '0001_init';
+
 export function dbCommand(io: CliIO): Command {
   const cmd = new Command('db').description('Local database administration (local mode only)');
-  const localDb = async (flags: Opts) => {
+  /** `mustExist`: refuse a SQLite path with no file, instead of creating an empty database (a typo would look like success). */
+  const localDb = async (flags: Opts, mustExist = false) => {
     const config = resolveConfig(flags, io);
     if (config.mode !== 'local' || !config.database)
       throw usage(
         'db commands need a local database: set --database or POIETIC_ISSUES_DATABASE_URL (not --server)',
       );
+    if (mustExist) {
+      const parsed = parseDatabaseUrl(config.database);
+      if (
+        parsed.dialect === 'sqlite' &&
+        parsed.filename !== ':memory:' &&
+        !existsSync(parsed.filename)
+      )
+        throw usage(`No database at ${parsed.filename}`);
+    }
     return { config, db: await openLocalDatabase(config.database, false) };
   };
   cmd
     .command('migrate')
     .description('Apply pending migrations')
-    .action(async (_o: Opts, command: Command) => {
-      const { config, db } = await localDb(command.optsWithGlobals());
+    .option(
+      '--down',
+      'revert the newest applied migration instead (one step; drops its tables and columns, so back up first; never reverts the first migration)',
+    )
+    .action(async (o: Opts, command: Command) => {
+      const { config, db } = await localDb(command.optsWithGlobals(), Boolean(o.down));
       try {
+        if (o.down) {
+          const newest = (await migrationStatus(db)).applied.at(-1);
+          if (newest === FIRST_MIGRATION)
+            throw usage(
+              `Refusing to revert ${FIRST_MIGRATION}: it drops every table. To start over, delete the database instead.`,
+            );
+          const reverted = await migrateDown(db);
+          const result = { database: config.database, reverted, latest: latestMigrationName() };
+          if (config.format === 'table')
+            io.stdout(
+              reverted.length ? `Reverted: ${reverted.join(', ')}\n` : 'No migrations to revert.\n',
+            );
+          else io.stdout(`${JSON.stringify(result, null, 2)}\n`);
+          return;
+        }
         const applied = await migrateToLatest(db);
         await ensureBuiltins(db);
         const result = { database: config.database, applied, latest: latestMigrationName() };
@@ -220,7 +268,7 @@ export function dbCommand(io: CliIO): Command {
     .command('status')
     .description('Show applied and pending migrations')
     .action(async (_o: Opts, command: Command) => {
-      const { config, db } = await localDb(command.optsWithGlobals());
+      const { config, db } = await localDb(command.optsWithGlobals(), true);
       try {
         const status = await migrationStatus(db);
         if (config.format === 'table')
@@ -262,7 +310,7 @@ export function dbCommand(io: CliIO): Command {
   cmd
     .command('seed')
     .description(
-      'Create demo users (ada, grace, claude), project ENG and sample issues; prints API tokens',
+      'Create demo users (ada admin, grace, margaret, claude agent), public ENG with a linked repo, private OPS and sample issues; prints API tokens',
     )
     .action(async (_o: Opts, command: Command) => {
       const { config, db } = await localDb(command.optsWithGlobals());

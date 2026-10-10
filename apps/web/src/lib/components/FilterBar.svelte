@@ -1,6 +1,7 @@
 <script lang="ts">
   import Search from '@lucide/svelte/icons/search';
   import X from '@lucide/svelte/icons/x';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
   import { FieldRegistry, type IssueFilter } from '@poietic-tech/issues-schema';
   import { PRIORITY_LABELS, PRIORITY_ORDER } from '../format.ts';
   import type { ProjectData } from '../project-data.svelte.ts';
@@ -17,7 +18,7 @@
   }: { filter: IssueFilter; project: ProjectData; onchange: (f: IssueFilter) => void } = $props();
 
   type Value = string | number | null;
-  const QUICK = ['status', 'assignee', 'labels', 'priority'];
+  const QUICK = ['status', 'assignee', 'labels', 'priority', 'repo'];
   const quickOf = (field: string) =>
     filter.conditions.find((c) => c.field === field && (c.op === 'in' || c.op === 'nin'));
   const valuesOf = (field: string): Value[] => (quickOf(field)?.value as Value[] | undefined) ?? [];
@@ -160,6 +161,28 @@
   >
     {#snippet item(it)}<PriorityIcon priority={it.p} /><span>{it.label}</span>{/snippet}
   </FilterChip>
+
+  <!-- Values are `owner/name` as the project spells them, which is what `Issue.repo` holds (the live matcher compares them exactly). -->
+  {#if project.repos.length || valuesOf('repo').length}
+    <FilterChip
+      label="Repository"
+      plural="repositories"
+      items={[
+        ...project.repos.map((r) => ({ value: r.fullName, label: r.fullName })),
+        // A filter from a saved view or the CLI may name a repo the project no longer links.
+        ...valuesOf('repo')
+          .map(String)
+          .filter((v) => !project.repos.some((r) => r.fullName === v))
+          .map((v) => ({ value: v, label: v })),
+      ]}
+      {...chipProps('repo')}
+      testid="filter-repo"
+    >
+      {#snippet item(it)}<GitBranch size={14} class="text-fg-subtle" /><span class="truncate"
+          >{it.label}</span
+        >{/snippet}
+    </FilterChip>
+  {/if}
 
   {#each others as c, i (i)}
     <span

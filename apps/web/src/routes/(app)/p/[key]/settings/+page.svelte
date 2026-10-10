@@ -1,15 +1,20 @@
 <script lang="ts">
   import { btn, input } from '$lib/styles.ts';
+  import { href } from '$lib/nav.ts';
+  import Lock from '@lucide/svelte/icons/lock';
+  import EmptyState from '$components/EmptyState.svelte';
   import { page } from '$app/state';
-  import { useQueryClient } from '@tanstack/svelte-query';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import { api, call, errorMessage, type Label, type Status } from '$lib/api.ts';
   import { useProjectData } from '$lib/project-data.svelte.ts';
-  import { keys } from '$lib/queries.ts';
+  import { fetchers, isSignedIn, keys } from '$lib/queries.ts';
   import { toast } from '$lib/toast.svelte.ts';
   import { confirmAction } from '$lib/confirm.svelte.ts';
   import CustomFieldsSettings from '$components/CustomFieldsSettings.svelte';
+  import ProjectAccessSettings from '$components/ProjectAccessSettings.svelte';
   import ProjectGeneralSettings from '$components/ProjectGeneralSettings.svelte';
+  import ProjectReposSettings from '$components/ProjectReposSettings.svelte';
   import ColorInput from '$components/ColorInput.svelte';
   import Select from '$components/Select.svelte';
   import SortableList from '$components/SortableList.svelte';
@@ -19,6 +24,14 @@
   const key = $derived(page.params.key!.toUpperCase());
   const project = useProjectData(() => key);
   const qc = useQueryClient();
+  const me = createQuery(() => ({ queryKey: keys.me, queryFn: fetchers.me, staleTime: 300_000 }));
+  /**
+   * Editors change the workflow, labels and custom fields; managers also change access, repos and the project's
+   * details. Signed-in viewers see the members read-only; signed-out visitors get a dead end.
+   */
+  const readerOnly = $derived(
+    project.access !== undefined && !project.canWrite && me.isSuccess && isSignedIn(me.data),
+  );
   const CATEGORY_ITEMS = [
     { value: 'backlog', label: 'Backlog', hint: 'not planned yet' },
     { value: 'unstarted', label: 'Unstarted', hint: 'planned' },
@@ -139,124 +152,164 @@
 
 <svelte:head><title>{key} · Settings</title></svelte:head>
 
-<div class="overflow-y-auto">
-  <div class="mx-auto max-w-3xl space-y-10 px-4 py-6 sm:px-6 sm:py-8">
-    <h1 class="text-lg font-semibold">Project settings</h1>
-
-    <ProjectGeneralSettings projectKey={key} />
-
-    <section data-testid="settings-statuses">
-      <h2 class="mb-1 font-medium">Workflow</h2>
-      <p class="mb-3 text-sm text-fg-muted">
-        Statuses are the board columns, in this order (drag to reorder). The category drives
-        started/completed dates and default views.
+{#if project.notFound || (project.access !== undefined && !project.canWrite && me.isSuccess && !readerOnly)}
+  <!-- The settings link is shown to editors and managers only; this covers typed or shared URLs of signed-out visitors. -->
+  <EmptyState
+    icon={Lock}
+    title={project.notFound ? `Project ${key} not found` : 'Project settings are for members'}
+    testid="settings-forbidden"
+  >
+    {project.notFound
+      ? 'It may not exist, or it may be private to its members.'
+      : 'Sign in to see who can work in this project.'}
+    {#snippet actions()}
+      {#if !project.notFound}
+        <a href={href(`/p/${key}`)} class={btn.primary}>Back to {key} issues</a>
+      {/if}
+    {/snippet}
+  </EmptyState>
+{:else if readerOnly}
+  <div class="overflow-y-auto">
+    <div class="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+      <h1 class="text-lg font-semibold">Project settings</h1>
+      <p class="text-sm text-fg-muted" data-testid="settings-readonly">
+        Only project editors and managers can change these settings.
       </p>
-      <SortableList
-        items={project.statuses}
-        onreorder={reorderStatuses}
-        label={(s) => `Reorder ${s.name}`}
-        class="divide-y divide-border rounded-lg border border-border"
-        itemClass="gap-2 bg-bg px-2 py-2 first:rounded-t-lg last:rounded-b-lg"
-      >
-        {#snippet row(s)}
-          <ColorInput
-            value={s.color}
-            label="Colour of {s.name}"
-            onchange={(color) => updateStatus(s, { color })}
-          />
-          <StatusIcon category={s.category} color={s.color} />
+      <ProjectAccessSettings projectKey={key} readonly />
+    </div>
+  </div>
+{:else if project.canWrite}
+  <div class="overflow-y-auto">
+    <div class="mx-auto max-w-3xl space-y-10 px-4 py-6 sm:px-6 sm:py-8">
+      <h1 class="text-lg font-semibold">Project settings</h1>
+
+      {#if project.canManage}
+        <ProjectAccessSettings projectKey={key} />
+
+        <ProjectReposSettings projectKey={key} />
+
+        <ProjectGeneralSettings projectKey={key} />
+      {:else}
+        <p class="text-sm text-fg-muted" data-testid="settings-editor-note">
+          You can change the workflow, labels and custom fields. Only project managers can change
+          access, repositories and the project's details.
+        </p>
+        <ProjectAccessSettings projectKey={key} readonly />
+      {/if}
+
+      <section data-testid="settings-statuses">
+        <h2 class="mb-1 font-medium">Workflow</h2>
+        <p class="mb-3 text-sm text-fg-muted">
+          Statuses are the board columns, in this order (drag to reorder). The category drives
+          started/completed dates and default views.
+        </p>
+        <SortableList
+          items={project.statuses}
+          onreorder={reorderStatuses}
+          label={(s) => `Reorder ${s.name}`}
+          class="divide-y divide-border rounded-lg border border-border"
+          itemClass="gap-2 bg-bg px-2 py-2 first:rounded-t-lg last:rounded-b-lg"
+        >
+          {#snippet row(s)}
+            <ColorInput
+              value={s.color}
+              label="Colour of {s.name}"
+              onchange={(color) => updateStatus(s, { color })}
+            />
+            <StatusIcon category={s.category} color={s.color} />
+            <input
+              class="{input} min-w-0 flex-1"
+              value={s.name}
+              aria-label="Status name"
+              onchange={(e) => updateStatus(s, { name: e.currentTarget.value })}
+            />
+            <Select
+              class="w-32"
+              label="Category of {s.name}"
+              value={s.category}
+              items={CATEGORY_ITEMS}
+              onchange={(v) => updateStatus(s, { category: v as Status['category'] })}
+            />
+            <button
+              class="rounded p-1.5 text-fg-subtle hover:bg-bg-hover hover:text-danger disabled:opacity-30"
+              aria-label="Delete status {s.name}"
+              title="Delete status"
+              disabled={project.statuses.length <= 1}
+              onclick={() => askRemoveStatus(s)}><Trash2 size={14} /></button
+            >
+          {/snippet}
+        </SortableList>
+        <form class="mt-3 flex gap-2" onsubmit={addStatus}>
           <input
-            class="{input} min-w-0 flex-1"
-            value={s.name}
-            aria-label="Status name"
-            onchange={(e) => updateStatus(s, { name: e.currentTarget.value })}
+            class="{input} flex-1"
+            placeholder="New status"
+            bind:value={newStatus.name}
+            aria-label="New status name"
           />
           <Select
             class="w-32"
-            label="Category of {s.name}"
-            value={s.category}
+            label="New status category"
+            value={newStatus.category}
             items={CATEGORY_ITEMS}
-            onchange={(v) => updateStatus(s, { category: v as Status['category'] })}
+            onchange={(v) => (newStatus.category = v as Status['category'])}
           />
-          <button
-            class="rounded p-1.5 text-fg-subtle hover:bg-bg-hover hover:text-danger disabled:opacity-30"
-            aria-label="Delete status {s.name}"
-            title="Delete status"
-            disabled={project.statuses.length <= 1}
-            onclick={() => askRemoveStatus(s)}><Trash2 size={14} /></button
-          >
-        {/snippet}
-      </SortableList>
-      <form class="mt-3 flex gap-2" onsubmit={addStatus}>
-        <input
-          class="{input} flex-1"
-          placeholder="New status"
-          bind:value={newStatus.name}
-          aria-label="New status name"
-        />
-        <Select
-          class="w-32"
-          label="New status category"
-          value={newStatus.category}
-          items={CATEGORY_ITEMS}
-          onchange={(v) => (newStatus.category = v as Status['category'])}
-        />
-        <button class={btn.primary} disabled={!newStatus.name.trim()}>Add status</button>
-      </form>
-    </section>
+          <button class={btn.primary} disabled={!newStatus.name.trim()}>Add status</button>
+        </form>
+      </section>
 
-    <section data-testid="settings-labels">
-      <h2 class="mb-3 font-medium">Labels</h2>
-      <ul class="divide-y divide-border rounded-lg border border-border">
-        {#each project.labels as l (l.id)}
-          <li class="flex items-center gap-2 px-3 py-2" data-label={l.name}>
-            <ColorInput
-              value={l.color}
-              label="Colour of {l.name}"
-              onchange={(color) => updateLabel(l, { color })}
-            />
-            <input
-              class="{input} w-40"
-              value={l.name}
-              aria-label="Label name"
-              onchange={(e) => updateLabel(l, { name: e.currentTarget.value })}
-            />
-            <input
-              class="{input} flex-1"
-              value={l.description}
-              placeholder="Description"
-              aria-label="Description"
-              onchange={(e) => updateLabel(l, { description: e.currentTarget.value })}
-            />
-            <button
-              class="rounded p-1 text-fg-subtle hover:bg-bg-hover hover:text-danger"
-              aria-label="Delete label"
-              onclick={() => removeLabel(l)}><Trash2 size={14} /></button
-            >
-          </li>
-        {:else}
-          <li class="px-3 py-3 text-sm text-fg-subtle">No labels yet.</li>
-        {/each}
-      </ul>
-      <form class="mt-3 flex gap-2" onsubmit={addLabel}>
-        <ColorInput
-          value={newLabel.color}
-          label="New label colour"
-          onchange={(color) => (newLabel.color = color)}
-        />
-        <input
-          class="{input} flex-1"
-          placeholder="New label"
-          bind:value={newLabel.name}
-          aria-label="New label name"
-        />
-        <button class={btn.primary} disabled={!newLabel.name.trim()}>Add label</button>
-      </form>
-    </section>
+      <section data-testid="settings-labels">
+        <h2 class="mb-3 font-medium">Labels</h2>
+        <ul class="divide-y divide-border rounded-lg border border-border">
+          {#each project.labels as l (l.id)}
+            <li class="flex items-center gap-2 px-3 py-2" data-label={l.name}>
+              <ColorInput
+                value={l.color}
+                label="Colour of {l.name}"
+                onchange={(color) => updateLabel(l, { color })}
+              />
+              <input
+                class="{input} w-40"
+                value={l.name}
+                aria-label="Label name"
+                onchange={(e) => updateLabel(l, { name: e.currentTarget.value })}
+              />
+              <input
+                class="{input} flex-1"
+                value={l.description}
+                placeholder="Description"
+                aria-label="Description"
+                onchange={(e) => updateLabel(l, { description: e.currentTarget.value })}
+              />
+              <button
+                class="rounded p-1 text-fg-subtle hover:bg-bg-hover hover:text-danger"
+                aria-label="Delete label"
+                onclick={() => removeLabel(l)}><Trash2 size={14} /></button
+              >
+            </li>
+          {:else}
+            <li class="px-3 py-3 text-sm text-fg-subtle">No labels yet.</li>
+          {/each}
+        </ul>
+        <form class="mt-3 flex gap-2" onsubmit={addLabel}>
+          <ColorInput
+            value={newLabel.color}
+            label="New label colour"
+            onchange={(color) => (newLabel.color = color)}
+          />
+          <input
+            class="{input} flex-1"
+            placeholder="New label"
+            bind:value={newLabel.name}
+            aria-label="New label name"
+          />
+          <button class={btn.primary} disabled={!newLabel.name.trim()}>Add label</button>
+        </form>
+      </section>
 
-    <CustomFieldsSettings projectKey={key} />
+      <CustomFieldsSettings projectKey={key} />
+    </div>
   </div>
-</div>
+{/if}
 
 <AlertDialog.Root open={!!deleting} onOpenChange={(open) => !open && (deleting = null)}>
   <AlertDialog.Portal>

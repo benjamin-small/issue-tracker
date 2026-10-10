@@ -31,6 +31,10 @@ function issueFieldOptions(cmd: Command, mode: 'create' | 'edit'): Command {
     .option('-e, --estimate <points>', 'estimate, or none')
     .option('--due <date>', 'due date YYYY-MM-DD, or none')
     .option(
+      '--repo <owner/name>',
+      "one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it",
+    )
+    .option(
       '--set <field=value>',
       'custom field (repeatable), e.g. --set severity=high --set points=3',
       collectRaw,
@@ -75,6 +79,7 @@ async function buildIssueInput(rt: Runtime, o: Opts, existingMetadata?: Record<s
     input.estimate = v === null ? null : Number(v);
   }
   if (o.due !== undefined) input.dueDate = nullable(String(o.due));
+  if (o.repo !== undefined) input.repo = o.repo === '' ? null : nullable(String(o.repo));
   set('labels', o.label);
   set('addLabels', o.addLabel);
   set('removeLabels', o.removeLabel);
