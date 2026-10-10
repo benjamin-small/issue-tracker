@@ -105,9 +105,12 @@ export function useProjectData(key: () => string): ProjectData {
     get loaded() {
       // Read every query's status (no short-circuit): TanStack only notifies about result properties that
       // were read, so a status first read after it changed would never update this again.
-      const ready = [project, statuses, labels, fields].map((q) => q.isSuccess);
-      const people = users.isSuccess || (me.isSuccess && !signedIn);
-      return ready.every(Boolean) && people;
+      const [p, s, l, f, u, m] = [project, statuses, labels, fields, users, me].map(
+        (q) => q.isSuccess,
+      ) as [boolean, boolean, boolean, boolean, boolean, boolean];
+      const anonymous = !signedIn;
+      // People: the user directory, or nothing to wait for once `me` says the visitor is signed out.
+      return p && s && l && f && (u || (m && anonymous));
     },
     get access() {
       return project.data?.myAccess;
