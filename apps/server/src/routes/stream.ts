@@ -1,9 +1,11 @@
 import { z } from '@hono/zod-openapi';
 import {
+  ContentRulesMemo,
   type EventTailer,
   filterEventsForViewer,
   getProjectRow,
   listEvents,
+  type ProjectIdSet,
   readableProjectIds,
   writableProjectIds,
 } from '@poietic-tech/issues-core';
@@ -28,6 +30,30 @@ const changesAccess = (e: TrackerEvent) =>
 const namesViewer = (e: TrackerEvent, actorId: string) =>
   e.type === 'user.updated' && (e.data.user as { id?: string } | undefined)?.id === actorId;
 
+const canRead = (access: ProjectIdSet, projectId: string) =>
+  access === 'all' || access.includes(projectId);
+
+/**
+ * An event that can end the viewer's read access to its project: the removal of their own membership, or the
+ * project made private. (Access is re-read at the current state, which may already include later changes, so the
+ * event itself says whether it concerns the viewer.)
+ */
+const mayEndAccess = (e: TrackerEvent, actorId: string) =>
+  (e.type === 'project.member_removed' &&
+    (e.data.member as { user?: { id?: string } } | undefined)?.user?.id === actorId) ||
+  (e.type === 'project.updated' &&
+    (e.data.changes as { visibility?: { to?: string } } | undefined)?.visibility?.to === 'private');
+
+/**
+ * An event that ended the viewer's read access to its project, as they still get it: no content, only that it
+ * happened. The removal of their membership names them (`member.user.id`), so the client knows its own access
+ * changed; a project made private has empty `data`.
+ */
+const withoutContent = (e: TrackerEvent, actorId: string): TrackerEvent => ({
+  ...e,
+  data: e.type === 'project.member_removed' ? { member: { user: { id: actorId } } } : {},
+});
+
 /**
  * `GET /events/stream` — live events as Server-Sent Events.
  *
@@ -41,6 +67,11 @@ const namesViewer = (e: TrackerEvent, actorId: string) =>
  * stream (with or without `?project=`) is closed after delivering a `user.updated` event about them; the client
  * reconnects as who they are now and resumes. Replay runs on the identity the reconnect authenticated as, so it
  * never closes the stream.
+ *
+ * Readers below write get `issue.deleted` and `attachment.deleted` as content-free tombstones, live and on replay,
+ * so open views drop the row. An event that ends the viewer's read access to its project is delivered without its
+ * content, and a `?project=` stream on that project is then closed. Connections with the same access share their
+ * content lookups (`ContentRulesMemo`).
  */
 export function registerStreamRoute(
   app: TrackerApp,
@@ -54,7 +85,9 @@ export function registerStreamRoute(
     description:
       'Streams events as `text/event-stream`: `id` is the event seq, `event` its type, `data` the Event JSON. ' +
       'Reconnect with `Last-Event-ID` (or `?after=<seq>`) to resume without gaps. A `reset` event means the gap ' +
-      'was too large to replay: refetch state. Comment lines are heartbeats.',
+      'was too large to replay: refetch state. Comment lines are heartbeats. Readers below write get ' +
+      '`issue.deleted` and `attachment.deleted` as tombstones (ids and the issue key only). An event that ends ' +
+      "the viewer's read access to its project arrives without content, and a `?project=` stream on it then ends.",
     request: {
       query: z.object({
         project: z
@@ -76,6 +109,8 @@ export function registerStreamRoute(
       },
     },
   });
+
+  const memo = new ContentRulesMemo();
 
   app.get('/events/stream', async (c) => {
     const tailer = deps.tailer;
@@ -121,13 +156,27 @@ export function registerStreamRoute(
       /**
        * Takes the next run of queued events that share one access state, catching up on access first when the
        * run starts with an event that changes it, and filters and redacts the run for this viewer in one batch.
+       * When that event took away the viewer's read access to its project, it is kept, without its content, so the
+       * client learns its open views are gone (`lost`).
        */
       const nextVisible = async () => {
-        if (changesAccess(queue[0]!)) await readAccess();
+        const first = queue[0]!;
+        if (changesAccess(first)) await readAccess();
+        const lost =
+          first.projectId !== null &&
+          mayEndAccess(first, ctx.actor.id) &&
+          !canRead(readable, first.projectId);
         let n = 1;
         while (n < queue.length && !changesAccess(queue[n]!)) n++;
         const run = queue.splice(0, n);
-        return { run, visible: await filterEventsForViewer(ctx, run, readable, writable) };
+        const visible = await filterEventsForViewer(ctx, run, {
+          readable,
+          writable,
+          tombstones: true,
+          memo,
+        });
+        if (lost) visible.unshift(withoutContent(first, ctx.actor.id));
+        return { run, visible, lost };
       };
 
       const send = async (e: TrackerEvent) => {
@@ -155,11 +204,11 @@ export function registerStreamRoute(
         // Replay runs as whoever reconnected: a `user.updated` about the viewer that it replays happened before
         // this connection authenticated, so it does not end the stream (and a project stream does not replay it).
         if (resume !== undefined) {
-          const replay = await listEvents(ctx, {
-            after: resume,
-            limit: MAX_REPLAY,
-            project: projectId,
-          });
+          const replay = await listEvents(
+            ctx,
+            { after: resume, limit: MAX_REPLAY, project: projectId },
+            { tombstones: true },
+          );
           if (replay.nextCursor) await reset();
           else for (const e of replay.data) await send(e);
         }
@@ -168,12 +217,15 @@ export function registerStreamRoute(
         deps.shutdownSignal?.addEventListener('abort', onShutdown);
         loop: while (!stopping()) {
           while (queue.length) {
-            const { run, visible } = await nextVisible();
+            const { run, visible, lost } = await nextVisible();
             // The viewer's role or status changed: end the stream after that event so the client reconnects as who
             // they are now (or as anonymous), instead of keeping the access it connected with.
             const stop = run.find((e) => namesViewer(e, ctx.actor.id));
             for (const v of visible) if (!stop || v.seq <= stop.seq) await send(v);
             if (stop) break loop;
+            // A project stream whose project the viewer can no longer read has nothing more to carry (on such a
+            // stream, the event that ended their access is about its project).
+            if (lost && projectId) break loop;
           }
           if (overflowed) {
             await reset();

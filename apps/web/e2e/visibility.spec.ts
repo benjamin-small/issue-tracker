@@ -272,6 +272,76 @@ test('a role change reaches the member live: controls and the member list update
   await ctx.close();
 });
 
+test('a trashed issue leaves a reader’s open list and page live', async ({ page, browser }) => {
+  const key = unique('TR');
+  await post(page.request, '/projects', { key, name: 'Trash live', visibility: 'public' });
+  const doomed = await post(page.request, `/projects/${key}/issues`, { title: 'About to go' });
+  await post(page.request, `/projects/${key}/issues`, { title: 'Staying put' });
+
+  const anon = await browser.newContext();
+  const p = await anon.newPage();
+  const errors: string[] = [];
+  p.on('pageerror', (error) => errors.push(error.message));
+  await p.goto(`${origin}/p/${key}`);
+  await expect(p.getByTestId('issue-row')).toHaveCount(2);
+  await expect(p.getByTestId('live-indicator')).toHaveAttribute('data-connected', 'true');
+  // Readers get only a tombstone (id and key); the row still goes, without a refetch.
+  let refetched = false;
+  p.on('request', (r) => {
+    if (r.url().includes(`/projects/${key}/issues`)) refetched = true;
+  });
+  const trashed = await page.request.delete(`/api/v1/issues/${doomed.key}`, {
+    headers: { origin },
+  });
+  expect(trashed.ok(), await trashed.text()).toBe(true);
+  await expect(p.getByTestId('issue-row')).toHaveCount(1);
+  await expect(p.getByTestId('issue-row')).toContainText('Staying put');
+  expect(refetched, 'the list was refetched').toBe(false);
+
+  // On the issue's own page, the deletion turns it into not found.
+  const restored = await page.request.post(`/api/v1/issues/${doomed.key}/restore`, {
+    headers: { origin },
+  });
+  expect(restored.ok(), await restored.text()).toBe(true);
+  await p.goto(`${origin}/i/${doomed.key}`);
+  await expect(p.getByTestId('issue-detail')).toBeVisible();
+  await expect(p.getByTestId('live-indicator')).toHaveAttribute('data-connected', 'true');
+  const again = await page.request.delete(`/api/v1/issues/${doomed.key}`, { headers: { origin } });
+  expect(again.ok(), await again.text()).toBe(true);
+  await expect(p.getByRole('heading', { name: `${doomed.key} doesn’t exist` })).toBeVisible();
+  await expect(p.getByTestId('issue-detail')).toHaveCount(0);
+  expect(errors, 'uncaught errors in the page').toEqual([]);
+  await anon.close();
+});
+
+test('a member removed from a private project sees its open page go', async ({ page, browser }) => {
+  const key = unique('RM');
+  await post(page.request, '/projects', { key, name: 'Removed live' });
+  await post(page.request, `/projects/${key}/issues`, { title: 'Seen while a member' });
+  await post(page.request, `/projects/${key}/members`, { user: 'grace', role: 'viewer' });
+
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  const errors: string[] = [];
+  p.on('pageerror', (error) => errors.push(error.message));
+  await p.goto(`${origin}/p/${key}`);
+  await expect(p.getByText('Seen while a member')).toBeVisible();
+  await expect(p.getByTestId('live-indicator')).toHaveAttribute('data-connected', 'true');
+
+  const removed = await page.request.delete(`/api/v1/projects/${key}/members/grace`, {
+    headers: { origin },
+  });
+  expect(removed.ok(), await removed.text()).toBe(true);
+  await expect(p.getByText(/not found/i)).toBeVisible();
+  await expect(p.getByText('Seen while a member')).toHaveCount(0);
+  expect(errors, 'uncaught errors in the page').toEqual([]);
+  await ctx.close();
+});
+
 test('a manager makes a project public, adds a repo and a member', async ({ page }) => {
   const key = unique('CF');
   await post(page.request, '/projects', { key, name: 'Config' });

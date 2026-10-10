@@ -1,12 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { ANONYMOUS_ACTOR, type ServiceContext, withActor } from './context.ts';
-import { createComment, deleteComment } from './services/comments.ts';
-import { createCustomField, deleteCustomField } from './services/custom-fields.ts';
+import { createComment, deleteComment, listComments } from './services/comments.ts';
+import {
+  createCustomField,
+  deleteCustomField,
+  listCustomFields,
+} from './services/custom-fields.ts';
 import { createIssue, getIssue, listIssues, updateIssue } from './services/issues.ts';
-import { createLabel } from './services/labels.ts';
-import { createLink, deleteLink } from './services/links.ts';
-import { addMember, removeMember } from './services/members.ts';
+import { createLabel, listLabels } from './services/labels.ts';
+import { createLink, deleteLink, listIssueLinks } from './services/links.ts';
+import { addMember, listMembers, removeMember } from './services/members.ts';
 import { createProject, getProject, updateProject } from './services/projects.ts';
 import { addRepo } from './services/repos.ts';
 import { createUser } from './services/users.ts';
@@ -14,7 +18,8 @@ import { createTestContext, grant, type TestContext } from './testing.ts';
 
 /**
  * The access matrix of ADR 0021 as data. Rows are operations, columns are actor x visibility, and each
- * cell is `OK` or the exact error code the operation must fail with.
+ * cell is `OK` or the exact error code the operation must fail with. An `OK` cell also checks, as the admin,
+ * that the operation did what it says (`effect`), so a call that resolves without acting cannot pass.
  *
  * Every cell runs against its own fresh project, so mutations in one cell can never change another, and
  * the cells can run in any order.
@@ -50,6 +55,8 @@ interface Operation {
   public: Column;
   private: Column;
   run(ctx: ServiceContext, w: World): Promise<unknown>;
+  /** Asserts the operation's effect after an `OK` cell: `admin` reads the state, `result` is what `run` returned. */
+  effect(admin: ServiceContext, w: World, result: unknown): Promise<void> | void;
 }
 
 /** The fixed data a cell's project starts with. */
@@ -77,36 +84,48 @@ const OPERATIONS: Operation[] = [
     public: READ,
     private: PRIVATE_READ,
     run: (ctx, w) => getProject(ctx, w.key),
+    effect: (_, w, project) => expect(project).toMatchObject({ key: w.key }),
   },
   {
     name: 'list issues',
     public: READ,
     private: PRIVATE_READ,
     run: (ctx, w) => listIssues(ctx, { project: w.key }),
+    effect: (_, w, page) =>
+      expect((page as { data: { key: string }[] }).data.map((i) => i.key)).toContain(w.issue),
   },
   {
     name: 'read issue',
     public: READ,
     private: PRIVATE_READ,
     run: (ctx, w) => getIssue(ctx, w.issue),
+    effect: (_, w, issue) => expect(issue).toMatchObject({ key: w.issue }),
   },
   {
     name: 'create issue',
     public: PUBLIC_WRITE,
     private: PRIVATE_WRITE,
     run: (ctx, w) => createIssue(ctx, w.key, { title: 'new' }),
+    effect: async (admin, _, created) =>
+      expect(await getIssue(admin, (created as { key: string }).key)).toMatchObject({
+        title: 'new',
+      }),
   },
   {
     name: 'update issue',
     public: PUBLIC_WRITE,
     private: PRIVATE_WRITE,
     run: (ctx, w) => updateIssue(ctx, w.issue, { title: 'renamed' }),
+    effect: async (admin, w) =>
+      expect(await getIssue(admin, w.issue)).toMatchObject({ title: 'renamed' }),
   },
   {
     name: 'create comment',
     public: PUBLIC_WRITE,
     private: PRIVATE_WRITE,
     run: (ctx, w) => createComment(ctx, w.issue, { body: 'hello' }),
+    effect: async (admin, w) =>
+      expect((await listComments(admin, w.issue)).map((c) => c.body)).toContain('hello'),
   },
   {
     // Editors may only change their own comments; moderating someone else's needs manage.
@@ -114,18 +133,24 @@ const OPERATIONS: Operation[] = [
     public: PUBLIC_MANAGE,
     private: PRIVATE_MANAGE,
     run: (ctx, w) => deleteComment(ctx, w.commentId),
+    effect: async (admin, w) =>
+      expect((await listComments(admin, w.issue)).map((c) => c.id)).not.toContain(w.commentId),
   },
   {
     name: 'create label',
     public: PUBLIC_WRITE,
     private: PRIVATE_WRITE,
     run: (ctx, w) => createLabel(ctx, w.key, { name: 'bug' }),
+    effect: async (admin, w) =>
+      expect((await listLabels(admin, w.key)).map((l) => l.name)).toContain('bug'),
   },
   {
     name: 'delete custom field',
     public: PUBLIC_MANAGE,
     private: PRIVATE_MANAGE,
     run: (ctx, w) => deleteCustomField(ctx, w.fieldId),
+    effect: async (admin, w) =>
+      expect((await listCustomFields(admin, w.key)).map((f) => f.id)).not.toContain(w.fieldId),
   },
   {
     name: 'change visibility',
@@ -133,18 +158,29 @@ const OPERATIONS: Operation[] = [
     private: PRIVATE_MANAGE,
     run: (ctx, w) =>
       updateProject(ctx, w.key, { visibility: w.visibility === 'public' ? 'private' : 'public' }),
+    effect: async (admin, w) =>
+      expect((await getProject(admin, w.key)).visibility).toBe(
+        w.visibility === 'public' ? 'private' : 'public',
+      ),
   },
   {
     name: 'add member',
     public: PUBLIC_MANAGE,
     private: PRIVATE_MANAGE,
     run: (ctx, w) => addMember(ctx, w.key, { user: '@newcomer', role: 'viewer' }),
+    effect: async (admin, w) =>
+      expect((await listMembers(admin, w.key)).map((m) => [m.user.handle, m.role])).toContainEqual([
+        'newcomer',
+        'viewer',
+      ]),
   },
   {
     name: 'add repo',
     public: PUBLIC_MANAGE,
     private: PRIVATE_MANAGE,
     run: (ctx, w) => addRepo(ctx, w.key, { repo: 'acme/app' }),
+    effect: async (admin, w) =>
+      expect((await getProject(admin, w.key)).repos.map((r) => r.fullName)).toEqual(['acme/app']),
   },
   {
     // Needs write on one end of the link; the link is stored within the one project here.
@@ -152,6 +188,8 @@ const OPERATIONS: Operation[] = [
     public: PUBLIC_WRITE,
     private: PRIVATE_WRITE,
     run: (ctx, w) => deleteLink(ctx, w.linkId),
+    effect: async (admin, w) =>
+      expect((await listIssueLinks(admin, w.issue)).map((l) => l.id)).not.toContain(w.linkId),
   },
 ];
 
@@ -219,8 +257,7 @@ describe(`access matrix (${testDialect()})`, () => {
         async (actor, expected) => {
           const { ctx, world } = await cell(visibility, actor);
           const attempt = op.run(ctx, world);
-          if (expected === OK)
-            await attempt; // some operations resolve to nothing
+          if (expected === OK) await op.effect(t.ctx, world, await attempt);
           else await expect(attempt).rejects.toMatchObject({ code: expected });
         },
       );

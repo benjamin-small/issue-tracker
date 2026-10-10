@@ -38,7 +38,7 @@ Every change is appended to the `events` table in the same transaction as the ch
 - `seq` increases in commit order. Rolled-back transactions may leave gaps, but an event never appears _behind_ one you have already seen. Resume with `after=<last seq>`.
 - `data` always holds the resource snapshot after the change, so consumers never need to refetch.
 - `data.changes` holds `{ field: { from, to } }` for updates.
-- `GET /events` and the live stream show each viewer only what they may see: readers below `write` on a project do not get events of trashed issues or deleted attachments, deleted comments arrive with an empty body, and a parent change naming a trashed issue is left out of `changes` ([security.md](security.md#project-access)). Webhooks deliver the raw events.
+- `GET /events` and the live stream show each viewer only what they may see: readers below `write` on a project do not get events of trashed issues or deleted attachments (the live stream sends them content-free tombstones of the deletions instead), deleted comments arrive with an empty body, and trashed parents are cut out of snapshots and parent changes ([security.md](security.md#project-access)). Webhooks deliver the raw events.
 - `data.requestId` identifies the API request that caused the change. The web app uses it to ignore echoes of its own writes.
 
 | Type                                                                | `data`                                                                          |
@@ -65,6 +65,8 @@ data: {"seq":1042,"type":"issue.updated",…}
 - The first message is `event: ready` (with the current `seq`). Comment lines (`: heartbeat`) keep proxies from timing out.
 - **Resuming:** reconnect with `Last-Event-ID: <seq>` (browsers do this automatically) or `?after=<seq>`, and missed events are replayed. When more than 1000 events were missed, the server sends `event: reset` and the client should refetch.
 - **Falling behind:** a connection holds at most 1,000 events waiting to be sent. One more and the server sends `event: reset` (with the newest `seq` as its id) and closes the stream; the client refetches and reconnects.
+- **Deletions for readers:** readers below `write` on a project get `issue.deleted` and `attachment.deleted` as tombstones, live and on replay: `data` is only `{ "issue": { "id", "key" } }`, plus `"attachment": { "id" }` for an attachment, so open views can drop the row. `GET /events` and issue activity leave these events out for readers.
+- **Losing access:** an event that ends the viewer's read access to a project still reaches them, without its content. The removal of their own membership arrives as `project.member_removed` with `data: { "member": { "user": { "id": <viewer> } } }`, and a project made private as `project.updated` with empty `data`. Nothing more about that project follows, and a `?project=` stream on it then ends (reconnecting to it is not found).
 - **Account changes:** a `user.updated` event about the viewer is delivered (on a `?project=` stream too, which carries no other `user.*` events) and then the stream ends, because the viewer's role or status may have changed. The client reconnects as who they are now. Replay after a reconnect runs as that new identity, so it never ends the stream.
 - **Authentication:** the session cookie (browsers) or `Authorization: Bearer` (scripts).
 - **Proxies:** they must not buffer the response. The server sends `X-Accel-Buffering: no`. For nginx, also set `proxy_buffering off` on this location.
@@ -87,6 +89,7 @@ So an agent that runs `poietic-issues issue create` against the same database sh
 - For every cached issue list, it applies the list's `IssueFilter` with `matchesFilter`, which has the same semantics as the server (proven by a property test), to insert, update or remove the issue, then re-sorts with the list's sort.
 - Comments, links and reference data (statuses, labels, users) trigger targeted refetches.
 - A `user.updated` event about the viewer refetches everything (their global role may have changed), and a membership event naming them also refetches issue lists and open issues.
+- A tombstone (`issue.deleted` with only the id and key, which readers get) or a permanent delete removes the issue from cached lists and refetches its page. A project event without content (the viewer lost access) refetches everything, so the project's open pages show not found.
 
 ## Webhooks
 

@@ -11,7 +11,8 @@ import {
   uploadAttachment,
 } from './services/attachments.ts';
 import { createComment, deleteComment, listComments, updateComment } from './services/comments.ts';
-import { filterEventsForViewer, listEvents } from './services/events.ts';
+import { ContentRulesMemo, filterEventsForViewer, listEvents } from './services/events.ts';
+import { readableProjectIds, writableProjectIds } from './access.ts';
 import { createLink, deleteLink, listIssueLinks } from './services/links.ts';
 import {
   createIssue,
@@ -311,6 +312,66 @@ describe(`deleted content needs write (${testDialect()})`, () => {
       }
     });
 
+    it('gives readers tombstones for deleted issues and attachments when asked (the live stream)', async () => {
+      const pub1 = await getIssue(t.ctx, 'PUB-1');
+      const prv1 = (await getIssue(t.ctx, 'PRV-1')).id;
+      const isTombstone = (e: TrackerEvent) =>
+        (e.type === 'issue.deleted' || e.type === 'attachment.deleted') &&
+        !('title' in (e.data.issue as object));
+      for (const who of readers) {
+        const name = who.actor.handle;
+        const listed = (await listEvents(who, { limit: 1000 })).data;
+        const live = await filterEventsForViewer(who, allEvents, { tombstones: true });
+        // Replay on the stream gets the same as live.
+        expect((await listEvents(who, { limit: 1000 }, { tombstones: true })).data, name).toEqual(
+          live,
+        );
+        // Without the tombstones, it is what GET /events shows.
+        expect(
+          live.filter((e) => !isTombstone(e)),
+          name,
+        ).toEqual(listed);
+        // One per deletion (PUB-2 was trashed, restored and trashed again), each with ids and the key only.
+        const tombstones = live.filter(isTombstone).map((e) => JSON.stringify([e.type, e.data]));
+        const trashings = allEvents.filter(
+          (e) => e.type === 'issue.deleted' && e.issueId === trashedId,
+        ).length;
+        expect(
+          tombstones.filter((x) => x.includes(trashedId)),
+          name,
+        ).toHaveLength(trashings);
+        expect(
+          [...new Set(tombstones)].map((x) => JSON.parse(x) as unknown),
+          name,
+        ).toEqual([
+          [
+            'attachment.deleted',
+            { issue: { id: pub1.id, key: 'PUB-1' }, attachment: { id: removedAttachment } },
+          ],
+          ['issue.deleted', { issue: { id: trashedId, key: 'PUB-2' } }],
+          // The viewer reads PRV too; anonymous visitors do not.
+          ...(who === viewer ? [['issue.deleted', { issue: { id: prv1, key: 'PRV-1' } }]] : []),
+        ]);
+        // Nothing else of the deleted content comes with them.
+        const json = JSON.stringify(live);
+        for (const secret of ['"trashed"', '"private trashed"', '"gone"', 'r.txt'])
+          expect(json, `${name} ${secret}`).not.toContain(secret);
+      }
+      // Writers get the events themselves, unchanged, and tombstones only where they just view (PRV).
+      for (const who of writers) {
+        const name = who.actor.handle;
+        const live = await filterEventsForViewer(who, allEvents, { tombstones: true });
+        expect(
+          live.filter((e) => !isTombstone(e)),
+          name,
+        ).toEqual(await filterEventsForViewer(who, allEvents));
+        expect(
+          live.filter(isTombstone).map((e) => e.data),
+          name,
+        ).toEqual(who === t.ctx ? [] : [{ issue: { id: prv1, key: 'PRV-1' } }]);
+      }
+    });
+
     it('hides deleted content from readers in issue activity', async () => {
       for (const who of readers) {
         const activity = (await listIssueActivity(who, 'PUB-1')).data;
@@ -383,5 +444,105 @@ describe(`deleted content needs write (${testDialect()})`, () => {
     expect((await deleteAttachment(manager, blobs, onTrashedIssue)).deletedAt).not.toBeNull();
     await deleteLink(editor, linkToTrashed);
     expect((await listEvents(t.ctx, { types: ['link.deleted'] })).data).toHaveLength(1);
+  });
+
+  // Writes too, in a project of its own.
+  it('keeps a move from a trashed parent to a live one as { from: null, to } below write', async () => {
+    const project = await createProject(t.ctx, {
+      key: 'REP',
+      name: 'Reparent',
+      visibility: 'public',
+    });
+    await grant(t, 'REP', viewer, 'viewer');
+    await grant(t, 'REP', editor, 'editor');
+    const old = await createIssue(t.ctx, 'REP', { title: 'old parent' });
+    const next = await createIssue(t.ctx, 'REP', { title: 'new parent' });
+    const moved = await createIssue(t.ctx, 'REP', { title: 'moved', parent: old.key });
+    const orphaned = await createIssue(t.ctx, 'REP', { title: 'orphaned', parent: old.key });
+    const adopted = await createIssue(t.ctx, 'REP', { title: 'adopted' });
+    await updateIssue(t.ctx, moved.key, { parent: next.key });
+    await updateIssue(t.ctx, orphaned.key, { parent: null });
+    await updateIssue(t.ctx, adopted.key, { parent: old.key });
+    await deleteIssue(t.ctx, old.key);
+
+    /** `changes` of the one `issue.updated` event of `key`, as `who` sees it in the log and in the activity. */
+    const changesOf = async (who: ServiceContext, key: string) => {
+      const listed = (
+        await listEvents(who, { project: project.id, types: ['issue.updated'] })
+      ).data.filter((e) => (e.data.issue as { key: string }).key === key);
+      expect(listed, `${who.actor.handle} ${key}`).toHaveLength(1);
+      const activity = (await listIssueActivity(who, key)).data.filter(
+        (e) => e.type === 'issue.updated',
+      );
+      expect(activity.map((e) => e.data.changes)).toEqual([listed[0]!.data.changes]);
+      return listed[0]!.data.changes;
+    };
+    const ref = (issue: { id: string; key: string }) =>
+      expect.objectContaining({ id: issue.id, key: issue.key });
+    for (const who of readers) {
+      // The live end of the move stays; the trashed one is cut.
+      expect(await changesOf(who, moved.key)).toEqual({ parent: { from: null, to: ref(next) } });
+      // From a trashed parent to none, or to a trashed one, there is nothing left to tell.
+      expect(await changesOf(who, orphaned.key)).toEqual({});
+      expect(await changesOf(who, adopted.key)).toEqual({});
+    }
+    expect(await changesOf(editor, moved.key)).toEqual({
+      parent: { from: ref(old), to: ref(next) },
+    });
+    expect(await changesOf(editor, orphaned.key)).toEqual({ parent: { from: ref(old), to: null } });
+  });
+
+  it('shares content lookups between concurrent viewers with the same access', async () => {
+    const outsider = withActor(
+      t.ctx,
+      toActor(await createUser(t.ctx, { handle: 'outsider', name: 'Outsider', kind: 'human' })),
+    );
+    const viewers = [anon, withActor(t.ctx, ANONYMOUS_ACTOR), outsider];
+    const events = (await listEvents(t.ctx, { limit: 1000 })).data;
+    let lookups = 0;
+    const counted = (who: ServiceContext): ServiceContext => {
+      const kysely = new Proxy(who.db.kysely, {
+        get(target, prop) {
+          if (prop === 'selectFrom') lookups++;
+          const value = Reflect.get(target, prop, target) as unknown;
+          // Kysely keeps private fields: its methods must run on the real instance.
+          return typeof value === 'function' ? (value as () => unknown).bind(target) : value;
+        },
+      });
+      const db = new Proxy(who.db, {
+        get: (target, prop, receiver) =>
+          prop === 'kysely' ? kysely : (Reflect.get(target, prop, receiver) as unknown),
+      });
+      return { ...who, db };
+    };
+    const filterAll = async (memo?: ContentRulesMemo) => {
+      const access = await Promise.all(
+        viewers.map(async (who) => ({
+          readable: await readableProjectIds(who, who.db.kysely),
+          writable: await writableProjectIds(who, who.db.kysely),
+        })),
+      );
+      // The same access, so they may share: anonymous visitors and a signed-in non-member of a public project.
+      expect(new Set(access.map((a) => JSON.stringify(a))).size).toBe(1);
+      lookups = 0;
+      const filtered = await Promise.all(
+        viewers.map((who, i) =>
+          filterEventsForViewer(counted(who), events, { ...access[i], tombstones: true, memo }),
+        ),
+      );
+      return { filtered, lookups };
+    };
+    const alone = await filterAll();
+    const memo = new ContentRulesMemo();
+    const shared = await filterAll(memo);
+    expect(shared.filtered).toEqual(alone.filtered);
+    expect(alone.lookups).toBeGreaterThan(0);
+    expect(shared.lookups).toBe(alone.lookups / viewers.length);
+    // Signed in, the outsider still gets their own `user.*` events, which anonymous viewers do not.
+    const userEvents = shared.filtered.map((f) => f.filter((e) => e.projectId === null).length);
+    expect(userEvents[0]).toBe(0);
+    expect(userEvents[2]).toBeGreaterThan(0);
+    // Nothing is kept once the lookups are done: a later run reads the current state again.
+    expect(memo.size).toBe(0);
   });
 });

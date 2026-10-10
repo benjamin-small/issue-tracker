@@ -6,7 +6,7 @@ import {
   FieldRegistry,
   type FilterCondition,
 } from '@poietic-tech/issues-schema';
-import { scalarCondition, setCondition } from './issue-query.ts';
+import { scalarCondition, setCondition } from './sql-conditions.ts';
 
 type Exec = Kysely<Database>;
 
