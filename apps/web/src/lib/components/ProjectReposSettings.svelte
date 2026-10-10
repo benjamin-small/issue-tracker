@@ -15,15 +15,18 @@
     queryFn: () => fetchers.project(projectKey),
   }));
 
-  async function run<T>(action: Promise<T>, saved: string): Promise<T | undefined> {
+  async function run<T>(
+    action: Promise<T>,
+    saved: string,
+    refresh: ReadonlyArray<readonly unknown[]> = [],
+  ): Promise<T | undefined> {
     try {
       const result = await action;
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: keys.project(projectKey) }),
-        qc.invalidateQueries({ queryKey: keys.projects }),
-        // Issues that named a removed repo lose the link.
-        qc.invalidateQueries({ queryKey: keys.issueLists(projectKey) }),
-      ]);
+      await Promise.all(
+        [keys.project(projectKey), keys.projects, ...refresh].map((queryKey) =>
+          qc.invalidateQueries({ queryKey }),
+        ),
+      );
       toast(saved, 'success');
       return result;
     } catch (e) {
@@ -64,6 +67,8 @@
         }),
       ),
       `Unlinked ${r.fullName}`,
+      // Issues that named the repo lose the link: lists and any cached issue pages.
+      [keys.issueLists(projectKey), ['issue']],
     );
   }
 </script>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { btn, input } from '$lib/styles.ts';
-  import { href } from '$lib/nav.ts';
+  import { href, navigate, signInPath } from '$lib/nav.ts';
   import Lock from '@lucide/svelte/icons/lock';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import EmptyState from '$components/EmptyState.svelte';
@@ -157,15 +157,16 @@
   <!-- The settings link is shown to editors and managers only; this covers typed or shared URLs of signed-out visitors. -->
   <EmptyState
     icon={Lock}
-    title={project.notFound ? `Project ${key} not found` : 'Project settings are for members'}
+    title={project.notFound ? `Project ${key} not found` : 'Sign in to see this project’s settings'}
     testid="settings-forbidden"
   >
     {project.notFound
       ? 'It may not exist, or it may be private to its members.'
-      : 'Sign in to see who can work in this project.'}
+      : 'Project settings are for members. Signed in, you can see who can work in this project.'}
     {#snippet actions()}
       {#if !project.notFound}
-        <a href={href(`/p/${key}`)} class={btn.primary}>Back to {key} issues</a>
+        <button class={btn.primary} onclick={() => navigate(signInPath())}>Sign in</button>
+        <a href={href(`/p/${key}`)} class={btn.secondary}>Back to {key} issues</a>
       {/if}
     {/snippet}
   </EmptyState>

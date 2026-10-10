@@ -305,7 +305,78 @@ test('viewers see the members read-only and signed-out visitors cannot open sett
   await a.goto(`${origin}/p/${key}/settings`);
   await expect(a.getByTestId('settings-forbidden')).toBeVisible();
   await expect(a.getByTestId('settings-access')).toHaveCount(0);
+  // The title says what the body does: signing in is the way in.
+  await expect(
+    a.getByRole('heading', { name: 'Sign in to see this project’s settings' }),
+  ).toBeVisible();
+  await a.getByTestId('settings-forbidden').getByRole('button', { name: 'Sign in' }).click();
+  await expect(a).toHaveURL(new RegExp(`/login\\?next=%2Fp%2F${key}%2Fsettings$`));
   await anon.close();
+});
+
+test('changing your own role asks first only when it drops you below manager', async ({ page }) => {
+  // Ada is an admin: she manages any project, whatever her own membership says.
+  const key = unique('SR');
+  await post(page.request, '/projects', { key, name: 'Self role' });
+  await post(page.request, `/projects/${key}/members`, { user: 'ada', role: 'viewer' });
+  await page.goto(`/p/${key}/settings`);
+  const row = page.getByTestId('settings-access').locator('[data-member="ada"]');
+  await choose(row, 'Role of @ada', 'Editor');
+  await expect(page.getByText('@ada is now editor')).toBeVisible();
+  await expect(page.getByTestId('confirm-ok')).toHaveCount(0);
+  await choose(row, 'Role of @ada', 'Manager');
+  await expect(page.getByText('@ada is now manager')).toBeVisible();
+  // Manager to editor is a demotion below manager: that one asks.
+  await choose(row, 'Role of @ada', 'Viewer');
+  await expect(page.getByTestId('confirm-ok')).toBeVisible();
+  await page.getByTestId('confirm-ok').click();
+  await expect(page.getByText('@ada is now viewer')).toBeVisible();
+});
+
+test('the visibility radios wait for the save', async ({ page }) => {
+  const key = unique('VS');
+  await post(page.request, '/projects', { key, name: 'Visibility save' });
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(new RegExp(`/api/v1/projects/${key}$`), async (route) => {
+    if (route.request().method() === 'PATCH') await held;
+    await route.fallback();
+  });
+  await page.goto(`/p/${key}/settings`);
+  await expect(page.getByRole('radio', { name: /Private/ })).toBeEnabled();
+  await page.getByRole('radio', { name: /Public/ }).check();
+  await expect(page.getByRole('radio', { name: /Private/ })).toBeDisabled();
+  await expect(page.getByRole('radio', { name: /Public/ })).toBeDisabled();
+  release();
+  await expect(page.getByText('Saved')).toBeVisible();
+  await expect(page.getByRole('radio', { name: /Private/ })).toBeEnabled();
+  await expect(page.getByRole('radio', { name: /Public/ })).toBeChecked();
+});
+
+test('unlinking a repo clears it from an issue page already loaded', async ({ page }) => {
+  const key = unique('UL');
+  await post(page.request, '/projects', { key, name: 'Unlink' });
+  await post(page.request, `/projects/${key}/repos`, { repo: 'acme/app' });
+  const issue = await post(page.request, `/projects/${key}/issues`, {
+    title: 'Linked to app',
+    repo: 'acme/app',
+  });
+  // No live events: the settings page itself must refresh what it changed.
+  await page.route(/\/api\/v1\/events\/stream/, (route) => route.abort());
+  await page.goto(`/i/${issue.key}`);
+  await expect(
+    page.getByTestId('issue-detail').getByRole('link', { name: 'acme/app' }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Settings' }).click();
+  const repos = page.getByTestId('settings-repos');
+  await repos.getByRole('button', { name: 'Unlink acme/app' }).click();
+  await page.getByTestId('confirm-ok').click();
+  await expect(page.getByText('Unlinked acme/app')).toBeVisible();
+  await page.goBack();
+  await expect(page.getByTestId('issue-title')).toHaveValue('Linked to app');
+  await expect(
+    page.getByTestId('issue-detail').getByRole('link', { name: 'acme/app' }),
+  ).toHaveCount(0);
 });
 
 test('editors change the workflow, labels and fields, and see access read-only', async ({

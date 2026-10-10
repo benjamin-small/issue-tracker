@@ -86,7 +86,8 @@
   }
 
   async function setRole(m: ProjectMember, role: ProjectRole) {
-    if (m.user.id === myId && role !== 'manager') {
+    // Only a demotion from manager can take away the caller's own access to these settings.
+    if (m.user.id === myId && m.role === 'manager' && role !== 'manager') {
       const ok = await confirmAction({
         title: 'Change your own role?',
         body: `You become ${roleLabel(role).toLowerCase()} and may no longer be able to change these settings.`,
@@ -171,6 +172,7 @@
               class="mt-0.5 accent-accent"
               value={v.value}
               checked={visibility === v.value}
+              disabled={pendingVisibility !== undefined}
               onchange={() => setVisibility(v.value)}
             />
             <span>
