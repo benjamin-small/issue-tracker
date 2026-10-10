@@ -692,21 +692,15 @@ Runs after the infra PR is applied, the secrets exist, the SSO plan has merged a
       Result: Deploy run 37666099022 (`workflow_run`, 2026-10-07) succeeded, smoke check passed.
 - [x] **Step 2:** Open `https://issues.poietic.tech`. The poietic admin account should land signed in as a tracker admin, through the automatic SSO attempt.
       Result: the owner signed in via poietic.tech SSO and reported it working; admin role not separately confirmed.
-- [ ] **Step 3:** Create a project and an issue, upload an attachment, and confirm the attachment downloads (a presigned R2 URL).
-      Not individually confirmed: the owner reported the site working, but did not confirm this step specifically.
-- [ ] **Step 4:** Open the issue list in two tabs, edit in one, and confirm the other updates live. This shows SSE streams through `Container.fetch`. If it doesn't, change the Worker to proxy through `this.ctx.container.getTcpPort(3000).fetch(...)` and redeploy.
-      Not individually confirmed: the owner reported the site working, but did not confirm this step specifically.
+- [x] **Step 3:** Create a project and an issue, upload an attachment, and confirm the attachment downloads (a presigned R2 URL).
+      Result (2026-10-10, after the 0004 upgrade): issue TEST-2 created in the existing TEST project; a text file and a PNG uploaded (201); the PNG's content link redirected to a presigned URL in `poietic-issues-attachments` and loaded as `image/png` 4×4. TEST-2 was then moved to the trash.
+- [x] **Step 4:** Open the issue list in two tabs, edit in one, and confirm the other updates live. This shows SSE streams through `Container.fetch`. If it doesn't, change the Worker to proxy through `this.ctx.container.getTcpPort(3000).fetch(...)` and redeploy.
+      Result (2026-10-10): renaming TEST-2 from one tab showed in the other tab's issue list within 3 seconds, with no reload. SSE streams through `Container.fetch`.
 - [x] **Step 5:** Trigger a restart and confirm the data is restored. The Containers API has a stop/restart call, which the cloudflare-devops agent runs via `cf api`; otherwise wait out `sleepAfter`.
       Result: the container slept at 18:57:04Z (`litestream shut down`) and woke at 19:49:22Z with `restore completed` and no migrations.
 - [x] **Step 5a: Rollout ordering (run before relying on a second deploy).** The spec's single-writer check: a `wrangler deploy` rollout must stop the old container, and let Litestream finish its final sync, before the new container restores. With a tab open on the live stream (the issue list), write something (create or edit an issue). Then trigger the Deploy workflow by `workflow_dispatch` on `main`. When the smoke check passes, reload and confirm the write survived. In the Worker's container logs (Workers Observability), confirm that the old container's `litestream shut down` line comes before the new container's `attempting restore before replication` / `restore completed`. If the write is lost, or the ordering is not guaranteed (overlap, or no `litestream shut down` before the restore), stop deploying: implement the spec's lease guard first (the Worker holds a lease in Durable Object storage that the entrypoint checks before restoring), and re-run this step.
       Result: run 37681019282 rolled v1→v2; old `litestream shut down` at 20:20:37.672Z, before the new instance's restore (20:20:41.886Z → 20:20:46.555Z, txid 0x0a). Stop-then-start, so no lease guard is needed (see ADR 0019).
-- [ ] **Step 6:** Create the Claude agent user and token:
+- [x] **Step 6:** Create two agent identities, so history shows who acted and each token can be revoked on its own: - `claude`, for Claude sessions a person drives on their own machine. Its token lives only in that machine's CLI config (`poietic-issues auth login --server https://issues.poietic.tech --with-token`), never in CI. - `github-ci`, for unattended GitHub Actions workflows. Its token is the `poietic-tech` org Actions secret `POIETIC_ISSUES_TOKEN` (all repositories), next to the org variable `POIETIC_ISSUES_SERVER=https://issues.poietic.tech`.
 
-```bash
-tracker user create --handle claude --name Claude --kind agent
-tracker token create --user claude --name ci
-```
-
-Run these with `TRACKER_SERVER=https://issues.poietic.tech` and the admin's token from the web UI.
-
-Step 6 result: not done yet.
+      Both need a role on each private project they work in (`poietic-issues project members add @<agent> --role editor -P <KEY>`).
+      Result (2026-10-10): both users exist (kind `agent`) and are editors on TEST. The `github-ci` token was verified against `/me` and stored as the org secret; the `claude` token is saved in the owner's local CLI config (mode 0600). Neither token value was displayed.
