@@ -228,6 +228,9 @@ describe(`member and repo routes (${testDialect()})`, () => {
   });
 
   it('hides private projects from non-members and rejects anonymous writes', async () => {
+    // Own state: whatever earlier tests left, the member starts without a membership of PRV.
+    await asAdmin('/projects/PRV/members/@member', { method: 'DELETE' });
+    expect((await as(memberToken, 'GET', '/projects/PRV')).status).toBe(404);
     expect((await as(memberToken, 'GET', '/projects/PRV/members')).status).toBe(404);
     expect(
       (await as(memberToken, 'POST', '/projects/PRV/repos', { repo: 'acme/app' })).status,
@@ -246,5 +249,94 @@ describe(`member and repo routes (${testDialect()})`, () => {
     expect(
       (await as(memberToken, 'POST', '/projects/PUB/repos', { repo: 'acme/app' })).status,
     ).toBe(403);
+  });
+
+  it('forbids non-managers to unlink repos or remove members', async () => {
+    expect(
+      (await asAdmin('/projects', { method: 'POST', body: { key: 'SRV', name: 'Srv' } })).status,
+    ).toBe(201);
+    expect(
+      (await as(adminToken, 'POST', '/projects/SRV/members', { user: '@member', role: 'viewer' }))
+        .status,
+    ).toBe(201);
+    expect(
+      (await as(adminToken, 'POST', '/projects/SRV/members', { user: '@bot', role: 'editor' }))
+        .status,
+    ).toBe(201);
+    expect((await as(adminToken, 'POST', '/projects/SRV/repos', { repo: 'acme/srv' })).status).toBe(
+      201,
+    );
+    const botToken = (await createToken(t.agent, 'bot', { name: 'test' })).token;
+
+    // A viewer (the member) and an editor (the bot) both get 403, not 404: they can see the project.
+    for (const [who, token] of [
+      ['viewer', memberToken],
+      ['editor', botToken],
+    ] as const) {
+      const repo = await as(
+        token,
+        'DELETE',
+        `/projects/SRV/repos/${encodeURIComponent('acme/srv')}`,
+      );
+      expect(repo.status, `${who} unlinking a repo`).toBe(403);
+      expect(((await repo.json()) as { code: string }).code).toBe('FORBIDDEN');
+      const member = await as(token, 'DELETE', '/projects/SRV/members/@bot');
+      expect(member.status, `${who} removing a member`).toBe(403);
+      expect(((await member.json()) as { code: string }).code).toBe('FORBIDDEN');
+    }
+
+    // Nothing was removed.
+    const shown = (await (await as(adminToken, 'GET', '/projects/SRV')).json()) as {
+      repos: { fullName: string }[];
+    };
+    expect(shown.repos.map((r) => r.fullName)).toEqual(['acme/srv']);
+    const members = (await (await as(adminToken, 'GET', '/projects/SRV/members')).json()) as {
+      data: { user: { handle: string } }[];
+    };
+    expect(members.data.map((m) => m.user.handle)).toEqual(['bot', 'member']);
+  });
+});
+
+describe(`"me" as a user path parameter (${testDialect()})`, () => {
+  it('resolves to the caller on user and token routes', async () => {
+    const me = await as(memberToken, 'GET', '/users/me');
+    expect(me.status).toBe(200);
+    expect(((await me.json()) as { handle: string }).handle).toBe('member');
+    const atMe = await as(adminToken, 'GET', '/users/@me');
+    expect(((await atMe.json()) as { handle: string }).handle).toBe('admin');
+
+    const list = await as(memberToken, 'GET', '/users/me/tokens');
+    expect(list.status).toBe(200);
+    const before = ((await list.json()) as { data: { id: string }[] }).data;
+    expect(before.length).toBeGreaterThan(0);
+
+    const created = await as(memberToken, 'POST', '/users/me/tokens', { name: 'via me' });
+    expect(created.status).toBe(201);
+    const token = (await created.json()) as { id: string; token: string };
+    // The new token belongs to the caller, so it signs in as the member.
+    const check = await as(token.token, 'GET', '/users/me');
+    expect(((await check.json()) as { handle: string }).handle).toBe('member');
+    const after = (
+      (await (await as(memberToken, 'GET', '/users/me/tokens')).json()) as {
+        data: { id: string }[];
+      }
+    ).data;
+    expect(after.map((x) => x.id)).toContain(token.id);
+    expect((await as(memberToken, 'DELETE', `/tokens/${token.id}`)).status).toBe(200);
+  });
+
+  it('is not a way around sign-in or around other users', async () => {
+    expect((await as(undefined, 'GET', '/users/me')).status).toBe(401);
+    expect((await as(undefined, 'GET', '/users/me/tokens')).status).toBe(401);
+    expect((await as(undefined, 'POST', '/users/me/tokens', { name: 'x' })).status).toBe(401);
+    // "me" is the member, so a member can't use it to reach the admin's tokens.
+    const mine = (await (await as(memberToken, 'GET', '/users/me/tokens')).json()) as {
+      data: { id: string }[];
+    };
+    const admins = (await (await as(adminToken, 'GET', '/users/admin/tokens')).json()) as {
+      data: { id: string }[];
+    };
+    expect(mine.data.some((x) => admins.data.some((a) => a.id === x.id))).toBe(false);
+    expect((await as(memberToken, 'GET', '/users/admin/tokens')).status).toBe(403);
   });
 });

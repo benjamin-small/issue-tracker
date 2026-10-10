@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -46,7 +46,8 @@ describe(`deleted content needs write (${testDialect()})`, () => {
   let onDeletedComment: string;
   let onTrashedIssue: string;
   let removedAttachment: string;
-  const blobs = new LocalDiskBlobStore(join(mkdtempSync(join(tmpdir(), 'del-blobs-')), 'b'));
+  const blobDir = mkdtempSync(join(tmpdir(), 'del-blobs-'));
+  const blobs = new LocalDiskBlobStore(join(blobDir, 'b'));
   const bytes = (s: string) => ({ filename: `${s}.txt`, data: new TextEncoder().encode(s) });
 
   beforeAll(async () => {
@@ -92,7 +93,10 @@ describe(`deleted content needs write (${testDialect()})`, () => {
     await deleteIssue(t.ctx, 'PUB-2');
     await deleteIssue(t.ctx, 'PRV-1');
   });
-  afterAll(() => t.destroy());
+  afterAll(async () => {
+    await t.destroy();
+    rmSync(blobDir, { recursive: true, force: true });
+  });
 
   const notFound = { code: 'NOT_FOUND' };
 

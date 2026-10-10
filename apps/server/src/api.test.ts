@@ -55,8 +55,8 @@ describe(`HTTP API (${testDialect()})`, () => {
 
   it('creates projects and issues and resolves human refs', async () => {
     const project = await call('POST', '/projects', { body: { key: 'api', name: 'API' } });
-    await grant(t, 'API', t.member, 'editor');
     expect(project.status).toBe(201);
+    await grant(t, 'API', t.member, 'editor');
     expect(project.body.key).toBe('API');
     expect(
       (await call('POST', '/projects', { token: memberToken, body: { key: 'NOPE', name: 'x' } }))

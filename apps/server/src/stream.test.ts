@@ -48,12 +48,22 @@ interface Message {
   data?: string;
 }
 
+/** Resolves once `messages` satisfies `pred`, i.e. once the stream has actually delivered what we wait for. */
+async function delivered(messages: Message[], pred: (m: Message[]) => boolean) {
+  const deadline = Date.now() + 5000;
+  while (!pred(messages)) {
+    if (Date.now() > deadline) throw new Error('the stream did not deliver in time');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 /** Opens the stream and collects parsed SSE messages until `done` returns true. */
 async function collect(
   query: string,
   headers: Record<string, string>,
   done: (m: Message[]) => boolean,
-  act?: () => Promise<void>,
+  /** Runs once the stream is ready, alongside reading it; gets the messages delivered so far. */
+  act?: (messages: Message[]) => Promise<void>,
   bearer: string | null = token,
   via: ReturnType<typeof createApp> = app,
 ) {
@@ -68,7 +78,7 @@ async function collect(
   const decoder = new TextDecoder();
   const messages: Message[] & { ended?: boolean } = [];
   let buffer = '';
-  let acted = false;
+  let acting: Promise<void> | undefined;
   const deadline = Date.now() + 5000;
   while (!done(messages) && Date.now() < deadline) {
     const { value, done: end } = await reader.read();
@@ -89,13 +99,11 @@ async function collect(
       }
       if (msg.event || msg.data) messages.push(msg);
     }
-    if (!acted && messages.some((m) => m.event === 'ready') && act) {
-      acted = true;
-      await act();
-    }
+    if (!acting && messages.some((m) => m.event === 'ready') && act) acting = act(messages);
   }
   controller.abort();
   await reader.cancel().catch(() => {});
+  await acting;
   return messages;
 }
 
@@ -174,10 +182,13 @@ describe(`SSE /events/stream (${testDialect()})`, () => {
       '',
       {},
       sawTitle('after removal marker'),
-      async () => {
+      async (seen) => {
         await createIssue(t.ctx, 'OTH', { title: 'before grant' });
         await addMember(t.ctx, 'OTH', { user: 'member', role: 'viewer' });
         await createIssue(t.ctx, 'OTH', { title: 'after grant' });
+        // The stream reads access as of when it handles a membership event, so let it deliver the
+        // issue made while the viewer was a member before that membership is taken away.
+        await delivered(seen, sawTitle('after grant'));
         await removeMember(t.ctx, 'OTH', 'member');
         await createIssue(t.ctx, 'OTH', { title: 'after removal' });
         await createIssue(t.ctx, 'PUB', { title: 'after removal marker' });
