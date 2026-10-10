@@ -37,8 +37,10 @@ const namesViewer = (e: TrackerEvent, actorId: string) =>
  *
  * The tailer fans out every event, so each connection applies its viewer's access (the same rules as
  * `GET /events`): only readable projects, and the readable set is re-read when memberships or a project's
- * visibility change. A connection with more than 1000 events waiting gets `reset` and is closed, and so is a
- * viewer's own stream after a `user.updated` event about them; the client reconnects and resumes.
+ * visibility change. A connection with more than 1000 events waiting gets `reset` and is closed, and a viewer's
+ * stream (with or without `?project=`) is closed after delivering a `user.updated` event about them; the client
+ * reconnects as who they are now and resumes. Replay runs on the identity the reconnect authenticated as, so it
+ * never closes the stream.
  */
 export function registerStreamRoute(
   app: TrackerApp,
@@ -93,7 +95,10 @@ export function registerStreamRoute(
       const queue: TrackerEvent[] = [];
       let overflowed = false;
       let wake: (() => void) | undefined;
-      const matches = (e: TrackerEvent) => !projectId || e.projectId === projectId;
+      // A project stream takes that project's events, plus the viewer's own `user.updated` (which has no project),
+      // so it ends after it like an unfiltered stream does. Other users' `user.*` events stay off it.
+      const matches = (e: TrackerEvent) =>
+        !projectId || e.projectId === projectId || namesViewer(e, ctx.actor.id);
       // Subscribe and read the position together, before any await, so nothing committed afterwards is
       // missed (replay and live may overlap; duplicates are dropped by seq).
       const unsubscribe = tailer.subscribe((e) => {
@@ -147,6 +152,8 @@ export function registerStreamRoute(
         // re-reads it before the events that follow are filtered. Replayed events were committed before
         // this read, so it already reflects any access they changed.
         await readAccess();
+        // Replay runs as whoever reconnected: a `user.updated` about the viewer that it replays happened before
+        // this connection authenticated, so it does not end the stream (and a project stream does not replay it).
         if (resume !== undefined) {
           const replay = await listEvents(ctx, {
             after: resume,

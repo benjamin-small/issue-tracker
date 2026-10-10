@@ -363,6 +363,34 @@ describe(`SSE /events/stream (${testDialect()})`, () => {
     expect(messages.at(-1)!.event).toBe('user.updated');
   });
 
+  it('closes a project stream too when a user.updated event names the viewer', async () => {
+    const messages = await collect(
+      '?project=PUB',
+      {},
+      () => false,
+      async () => {
+        await updateUser(t.ctx, 'bot', { name: 'Bot renamed on PUB' });
+        await createIssue(t.ctx, 'PUB', { title: 'before the change' });
+        await updateUser(t.ctx, 'member', { name: 'Member renamed on PUB' });
+        await createIssue(t.ctx, 'PUB', { title: 'after the change' });
+      },
+      memberToken,
+    );
+    expect(messages.ended).toBe(true);
+    // Other users' user.* events stay off a project stream; the viewer's own is delivered, then the stream ends.
+    expect(
+      messages
+        .filter((m) => m.event === 'user.updated')
+        .map((m) => JSON.parse(m.data!).data.user.handle),
+    ).toEqual(['member']);
+    expect(
+      messages
+        .filter((m) => m.event === 'issue.created')
+        .map((m) => JSON.parse(m.data!).data.issue.title),
+    ).toEqual(['before the change']);
+    expect(messages.at(-1)!.event).toBe('user.updated');
+  });
+
   it('logs a failed access read with the request id before closing', async () => {
     const lines: Record<string, unknown>[] = [];
     const sink = new Writable({
