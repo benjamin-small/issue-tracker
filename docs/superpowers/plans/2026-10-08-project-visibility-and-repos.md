@@ -101,7 +101,7 @@ Repo links are a new `project_repos` table plus a nullable `issues.repo_id`, exp
   - `CreateProjectInput.visibility` (default `'private'`), `UpdateProjectInput.visibility`
   - event types `project.member_added`, `project.member_changed`, `project.member_removed`
 
-- [ ] **Step 1: Write the failing test.** Append to `packages/schema/src/ids.test.ts`:
+- [x] **Step 1: Write the failing test.** Append to `packages/schema/src/ids.test.ts`:
 
 ```ts
 it('has a prefix for project repos', () => {
@@ -110,11 +110,11 @@ it('has a prefix for project repos', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to make sure it fails.** Run `pnpm vitest run --project schema src/ids.test.ts`. Expected: FAIL, because `projectRepo` is not a key of `ID_PREFIXES`.
+- [x] **Step 2: Run it to make sure it fails.** Run `pnpm vitest run --project schema src/ids.test.ts`. Expected: FAIL, because `projectRepo` is not a key of `ID_PREFIXES`.
 
-- [ ] **Step 3: Add the prefix.** In `packages/schema/src/ids.ts`, add `projectRepo: 'rpo',` after `webhookDelivery: 'whd',`.
+- [x] **Step 3: Add the prefix.** In `packages/schema/src/ids.ts`, add `projectRepo: 'rpo',` after `webhookDelivery: 'whd',`.
 
-- [ ] **Step 4: Add the schemas.** In `packages/schema/src/entities.ts`, replace `ProjectSchema`, `CreateProjectInputSchema` and `UpdateProjectInputSchema` with:
+- [x] **Step 4: Add the schemas.** In `packages/schema/src/entities.ts`, replace `ProjectSchema`, `CreateProjectInputSchema` and `UpdateProjectInputSchema` with:
 
 ```ts
 export const ProjectVisibilitySchema = z.enum(['public', 'private']).meta({
@@ -203,7 +203,7 @@ export const UpdateProjectMemberInputSchema = z
 export type UpdateProjectMemberInput = z.input<typeof UpdateProjectMemberInputSchema>;
 ```
 
-- [ ] **Step 5: Add the event types.** In `packages/schema/src/events.ts`:
+- [x] **Step 5: Add the event types.** In `packages/schema/src/events.ts`:
   - Add `'project.member_added'`, `'project.member_changed'` and `'project.member_removed'` to `EVENT_TYPES`, after `'project.updated'`.
   - Add this schema:
 
@@ -216,7 +216,7 @@ export const ProjectMemberEventDataSchema = z
 - Map all three new types to it in the event-data record, next to `'project.updated': ProjectEventDataSchema`.
 - Import `ProjectMemberSchema` and `ProjectRoleSchema` from `./entities.ts`.
 
-- [ ] **Step 6: Typecheck.** Run `pnpm vitest run --project schema` (expected: PASS), then `pnpm typecheck`. Expected: errors only in `packages/core/src/mappers.ts` (`visibility` is missing from `toProject`) and code that builds `Project`. Task 2 fixes them; don't commit yet.
+- [x] **Step 6: Typecheck.** Run `pnpm vitest run --project schema` (expected: PASS), then `pnpm typecheck`. Expected: errors only in `packages/core/src/mappers.ts` (`visibility` is missing from `toProject`) and code that builds `Project`. Task 2 fixes them; don't commit yet.
 
 ### Task 2: Migration 0004 and database types
 
@@ -234,7 +234,7 @@ export const ProjectMemberEventDataSchema = z
   - `IssuesTable.repo_id: string | null`
   - migration name `'0004_project_access'`
 
-- [ ] **Step 1: Write the failing tests.** In `packages/db/src/db.test.ts`, inside `describe(\`migrations (${dialect})\`…)`:
+- [x] **Step 1: Write the failing tests.** In `packages/db/src/db.test.ts`, inside `describe(\`migrations (${dialect})\`…)`:
   - Change the first assertion to `expect(await migrateDown(db)).toEqual(['0004_project_access']);`, followed by `await expect(sql\`select count(*) from project_members\`.execute(db.kysely)).rejects.toThrow();`. Then keep the existing `0003`→`0001` steps.
   - Add `'0004_project_access'` to both arrays at the end.
   - Add a new test:
@@ -281,9 +281,9 @@ it('0004 makes active non-admin users editors of existing projects', async () =>
 });
 ```
 
-- [ ] **Step 2: Run the tests to make sure they fail.** Run `pnpm vitest run --project db src/db.test.ts`. Expected: FAIL (no migration `0004_project_access`).
+- [x] **Step 2: Run the tests to make sure they fail.** Run `pnpm vitest run --project db src/db.test.ts`. Expected: FAIL (no migration `0004_project_access`).
 
-- [ ] **Step 3: Write the migration.** Create `packages/db/src/migrations/0004_project_access.ts`:
+- [x] **Step 3: Write the migration.** Create `packages/db/src/migrations/0004_project_access.ts`:
 
 ```ts
 import { type Kysely, sql } from 'kysely';
@@ -362,7 +362,7 @@ export function migration0004(dialect: Dialect) {
 > On Postgres, `${now}` binds as text into a `timestamptz(3)` column. If Postgres rejects the implicit cast, use `cast(${now} as timestamptz)` when `dialect === 'postgres'`, behind a small ternary in this file. Check this under `pnpm test:pg` in Step 6.
 > SQLite may refuse `dropColumn('repo_id')` on a column with a foreign key. If the down migration fails on SQLite, drop the `references(...)` from `repo_id` (the service clears it explicitly in Task 11) and keep the column a plain `t.id`.
 
-- [ ] **Step 4: Register the migration and the types.**
+- [x] **Step 4: Register the migration and the types.**
   - In `packages/db/src/migrate.ts`, import `migration0004` and add `'0004_project_access': migration0004(dialect),` as the last entry of `allMigrations`.
   - In `packages/db/src/types.ts`:
     - add `visibility: 'public' | 'private';` to `ProjectsTable` after `description`;
@@ -387,11 +387,11 @@ export interface ProjectReposTable {
 }
 ```
 
-- [ ] **Step 5: Map `visibility`.** In `packages/core/src/mappers.ts`, add `visibility: r.visibility,` to `toProject` after `description`. In `packages/core/src/services/projects.ts` `createProject`, add `visibility: data.visibility,` to the `insertInto('projects').values({...})` object.
+- [x] **Step 5: Map `visibility`.** In `packages/core/src/mappers.ts`, add `visibility: r.visibility,` to `toProject` after `description`. In `packages/core/src/services/projects.ts` `createProject`, add `visibility: data.visibility,` to the `insertInto('projects').values({...})` object.
 
-- [ ] **Step 6: Run the tests.** Run `pnpm vitest run --project db` and `TEST_DB=postgres pnpm vitest run --project db` (start Postgres first with `pnpm pg start`). Expected: PASS. Then run `pnpm typecheck`. Expected: PASS.
+- [x] **Step 6: Run the tests.** Run `pnpm vitest run --project db` and `TEST_DB=postgres pnpm vitest run --project db` (start Postgres first with `pnpm pg start`). Expected: PASS. Then run `pnpm typecheck`. Expected: PASS.
 
-- [ ] **Step 7: Commit.**
+- [x] **Step 7: Commit.**
 
 ```bash
 git add packages/schema packages/db packages/core/src/mappers.ts packages/core/src/services/projects.ts
@@ -446,7 +446,7 @@ export async function grant(
 ): Promise<void>;
 ```
 
-- [ ] **Step 1: Write the failing test.** Create `packages/core/src/access.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `packages/core/src/access.test.ts`:
 
 ```ts
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -504,9 +504,9 @@ describe(`access (${testDialect()})`, () => {
 });
 ```
 
-- [ ] **Step 2: Run it to make sure it fails.** Run `pnpm vitest run --project core src/access.test.ts`. Expected: FAIL, because `./access.ts`, `ANONYMOUS_ACTOR` and `grant` do not exist.
+- [x] **Step 2: Run it to make sure it fails.** Run `pnpm vitest run --project core src/access.test.ts`. Expected: FAIL, because `./access.ts`, `ANONYMOUS_ACTOR` and `grant` do not exist.
 
-- [ ] **Step 3: Add the anonymous actor.** In `packages/core/src/context.ts`:
+- [x] **Step 3: Add the anonymous actor.** In `packages/core/src/context.ts`:
   - Widen `Actor.kind` to `'human' | 'agent' | 'system' | 'anonymous'`.
   - Add:
 
@@ -530,7 +530,7 @@ export function isAnonymous(ctx: Pick<ServiceContext, 'actor'>): boolean {
 
 Then fix any exhaustive `switch (actor.kind)` that `pnpm typecheck` reports. `toActor` in `services/users.ts` maps stored users, which never have the kind `anonymous`, so it needs no change.
 
-- [ ] **Step 4: Write `access.ts`.**
+- [x] **Step 4: Write `access.ts`.**
 
 ```ts
 import type { Database, Kysely } from '@poietic-tech/issues-db';
@@ -630,7 +630,7 @@ export {
 
 `ANONYMOUS_ACTOR` and `isAnonymous` are already exported by `export * from './context.ts'`.
 
-- [ ] **Step 5: Add the `grant` test helper.** Append to `packages/core/src/testing.ts`:
+- [x] **Step 5: Add the `grant` test helper.** Append to `packages/core/src/testing.ts`:
 
 ```ts
 /** Test helper: gives `who` a role on a project, writing directly (no permission check, no event). */
@@ -662,9 +662,9 @@ export async function grant(
 }
 ```
 
-- [ ] **Step 6: Run the tests.** Run `pnpm vitest run --project core src/access.test.ts`, then with `TEST_DB=postgres`. Expected: PASS.
+- [x] **Step 6: Run the tests.** Run `pnpm vitest run --project core src/access.test.ts`, then with `TEST_DB=postgres`. Expected: PASS.
 
-- [ ] **Step 7: Commit.**
+- [x] **Step 7: Commit.**
 
 ```bash
 git add packages/core/src/access.ts packages/core/src/access.test.ts packages/core/src/context.ts packages/core/src/index.ts packages/core/src/testing.ts
@@ -705,7 +705,7 @@ export async function requireProjectId(
 
 `findProject` and `findIssue` stay unchecked. They are for internal joins and the access module only. Every service that resolves a caller-supplied reference uses the checked versions.
 
-- [ ] **Step 1: Write the failing test.** Create `packages/core/src/visibility.test.ts`. Task 6 extends this file; start it with the per-project lookups:
+- [x] **Step 1: Write the failing test.** Create `packages/core/src/visibility.test.ts`. Task 6 extends this file; start it with the per-project lookups:
 
 ```ts
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -748,9 +748,9 @@ describe(`project visibility (${testDialect()})`, () => {
 
 Check the real exported names (`updateIssue` vs `updateIssueInTx`) in `services/issues.ts` and adjust the imports.
 
-- [ ] **Step 2: Run it to make sure it fails.** Run `pnpm vitest run --project core src/visibility.test.ts`. Expected: FAIL, because the member can read `PRV` today.
+- [x] **Step 2: Run it to make sure it fails.** Run `pnpm vitest run --project core src/visibility.test.ts`. Expected: FAIL, because the member can read `PRV` today.
 
-- [ ] **Step 3: Change `refs.ts`.** Replace `getProjectRow` and `getIssueRow` with:
+- [x] **Step 3: Change `refs.ts`.** Replace `getProjectRow` and `getIssueRow` with:
 
 ```ts
 type Need = Exclude<AccessLevel, 'none'>;
@@ -785,7 +785,7 @@ export async function getIssueRow(ctx: ServiceContext, db: Exec, ref: string, le
 
 Import `type AccessLevel`, `projectLevel` and `requireLevel` from `./access.ts`.
 
-- [ ] **Step 4: Update every call site.** `pnpm typecheck` lists them all. Apply this table. "write" means the existing write path; any extra admin check already in the function stays.
+- [x] **Step 4: Update every call site.** `pnpm typecheck` lists them all. Apply this table. "write" means the existing write path; any extra admin check already in the function stays.
 
 | File                        | Function                                                                                           | Lookup → level                                                                                                                                |
 | --------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -817,13 +817,13 @@ Import `type AccessLevel`, `projectLevel` and `requireLevel` from `./access.ts`.
 
 The call shape changes from `getIssueRow(tx, ref)` to `getIssueRow(ctx, tx, ref, 'write')`.
 
-- [ ] **Step 5: Run the target test.** Run `pnpm vitest run --project core src/visibility.test.ts`. Expected: PASS.
+- [x] **Step 5: Run the target test.** Run `pnpm vitest run --project core src/visibility.test.ts`. Expected: PASS.
 
-- [ ] **Step 6: Run the full suite and repair existing tests.** Run `pnpm test`. Tests that act as `t.member` or `t.agent` on projects created by the admin now fail with `NOT_FOUND` or `FORBIDDEN`. In each failing file, right after the project is created, add `await grant(t, '<KEY>', t.member, 'editor')` (and the same for `t.agent` where it's used). Do not loosen any assertion. Repeat until `pnpm test` passes, then run `pnpm test:pg`.
+- [x] **Step 6: Run the full suite and repair existing tests.** Run `pnpm test`. Tests that act as `t.member` or `t.agent` on projects created by the admin now fail with `NOT_FOUND` or `FORBIDDEN`. In each failing file, right after the project is created, add `await grant(t, '<KEY>', t.member, 'editor')` (and the same for `t.agent` where it's used). Do not loosen any assertion. Repeat until `pnpm test` passes, then run `pnpm test:pg`.
 
   The CLI and server suites act through HTTP with tokens: grant memberships in their fixtures the same way, using the `grant` helper on the test database.
 
-- [ ] **Step 7: Commit.**
+- [x] **Step 7: Commit.**
 
 ```bash
 git add packages/core apps/server/src/routes/collaboration.ts apps/server/src/routes/stream.ts apps/server/src apps/cli/src
@@ -849,7 +849,7 @@ git commit -m "feat(core): check project access in the shared issue and project 
   - `getAttachment` by id needs `read`;
   - `deleteLink` needs `write` on the source issue.
 
-- [ ] **Step 1: Write the failing tests.** Append inside the `describe` in `visibility.test.ts`:
+- [x] **Step 1: Write the failing tests.** Append inside the `describe` in `visibility.test.ts`:
 
 ```ts
 it('checks the parent project for lookups by id', async () => {
@@ -887,9 +887,9 @@ it('lets managers moderate comments and delete custom fields', async () => {
 
 Match the real input shapes of `createCustomField` and `createLabel` (read their schemas in `packages/schema/src/custom-fields.ts` and `entities.ts`).
 
-- [ ] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project core src/visibility.test.ts`. Expected: FAIL, because by-id updates don't check the project.
+- [x] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project core src/visibility.test.ts`. Expected: FAIL, because by-id updates don't check the project.
 
-- [ ] **Step 3: Add the checks.** In each by-id function, after loading the row and before any write, add `await requireProjectId(ctx, tx, row.project_id, '<level>')`. Use `ctx.db.kysely` instead of `tx` in read paths. For rows without `project_id`, join through:
+- [x] **Step 3: Add the checks.** In each by-id function, after loading the row and before any write, add `await requireProjectId(ctx, tx, row.project_id, '<level>')`. Use `ctx.db.kysely` instead of `tx` in read paths. For rows without `project_id`, join through:
 
 | Row                   | Project id from                 |
 | --------------------- | ------------------------------- |
@@ -903,9 +903,9 @@ Replace these existing checks:
 - `views.ts` shared-view admin check (around line 101): for `owner_id === null`, require `'manage'`.
 - `comments.ts` around line 123 and `attachments.ts` around line 193: the condition becomes `row.author_id === ctx.actor.id || atLeast(await projectLevel(ctx, tx, project), 'manage')`, where `project` comes from `requireProjectId(ctx, tx, projectId, 'write')`. Keep each file's existing error message.
 
-- [ ] **Step 4: Run the tests.** Run `pnpm vitest run --project core` and `pnpm test:pg`. Expected: PASS.
+- [x] **Step 4: Run the tests.** Run `pnpm vitest run --project core` and `pnpm test:pg`. Expected: PASS.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add packages/core
@@ -947,7 +947,7 @@ if (readable !== 'all')
   q = readable.length ? q.where('i.project_id', 'in', readable) : q.where(sql<boolean>`1 = 0`);
 ```
 
-- [ ] **Step 1: Write the failing tests.** Append to `visibility.test.ts`:
+- [x] **Step 1: Write the failing tests.** Append to `visibility.test.ts`:
 
 ```ts
 it('never returns unreadable projects from cross-project reads', async () => {
@@ -1001,13 +1001,13 @@ it('requires sign-in for users and shows emails only to admins and the user', as
 
 Adjust `listIssues` and `listUsers` call shapes to their real signatures.
 
-- [ ] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project core src/visibility.test.ts`. Expected: FAIL.
+- [x] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project core src/visibility.test.ts`. Expected: FAIL.
 
-- [ ] **Step 3: Filter projects.** In `listProjects`, apply the readable pattern on `id`.
+- [x] **Step 3: Filter projects.** In `listProjects`, apply the readable pattern on `id`.
 
-- [ ] **Step 4: Filter issue queries.** In `queryIssues`, when `params.projectId` is undefined, apply it on `i.project_id`. In `resolveFilterRefs`, when `projectId` is undefined, compute `readable` once at the top and add `.where('project_id', 'in', readable)` to the status and label lookups (`1 = 0` when the list is empty, nothing for `'all'`).
+- [x] **Step 4: Filter issue queries.** In `queryIssues`, when `params.projectId` is undefined, apply it on `i.project_id`. In `resolveFilterRefs`, when `projectId` is undefined, compute `readable` once at the top and add `.where('project_id', 'in', readable)` to the status and label lookups (`1 = 0` when the list is empty, nothing for `'all'`).
 
-- [ ] **Step 5: Filter events.** In `listEvents`, apply it on `e.project_id` as:
+- [x] **Step 5: Filter events.** In `listEvents`, apply it on `e.project_id` as:
 
 ```ts
 const readable = await readableProjectIds(ctx, ctx.db.kysely);
@@ -1022,18 +1022,18 @@ if (readable !== 'all') {
 }
 ```
 
-- [ ] **Step 6: Filter links.** `linksOf(db, issueId)` gains a `ctx` parameter. After the query, drop rows whose other issue's project isn't readable. Select `o.project_id as other_project_id` and filter with `readable === 'all' || readable.includes(r.other_project_id)`. `createLink` still returns the created link because its caller passed the `read` check on the target.
+- [x] **Step 6: Filter links.** `linksOf(db, issueId)` gains a `ctx` parameter. After the query, drop rows whose other issue's project isn't readable. Select `o.project_id as other_project_id` and filter with `readable === 'all' || readable.includes(r.other_project_id)`. `createLink` still returns the created link because its caller passed the `read` check on the target.
 
-- [ ] **Step 7: Users.** In `listUsers` and `getUser`, start with `if (isAnonymous(ctx)) throw new DomainError('UNAUTHENTICATED', 'Sign in to see users');`. Map results through:
+- [x] **Step 7: Users.** In `listUsers` and `getUser`, start with `if (isAnonymous(ctx)) throw new DomainError('UNAUTHENTICATED', 'Sign in to see users');`. Map results through:
 
 ```ts
 const redact = (u: User): User =>
   ctx.actor.role === 'admin' || u.id === ctx.actor.id ? u : { ...u, email: null };
 ```
 
-- [ ] **Step 8: Run the tests.** Run `pnpm test` and `pnpm test:pg`. Expected: PASS.
+- [x] **Step 8: Run the tests.** Run `pnpm test` and `pnpm test:pg`. Expected: PASS.
 
-- [ ] **Step 9: Commit.**
+- [x] **Step 9: Commit.**
 
 ```bash
 git add packages/core
@@ -1076,7 +1076,7 @@ export async function removeMember(
 // projects.ts: listProjects/getProject/createProject/updateProject now return ProjectWithAccess
 ```
 
-- [ ] **Step 1: Write the failing tests.** Create `members.test.ts`:
+- [x] **Step 1: Write the failing tests.** Create `members.test.ts`:
 
 ```ts
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -1136,9 +1136,9 @@ describe(`project members (${testDialect()})`, () => {
 });
 ```
 
-- [ ] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project core src/services/members.test.ts`. Expected: FAIL, because `./members.ts` doesn't exist.
+- [x] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project core src/services/members.test.ts`. Expected: FAIL, because `./members.ts` doesn't exist.
 
-- [ ] **Step 3: Write `members.ts`.**
+- [x] **Step 3: Write `members.ts`.**
 
 ```ts
 import { withWriteTx } from '@poietic-tech/issues-db';
@@ -1265,7 +1265,7 @@ export async function removeMember(ctx: ServiceContext, projectRef: string, user
 
 Export it from `index.ts` with `export * from './services/members.ts';`.
 
-- [ ] **Step 4: Add `myAccess` and the visibility check.** In `projects.ts`:
+- [x] **Step 4: Add `myAccess` and the visibility check.** In `projects.ts`:
 
 ```ts
 async function withAccess(
@@ -1289,9 +1289,9 @@ async function withAccess(
   - add `'visibility'` to the `diff` keys.
 - Events keep using `toProject(updated)` (no `myAccess`).
 
-- [ ] **Step 5: Run the tests.** Run `pnpm test` and `pnpm test:pg`. Expected: PASS. Fix any callers that read `Project` and now get `ProjectWithAccess`; it's a superset, so it should be type-compatible.
+- [x] **Step 5: Run the tests.** Run `pnpm test` and `pnpm test:pg`. Expected: PASS. Fix any callers that read `Project` and now get `ProjectWithAccess`; it's a superset, so it should be type-compatible.
 
-- [ ] **Step 6: Commit.**
+- [x] **Step 6: Commit.**
 
 ```bash
 git add packages/core packages/schema
@@ -1319,7 +1319,7 @@ git commit -m "feat(core): project membership services, visibility changes and m
   - with no credentials, `c.get('ctx').actor === ANONYMOUS_ACTOR`;
   - unsafe methods without an actor get 401.
 
-- [ ] **Step 1: Write the failing tests.** Create `apps/server/src/access.test.ts`. Copy the app and fixture setup from an existing server test (`api.test.ts` shows how to create the app over a test database and get an admin token). Then:
+- [x] **Step 1: Write the failing tests.** Create `apps/server/src/access.test.ts`. Copy the app and fixture setup from an existing server test (`api.test.ts` shows how to create the app over a test database and get an admin token). Then:
 
 ```ts
 it('treats requests without credentials as anonymous, never as admin', async () => {
@@ -1347,9 +1347,9 @@ it('treats requests without credentials as anonymous, never as admin', async () 
 
 Match the real issue-create path in `routes/issues.ts`.
 
-- [ ] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project server src/access.test.ts`. Expected: FAIL (`/me` returns 401).
+- [x] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project server src/access.test.ts`. Expected: FAIL (`/me` returns 401).
 
-- [ ] **Step 3: Use the anonymous actor.** In `middleware/auth.ts`:
+- [x] **Step 3: Use the anonymous actor.** In `middleware/auth.ts`:
   - Change `actor: actor ?? SYSTEM_ACTOR` to `actor: actor ?? ANONYMOUS_ACTOR`. Keep `SYSTEM_ACTOR` for trusted mode, where `actor` is always set.
   - Change `requireActor` to:
 
@@ -1368,7 +1368,7 @@ export const requireActor = createMiddleware<AppEnv>(async (c, next) => {
 
 Check `routes/auth.ts` `/auth/*` handlers that read `ctx.actor`: they previously got `SYSTEM_ACTOR` when signed out, and must still work with the anonymous actor. Grep for `ctx.actor` in `routes/auth.ts` and `services/sso.ts`. `signInWithSso` creates users and must keep running with a privileged actor: if it uses `ctx`, call it with `withActor(ctx, SYSTEM_ACTOR)`.
 
-- [ ] **Step 4: `/me`.** Add `MeSchema` to `entities.ts`, then change the `/me` route's response to `json(MeSchema, 'Current user, or { anonymous: true }')` and its handler to:
+- [x] **Step 4: `/me`.** Add `MeSchema` to `entities.ts`, then change the `/me` route's response to `json(MeSchema, 'Current user, or { anonymous: true }')` and its handler to:
 
 ```ts
 async (c) => {
@@ -1378,9 +1378,9 @@ async (c) => {
 },
 ```
 
-- [ ] **Step 5: Project response schemas.** In `routes/projects.ts`, use `ProjectWithAccessSchema` for the list, get, create and update responses. Add `visibility` to the route descriptions, and mark update "Name, description and visibility need manage".
+- [x] **Step 5: Project response schemas.** In `routes/projects.ts`, use `ProjectWithAccessSchema` for the list, get, create and update responses. Add `visibility` to the route descriptions, and mark update "Name, description and visibility need manage".
 
-- [ ] **Step 6: Live stream.** In `routes/stream.ts`, replace `matches`:
+- [x] **Step 6: Live stream.** In `routes/stream.ts`, replace `matches`:
 
 ```ts
 let readable = await readableProjectIds(ctx, ctx.db.kysely);
@@ -1400,9 +1400,9 @@ if (e.type.startsWith('project.member_') || e.type === 'project.updated')
 
 Replay already goes through `listEvents`, which filters since Task 6.
 
-- [ ] **Step 7: Regenerate the contract and run the tests.** Run `pnpm openapi:gen`, `pnpm vitest run --project server`, then `pnpm test` and `pnpm test:pg`. Expected: PASS.
+- [x] **Step 7: Regenerate the contract and run the tests.** Run `pnpm openapi:gen`, `pnpm vitest run --project server`, then `pnpm test` and `pnpm test:pg`. Expected: PASS.
 
-- [ ] **Step 8: Commit.**
+- [x] **Step 8: Commit.**
 
 ```bash
 git add apps/server packages/schema docs/openapi.json packages/client/src/generated
@@ -1416,7 +1416,7 @@ git commit -m "feat(server): anonymous read access, /me for signed-out visitors,
 - Create: `docs/adr/0021-project-visibility-and-roles.md`
 - Modify: `docs/adr/README.md`, `docs/adr/0009-auth-v1.md` (consequence line), `docs/agents.md`, `docs/deployment.md`, `docs/security.md`
 
-- [ ] **Step 1: Write ADR 0021.** Use the template in `docs/adr/0000-template.md`, with status `Accepted` and date `2026-10-08`.
+- [x] **Step 1: Write ADR 0021.** Use the template in `docs/adr/0000-template.md`, with status `Accepted` and date `2026-10-08`.
   - **Context:** ADR 0009's "every member can act on every project"; the need for public read access and private projects.
   - **Decision:**
     - the levels and roles table from the spec (§2);
@@ -1430,19 +1430,19 @@ git commit -m "feat(server): anonymous read access, /me for signed-out visitors,
     - users created after the upgrade start with none;
     - admins see everything;
     - links into unreadable projects are hidden.
-- [ ] **Step 2: Update the ADR index and ADR 0009.** Add the row to `docs/adr/README.md`. In ADR 0009, change the consequence line to: "There is no per-project permission model yet. Every member can act on every project. _(Superseded by [ADR 0021](0021-project-visibility-and-roles.md).)_"
-- [ ] **Step 3: Update the guides.**
+- [x] **Step 2: Update the ADR index and ADR 0009.** Add the row to `docs/adr/README.md`. In ADR 0009, change the consequence line to: "There is no per-project permission model yet. Every member can act on every project. _(Superseded by [ADR 0021](0021-project-visibility-and-roles.md).)_"
+- [x] **Step 3: Update the guides.**
   - `docs/agents.md`: "Give every agent user a role on each private project it works in: `poietic-issues project members add <KEY> @agent --role editor`." Mark the command as available from Task 13.
   - `docs/security.md`: anonymous read access to public projects, 404 for private ones, and email visibility.
   - `docs/deployment.md`: what migration 0004 does on upgrade.
-- [ ] **Step 4: Check and commit.** Run `pnpm format` and `pnpm check`, then:
+- [x] **Step 4: Check and commit.** Run `pnpm format` and `pnpm check`, then:
 
 ```bash
 git add docs
 git commit -m "docs: ADR 0021 project visibility and roles"
 ```
 
-- [ ] **Step 5: Open PR 1.** Push the branch and open a PR titled "Project visibility and roles: access core", without attribution lines. Wait for review before starting PR 2. Branch PR 2 from PR 1's branch if PR 1 hasn't merged yet.
+- [x] **Step 5: Open PR 1.** Push the branch and open a PR titled "Project visibility and roles: access core", without attribution lines. Wait for review before starting PR 2. Branch PR 2 from PR 1's branch if PR 1 hasn't merged yet.
 
 ---
 
@@ -1489,7 +1489,7 @@ export async function removeRepo(
 export async function reposOf(db: Exec, projectIds: string[]): Promise<Map<string, ProjectRepo[]>>;
 ```
 
-- [ ] **Step 1: Write the failing tests.** Create `repos.test.ts`:
+- [x] **Step 1: Write the failing tests.** Create `repos.test.ts`:
 
 ```ts
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -1542,9 +1542,9 @@ describe(`repo links (${testDialect()})`, () => {
 
 The `repo` issue assertions pass only after Task 11. Mark that `it` with `it.todo` here and restore it in Task 11 Step 1.
 
-- [ ] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project core src/services/repos.test.ts`. Expected: FAIL.
+- [x] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project core src/services/repos.test.ts`. Expected: FAIL.
 
-- [ ] **Step 3: Add the schema.** In `entities.ts`:
+- [x] **Step 3: Add the schema.** In `entities.ts`:
 
 ```ts
 export const ProjectRepoSchema = z
@@ -1571,7 +1571,7 @@ export type AddProjectRepoInput = z.input<typeof AddProjectRepoInputSchema>;
 
 Declare `ProjectRepoSchema` before `ProjectSchema`, then add `repos: z.array(ProjectRepoSchema)` to `ProjectSchema` after `visibility`. Add `project.repo_added` and `project.repo_removed` to `EVENT_TYPES`, with `ProjectRepoEventDataSchema = z.object({ ...base, repo: ProjectRepoSchema }).meta({ id: 'ProjectRepoEventData' })`.
 
-- [ ] **Step 4: Write `repos.ts`.**
+- [x] **Step 4: Write `repos.ts`.**
 
 ```ts
 import { withWriteTx, type Database, type Kysely } from '@poietic-tech/issues-db';
@@ -1700,14 +1700,14 @@ export async function removeRepo(ctx: ServiceContext, projectRef: string, repoRe
 
 `clearIssueRepo` is defined in Task 11 (`services/issues.ts`). Until then, define it locally as a direct `updateTable('issues').set({ repo_id: null, version: sql\`version + 1\`, updated_at: nowIso(ctx) })`. Task 11 Step 5 replaces it with the version that records events.
 
-- [ ] **Step 5: Add `repos` to projects.** `toProject(r, repos: ProjectRepo[] = [])` adds `repos`.
+- [x] **Step 5: Add `repos` to projects.** `toProject(r, repos: ProjectRepo[] = [])` adds `repos`.
   - Every caller that has a database handle loads the repos with `reposOf`. In `projects.ts`, `withAccess` and `listProjects` call `reposOf(db, ids)` once.
   - Event payloads built inside transactions also pass `(await reposOf(tx, [id])).get(id)`.
   - Export `repos.ts` from `index.ts`.
 
-- [ ] **Step 6: Run the tests.** Run `pnpm vitest run --project core` and `pnpm test:pg`. Expected: PASS, apart from the `it.todo`.
+- [x] **Step 6: Run the tests.** Run `pnpm vitest run --project core` and `pnpm test:pg`. Expected: PASS, apart from the `it.todo`.
 
-- [ ] **Step 7: Commit.**
+- [x] **Step 7: Commit.**
 
 ```bash
 git add packages/core packages/schema
@@ -1734,7 +1734,7 @@ git commit -m "feat(core): link GitHub repositories to projects"
   - field `{ key: 'repo', type: 'repo', filterOps: ['eq', 'neq', 'in', 'nin', 'isNull'], groupable: true, sortable: false }`
   - `export async function clearIssueRepo(ctx: ServiceContext, tx: Tx, issueId: string): Promise<void>` in `services/issues.ts`
 
-- [ ] **Step 1: Restore the test and add filter and move cases.** In `repos.test.ts`, turn the `it.todo` back into the full test from Task 10, then add:
+- [x] **Step 1: Restore the test and add filter and move cases.** In `repos.test.ts`, turn the `it.todo` back into the full test from Task 10, then add:
 
 ```ts
 it('filters by repo and clears it when an issue moves projects', async () => {
@@ -1757,9 +1757,9 @@ it('filters by repo and clears it when an issue moves projects', async () => {
 
 Match `moveIssue`'s real input shape (`MoveIssueInputSchema`).
 
-- [ ] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project core src/services/repos.test.ts`. Expected: FAIL (`repo` is unknown).
+- [x] **Step 2: Run them to make sure they fail.** Run `pnpm vitest run --project core src/services/repos.test.ts`. Expected: FAIL (`repo` is unknown).
 
-- [ ] **Step 3: Schema.**
+- [x] **Step 3: Schema.**
   - Add `repo: z.string().nullable().meta({ description: 'Linked GitHub repository (`owner/name`), one of the project\'s repos.', example: 'acme/app' })` to `IssueSchema` after `parent`.
   - Add `repo: z.string().nullable().meta({ description: 'One of the project\'s repos (`owner/name`, URL or id), or null.' })` to `issueWritable`.
   - Add `repo: issueWritable.repo.optional()` to `CreateIssueInputSchema`.
@@ -1780,7 +1780,7 @@ field({
 
 (Use `SET` instead of `NULLABLE_EQUALITY` if `in`/`nin` aren't in `NULLABLE_EQUALITY`.)
 
-- [ ] **Step 4: Query layer.**
+- [x] **Step 4: Query layer.**
   - In `loadIssues`, add `.leftJoin('project_repos as rp', 'rp.id', 'i.repo_id')`, select `'rp.owner as repo_owner'` and `'rp.name as repo_name'`, and map `repo: r.repo_owner ? \`${r.repo_owner}/${r.repo_name}\` : null`.
   - Add `repo: sql.ref('i.repo_id')` to `SCALAR_COLUMNS`.
   - In `resolveFilterRefs`, add:
@@ -1804,7 +1804,7 @@ case 'repo': {
 
 (`readable` is the value computed at the top of the function in Task 6.)
 
-- [ ] **Step 5: Services.**
+- [x] **Step 5: Services.**
   - In `createIssue` and `updateIssueInTx`, resolve `data.repo`:
     - `null` clears it;
     - a string goes through `findRepo(tx, project.id, data.repo)`, and if no row is found, `throw invalidRelation(\`"${data.repo}" is not linked to project ${project.key}\`)`;
@@ -1814,9 +1814,9 @@ case 'repo': {
   - Implement `clearIssueRepo(ctx, tx, issueId)` by calling `updateIssueInTx(ctx, tx, issueId, { repo: null })`, then delete the temporary version from `repos.ts` and import this one.
   - `updateIssueInTx` looks up the issue with `'write'`. `removeRepo` already holds `manage`, so this passes.
 
-- [ ] **Step 6: Run the tests.** Run `pnpm test` and `pnpm test:pg`. Expected: PASS.
+- [x] **Step 6: Run the tests.** Run `pnpm test` and `pnpm test:pg`. Expected: PASS.
 
-- [ ] **Step 7: Commit, then open PR 2.**
+- [x] **Step 7: Commit, then open PR 2.**
 
 ```bash
 git add packages/schema packages/core
@@ -1850,7 +1850,7 @@ Open PR 2, "Project repo links", stacked on PR 1.
 | `POST /projects/{project}/repos`            | 201 `ProjectRepo`                                     |
 | `DELETE /projects/{project}/repos/{repo}`   | 204 (`repo` = `rpo_…` id or `owner/name` URL-encoded) |
 
-- [ ] **Step 1: Write the failing test.** Append to `apps/server/src/access.test.ts`:
+- [x] **Step 1: Write the failing test.** Append to `apps/server/src/access.test.ts`:
 
 ```ts
 it('manages members and repos over HTTP', async () => {
@@ -1887,9 +1887,9 @@ it('manages members and repos over HTTP', async () => {
 
 Use the `call` helper pattern from `api.test.ts`, with a member token created through `POST /users/{user}/tokens` as admin.
 
-- [ ] **Step 2: Run it to make sure it fails.** Run `pnpm vitest run --project server src/access.test.ts`. Expected: FAIL (404 on the new paths).
+- [x] **Step 2: Run it to make sure it fails.** Run `pnpm vitest run --project server src/access.test.ts`. Expected: FAIL (404 on the new paths).
 
-- [ ] **Step 3: Write `routes/members.ts`.** Follow `routes/projects.ts`: `createRoute`, `projectParam`, `json`, `jsonBody`, `errorResponses`, tags `['Project access']`. Each handler is one line calling the core service with `c.get('ctx')`, for example:
+- [x] **Step 3: Write `routes/members.ts`.** Follow `routes/projects.ts`: `createRoute`, `projectParam`, `json`, `jsonBody`, `errorResponses`, tags `['Project access']`. Each handler is one line calling the core service with `c.get('ctx')`, for example:
 
 ```ts
 async (c) => c.json(await addMember(c.get('ctx'), c.req.valid('param').project, c.req.valid('json')), 201),
@@ -1897,9 +1897,9 @@ async (c) => c.json(await addMember(c.get('ctx'), c.req.valid('param').project, 
 
 For deletes, return `c.body(null, 204)`. Register it in `app.ts` next to `registerProjectRoutes`.
 
-- [ ] **Step 4: Regenerate and run the tests.** Run `pnpm openapi:gen`, `pnpm vitest run --project server`, `pnpm test`. Expected: PASS.
+- [x] **Step 4: Regenerate and run the tests.** Run `pnpm openapi:gen`, `pnpm vitest run --project server`, `pnpm test`. Expected: PASS.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add apps/server docs/openapi.json packages/client/src/generated
@@ -1936,7 +1936,7 @@ Also `--visibility public|private` on `project create|edit`, and `--repo <owner/
 
 Where `[project]` is optional it falls back to `rt.project(undefined)`, which uses `-P`, `POIETIC_ISSUES_PROJECT` or `.poietic-issues.json`. For commands that take both a project and a user, make the project a required option `-P` instead, to avoid ambiguous positionals. The CLI already has the global `-P, --project`; use `rt.project(undefined)` and take only `<user>`/`<repo>` as positionals.
 
-- [ ] **Step 1: Write the failing test.** In `apps/cli/src/cli.test.ts`, inside the remote-mode test that has an admin, add:
+- [x] **Step 1: Write the failing test.** In `apps/cli/src/cli.test.ts`, inside the remote-mode test that has an admin, add:
 
 ```ts
 const added = await cli([
@@ -1968,9 +1968,9 @@ expect(vis.json()).toMatchObject({ visibility: 'public' });
 
 Use whatever user handles and project keys the surrounding test already set up.
 
-- [ ] **Step 2: Run it to make sure it fails.** Run `pnpm vitest run --project cli src/cli.test.ts`. Expected: FAIL ("unknown command 'members'").
+- [x] **Step 2: Run it to make sure it fails.** Run `pnpm vitest run --project cli src/cli.test.ts`. Expected: FAIL ("unknown command 'members'").
 
-- [ ] **Step 3: Implement the commands.** Follow the `project create` pattern in `admin.ts` (`act`, `rt.api()`, `rt.call`, `rt.out.item` / `rt.out.list`). In `output.ts`, add to `Kind` and `COLUMNS`:
+- [x] **Step 3: Implement the commands.** Follow the `project create` pattern in `admin.ts` (`act`, `rt.api()`, `rt.call`, `rt.out.item` / `rt.out.list`). In `output.ts`, add to `Kind` and `COLUMNS`:
 
 ```ts
 member: [
@@ -1987,9 +1987,9 @@ repo: [
 
 Validate `--role` against `viewer|editor|manager` and `--visibility` against `public|private` with Commander's `Option.choices`.
 
-- [ ] **Step 4: Refresh the goldens and run the tests.** Run `pnpm vitest run --project cli -u`, then `pnpm check`. Expected: PASS. Commit the updated `apps/cli/test/commands.golden.json` and `docs/cli-reference.md`.
+- [x] **Step 4: Refresh the goldens and run the tests.** Run `pnpm vitest run --project cli -u`, then `pnpm check`. Expected: PASS. Commit the updated `apps/cli/test/commands.golden.json` and `docs/cli-reference.md`.
 
-- [ ] **Step 5: Commit and open PR 3.**
+- [x] **Step 5: Commit and open PR 3.**
 
 ```bash
 git add apps/cli docs/cli-reference.md
@@ -2028,7 +2028,7 @@ export type Me = Schemas['Me'];
 export function isSignedIn(me: Me | undefined): me is Schemas['User'];
 ```
 
-- [ ] **Step 1: Write the failing end-to-end test.** Create `apps/web/e2e/visibility.spec.ts` using the fixtures in `e2e/fixtures.ts`. Read it first: it shows how tests seed data through the API with an admin token and open pages.
+- [x] **Step 1: Write the failing end-to-end test.** Create `apps/web/e2e/visibility.spec.ts` using the fixtures in `e2e/fixtures.ts`. Read it first: it shows how tests seed data through the API with an admin token and open pages.
 
 ```ts
 import { expect, test } from './fixtures.ts';
@@ -2056,9 +2056,9 @@ test('anonymous visitors can read a public project but not a private one', async
 
 Adapt `api` and `browser` to the real fixture names.
 
-- [ ] **Step 2: Run it to make sure it fails.** Run `pnpm e2e -- visibility.spec.ts`. Expected: FAIL, because the page redirects to `/login`.
+- [x] **Step 2: Run it to make sure it fails.** Run `pnpm e2e -- visibility.spec.ts`. Expected: FAIL, because the page redirects to `/login`.
 
-- [ ] **Step 3: Change the query layer and layouts.**
+- [x] **Step 3: Change the query layer and layouts.**
   - In `queries.ts`, add the `Me` type and the guard:
 
 ```ts
@@ -2076,7 +2076,7 @@ export function isSignedIn(me: Me | undefined): me is Schemas['User'] {
 - In `routes/+layout.svelte`, the 401 handler still redirects to `/login`. An anonymous visitor only hits 401 when they try a write, which is the right moment to send them there.
 - The root page (`(app)/+page.svelte`) with no projects visible while signed out should show "Sign in to see your projects" with a button.
 
-- [ ] **Step 4: Hide write controls by `myAccess`.** Expose `myAccess` from the project query (`useProjectData` in `$lib/project-data.svelte.ts` reads `/projects/{key}`). Add `canWrite = myAccess === 'write' || myAccess === 'manage'` and `canManage = myAccess === 'manage'` to its return value. Gate the issue-editing controls on `canWrite`:
+- [x] **Step 4: Hide write controls by `myAccess`.** Expose `myAccess` from the project query (`useProjectData` in `$lib/project-data.svelte.ts` reads `/projects/{key}`). Add `canWrite = myAccess === 'write' || myAccess === 'manage'` and `canManage = myAccess === 'manage'` to its return value. Gate the issue-editing controls on `canWrite`:
   - `IssueProperties` pickers become read-only text;
   - the `MarkdownEditor` edit button;
   - comment form, attachment upload, link add and sub-issue add;
@@ -2084,9 +2084,9 @@ export function isSignedIn(me: Me | undefined): me is Schemas['User'] {
 
   Gate the project settings link on `canManage`. The server stays the authority, so these are cosmetic.
 
-- [ ] **Step 5: Run the end-to-end tests.** Run `pnpm e2e`. Expected: PASS for the new test and all existing tests. Existing tests sign in as admin and have `manage` everywhere.
+- [x] **Step 5: Run the end-to-end tests.** Run `pnpm e2e`. Expected: PASS for the new test and all existing tests. Existing tests sign in as admin and have `manage` everywhere.
 
-- [ ] **Step 6: Commit.**
+- [x] **Step 6: Commit.**
 
 ```bash
 git add apps/web
@@ -2101,7 +2101,7 @@ git commit -m "feat(web): browse public projects signed out; hide write controls
 - Modify: `apps/web/src/routes/(app)/p/[key]/settings/+page.svelte`, `apps/web/src/lib/queries.ts` (`keys.members(key)`, `fetchers.members(key)`)
 - Test: `apps/web/e2e/visibility.spec.ts`
 
-- [ ] **Step 1: Write the failing end-to-end test.** Append:
+- [x] **Step 1: Write the failing end-to-end test.** Append:
 
 ```ts
 test('a manager makes a project public, adds a repo and a member', async ({ page, api }) => {
@@ -2125,9 +2125,9 @@ test('a manager makes a project public, adds a repo and a member', async ({ page
 
 Make sure a user `member` exists in the end-to-end seed (`e2e/server.ts`); add one if not.
 
-- [ ] **Step 2: Run it to make sure it fails.** Run `pnpm e2e -- visibility.spec.ts`. Expected: FAIL (no `settings-access`).
+- [x] **Step 2: Run it to make sure it fails.** Run `pnpm e2e -- visibility.spec.ts`. Expected: FAIL (no `settings-access`).
 
-- [ ] **Step 3: Write `ProjectAccessSettings.svelte`.** Follow the structure of the `settings-labels` section in the existing settings page (`run(...)` helper, `btn` / `input` styles, `toast`, `confirmAction` for removal).
+- [x] **Step 3: Write `ProjectAccessSettings.svelte`.** Follow the structure of the `settings-labels` section in the existing settings page (`run(...)` helper, `btn` / `input` styles, `toast`, `confirmAction` for removal).
   - A `<section data-testid="settings-access">` with:
     - a `<fieldset>` of two radios, Private and Public. Each has a one-line explanation:
       - Private: "Only members and admins can see it."
@@ -2138,13 +2138,13 @@ Make sure a user `member` exists in the end-to-end seed (`e2e/server.ts`); add o
     - an add form with an `@handle` input, a role `Select` (default `editor`) and an "Add member" button.
   - Invalidate `keys.members(key)` and `keys.project(key)` after each change.
 
-- [ ] **Step 4: Write `ProjectReposSettings.svelte`.** A `<section data-testid="settings-repos">` that lists `project.repos`. Each row has an `<a href={repo.url} target="_blank" rel="noreferrer">{repo.fullName}</a>` and a remove button, with confirmation text: "Issues linked to it lose the link." Below the list is an input with placeholder `owner/name or GitHub URL` and a "Link repository" button that posts `{ repo }`.
+- [x] **Step 4: Write `ProjectReposSettings.svelte`.** A `<section data-testid="settings-repos">` that lists `project.repos`. Each row has an `<a href={repo.url} target="_blank" rel="noreferrer">{repo.fullName}</a>` and a remove button, with confirmation text: "Issues linked to it lose the link." Below the list is an input with placeholder `owner/name or GitHub URL` and a "Link repository" button that posts `{ repo }`.
 
-- [ ] **Step 5: Wire up the settings page.** Render both components at the top of the settings page, under `<h1>`, only when `canManage`. Viewers and editors who open `/settings` see "Only project managers can change these settings." plus the read-only member list.
+- [x] **Step 5: Wire up the settings page.** Render both components at the top of the settings page, under `<h1>`, only when `canManage`. Viewers and editors who open `/settings` see "Only project managers can change these settings." plus the read-only member list.
 
-- [ ] **Step 6: Run the end-to-end tests.** Run `pnpm e2e`. Expected: PASS.
+- [x] **Step 6: Run the end-to-end tests.** Run `pnpm e2e`. Expected: PASS.
 
-- [ ] **Step 7: Commit.**
+- [x] **Step 7: Commit.**
 
 ```bash
 git add apps/web
@@ -2162,7 +2162,7 @@ git commit -m "feat(web): project settings for visibility, members and repositor
   - `apps/web/src/lib/components/CreateIssueDialog.svelte`
 - Test: `apps/web/e2e/visibility.spec.ts`
 
-- [ ] **Step 1: Write the failing end-to-end test.** Append:
+- [x] **Step 1: Write the failing end-to-end test.** Append:
 
 ```ts
 test('an issue can be linked to one of the project repos and filtered by it', async ({
@@ -2182,16 +2182,16 @@ test('an issue can be linked to one of the project repos and filtered by it', as
 });
 ```
 
-- [ ] **Step 2: Run it to make sure it fails.** Run `pnpm e2e -- visibility.spec.ts`. Expected: FAIL.
+- [x] **Step 2: Run it to make sure it fails.** Run `pnpm e2e -- visibility.spec.ts`. Expected: FAIL.
 
-- [ ] **Step 3: Add the picker.** Write `RepoPicker.svelte` on top of the existing `Picker.svelte`, the way `AssigneePicker.svelte` does. Its items are the project's `repos` plus "No repository"; selecting one sends `PATCH` with `{ repo: fullName | null }`.
+- [x] **Step 3: Add the picker.** Write `RepoPicker.svelte` on top of the existing `Picker.svelte`, the way `AssigneePicker.svelte` does. Its items are the project's `repos` plus "No repository"; selecting one sends `PATCH` with `{ repo: fullName | null }`.
   - In `IssueProperties.svelte`, add a "Repository" row, hidden when the project has no repos and the issue has none. It's read-only (a link) without `canWrite`.
   - In `FieldValue.svelte`, render type `repo` as a GitHub link.
   - In `CreateIssueDialog.svelte`, add the picker when the project has repos.
 
-- [ ] **Step 4: Run the end-to-end tests.** Run `pnpm e2e`. Expected: PASS. The filter bar picks up `repo` from `CORE_FIELDS` automatically. If it needs a value renderer for type `repo`, add one in `FilterChip.svelte` with the project's repo names as choices.
+- [x] **Step 4: Run the end-to-end tests.** Run `pnpm e2e`. Expected: PASS. The filter bar picks up `repo` from `CORE_FIELDS` automatically. If it needs a value renderer for type `repo`, add one in `FilterChip.svelte` with the project's repo names as choices.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add apps/web
@@ -2204,13 +2204,13 @@ git commit -m "feat(web): repository property on issues"
 
 - Modify: `packages/core/src/services/seed.ts`; also `apps/web/e2e-demo/*.spec.ts` if they assume every project is visible.
 
-- [ ] **Step 1: Seed both visibilities.** In `seedDemoData`:
+- [x] **Step 1: Seed both visibilities.** In `seedDemoData`:
   - make the first demo project `public` and give it one repo (`poietic-tech/poietic-issues`), with a couple of issues linked to it;
   - make the second project `private`;
   - add the demo's non-admin users with different roles on it (one `viewer`, one `editor`, one `manager`) through `addMember`, using the admin seed context.
-- [ ] **Step 2: Run the demo build and tests.** Run `pnpm build:demo && pnpm e2e:demo`. Expected: PASS. If a demo test signs in as a non-admin user and expects to see the private project, change it to use the manager user. Don't remove assertions.
-- [ ] **Step 3: Run everything.** Run `pnpm check`, `pnpm test:pg` and `pnpm e2e` (both databases: `E2E_DATABASE_URL=… pnpm e2e`). Expected: all PASS.
-- [ ] **Step 4: Commit, then open PR 4.**
+- [x] **Step 2: Run the demo build and tests.** Run `pnpm build:demo && pnpm e2e:demo`. Expected: PASS. If a demo test signs in as a non-admin user and expects to see the private project, change it to use the manager user. Don't remove assertions.
+- [x] **Step 3: Run everything.** Run `pnpm check`, `pnpm test:pg` and `pnpm e2e` (both databases: `E2E_DATABASE_URL=… pnpm e2e`). Expected: all PASS.
+- [x] **Step 4: Commit, then open PR 4.**
 
 ```bash
 git add packages/core/src/services/seed.ts apps/web

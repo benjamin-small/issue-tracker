@@ -74,7 +74,7 @@
   - `Database['user_identities']: UserIdentitiesTable`;
   - error code `'PENDING_APPROVAL'` (403, exit 5).
 
-- [ ] **Step 1: Update the migration test so it fails**
+- [x] **Step 1: Update the migration test so it fails**
 
 In `packages/db/src/db.test.ts`, replace the body of `it('migrate down removes everything and migrate up restores it', …)` with:
 
@@ -105,13 +105,13 @@ try {
 }
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 Run: `pnpm vitest run --project db -t "migrate down"`
 
 Expected: FAIL. The first `migrateDown` returns `['0002_webhook_delivery_details']`.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 `packages/db/src/migrations/0003_user_identities.ts`:
 
@@ -168,13 +168,13 @@ In `packages/schema/src/errors.ts`, add after `FORBIDDEN`:
   PENDING_APPROVAL: { status: 403, title: 'Awaiting approval', exit: 5 },
 ```
 
-- [ ] **Step 4: Run the db tests on both dialects**
+- [x] **Step 4: Run the db tests on both dialects**
 
 Run: `pnpm vitest run --project db && TEST_DB=postgres pnpm vitest run --project db`
 
 Expected: PASS. Run `pnpm pg start` first if Postgres isn't running.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/db packages/schema/src/errors.ts
@@ -224,7 +224,7 @@ export async function insertUser(
 ): Promise<User>; // users.ts
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `packages/core/src/services/sso.test.ts`:
 
@@ -353,13 +353,13 @@ describe(`signInWithSso (${testDialect()})`, () => {
 
 > Before running, check that the `events` columns are named `type` and `entity_id` (`packages/db/src/types.ts`, `EventsTable`). If they differ, fix the select in the last test to match how `recordEvent` stores `user.created`.
 
-- [ ] **Step 2: Run them and confirm they fail**
+- [x] **Step 2: Run them and confirm they fail**
 
 Run: `pnpm vitest run --project core sso`
 
 Expected: FAIL with "Cannot find module './sso.ts'".
 
-- [ ] **Step 3: Extract `insertUser` in `users.ts`**
+- [x] **Step 3: Extract `insertUser` in `users.ts`**
 
 Replace `createUserUnchecked` in `packages/core/src/services/users.ts` with:
 
@@ -411,7 +411,7 @@ export async function insertUser(
 
 Update the imports: `import { type Tx, withWriteTx } from '@tracker/db';` and `import type { z } from 'zod';`. Check that `Tx` is exported from `@tracker/db` (`packages/db/src/index.ts`). If it isn't, export it there.
 
-- [ ] **Step 4: Write `sso.ts`**
+- [x] **Step 4: Write `sso.ts`**
 
 `packages/core/src/services/sso.ts`:
 
@@ -522,13 +522,13 @@ export async function signInWithSso(
 
 Add `export * from './services/sso.ts';` to `packages/core/src/index.ts`.
 
-- [ ] **Step 5: Run the tests on both dialects**
+- [x] **Step 5: Run the tests on both dialects**
 
 Run: `pnpm vitest run --project core && TEST_DB=postgres pnpm vitest run --project core`
 
 Expected: PASS, including the existing user and bootstrap tests that go through `createUserUnchecked`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/core
@@ -569,7 +569,7 @@ export function createJwtVerifier(opts: {
 }): JwtVerifier;
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `apps/server/src/sso/jwt.test.ts`:
 
@@ -685,13 +685,13 @@ describe('createJwtVerifier', () => {
 });
 ```
 
-- [ ] **Step 2: Run them and confirm they fail**
+- [x] **Step 2: Run them and confirm they fail**
 
 Run: `pnpm vitest run --project server jwt`
 
 Expected: FAIL with "Cannot find module './jwt.ts'". If the project isn't named `server`, use the `name` from `apps/server/package.json`.
 
-- [ ] **Step 3: Write the verifier**
+- [x] **Step 3: Write the verifier**
 
 `apps/server/src/sso/jwt.ts`:
 
@@ -845,13 +845,13 @@ export function createJwtVerifier(opts: {
 
 > `role` must be a non-empty string. The poietic issuer always sets it. If a generic issuer omits it, relax the check to default `role` to `''` (never admin).
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm vitest run --project server jwt`
 
 Expected: PASS (5 tests, with the `it.each` cases counted individually).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/server/src/sso
@@ -892,7 +892,7 @@ export interface SsoOptions {
 
 `AuthConfig`'s `standard` variant gains `sso?: SsoOptions | undefined`. `loadConfig` gains `TRACKER_SSO_NAME`, `TRACKER_SSO_COOKIE`, `TRACKER_SSO_ISSUER`, `TRACKER_SSO_AUDIENCE`, `TRACKER_SSO_JWKS_URL`, `TRACKER_SSO_LOGIN_URL`, `TRACKER_SSO_REFRESH_URL` and `TRACKER_SSO_ADMIN_ROLE`, plus `ssoOptionsFromConfig(config): SsoOptions | undefined` in `config.ts`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `apps/server/src/config.test.ts` (append to the file if it exists):
 
@@ -934,13 +934,13 @@ describe('SSO configuration', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 Run: `pnpm vitest run --project server config`
 
 Expected: FAIL, because `ssoOptionsFromConfig` is not exported.
 
-- [ ] **Step 3: Implement it**
+- [x] **Step 3: Implement it**
 
 In `apps/server/src/config.ts`, add to the zod object (after `TRACKER_ALLOWED_ORIGINS`):
 
@@ -997,13 +997,13 @@ In `apps/server/src/env.ts`, add the `SsoOptions` interface from the Interfaces 
 
 In `apps/server/src/server.ts`, add `sso: ssoOptionsFromConfig(config),` to the `auth` object passed to `createApp`, and import `ssoOptionsFromConfig` from `./config.ts`.
 
-- [ ] **Step 4: Run the tests and typecheck**
+- [x] **Step 4: Run the tests and typecheck**
 
 Run: `pnpm vitest run --project server config && pnpm typecheck`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/server/src
@@ -1031,7 +1031,7 @@ git commit -m "server: TRACKER_SSO_* configuration"
   - `POST /api/v1/auth/sso` (no body) returns `200 User` with the cookie set, `403 PENDING_APPROVAL`, `403 FORBIDDEN` (cross-origin) or `401 UNAUTHENTICATED`;
   - `404 NOT_FOUND` when SSO is off.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `apps/server/src/sso.test.ts`:
 
@@ -1127,13 +1127,13 @@ describe(`SSO sign-in (${testDialect()})`, () => {
 });
 ```
 
-- [ ] **Step 2: Run them and confirm they fail**
+- [x] **Step 2: Run them and confirm they fail**
 
 Run: `pnpm vitest run --project server sso.test`
 
 Expected: FAIL. `/auth/config` has no `sso` field, and `/auth/sso` returns 404.
 
-- [ ] **Step 3: Implement the route**
+- [x] **Step 3: Implement the route**
 
 In `apps/server/src/middleware/auth.ts`, change `function sameOrigin(` to `export function sameOrigin(`.
 
@@ -1216,13 +1216,13 @@ app.openapi(
 >
 > `UNAUTHENTICATED` is presumably included by default, as `/auth/token-login` uses `errorResponses()` and throws it. Confirm by reading `common.ts`.
 
-- [ ] **Step 4: Run the tests, regenerate the contract, then run the full check**
+- [x] **Step 4: Run the tests, regenerate the contract, then run the full check**
 
 Run: `pnpm vitest run --project server && pnpm openapi:gen && pnpm vitest run --project cli -u && pnpm check`
 
 Expected: everything passes. The changes are `docs/openapi.json`, the client types, and possibly `docs/cli-reference.md` (if exit codes are listed).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/server packages/client docs/openapi.json docs/cli-reference.md apps/cli
@@ -1244,7 +1244,7 @@ git commit -m "server: POST /auth/sso exchanges an SSO cookie for a session"
   - `fetchers.authConfig()`, which now returns `sso: { name, loginUrl, refreshUrl } | null`;
   - `api.POST('/auth/sso')`.
 
-- [ ] **Step 1: Write the failing e2e test**
+- [x] **Step 1: Write the failing e2e test**
 
 `apps/web/e2e/sso.spec.ts`. It uses the plain Playwright `test`, not the dev-login fixture, and mocks the two API calls:
 
@@ -1320,13 +1320,13 @@ test('enters the app when SSO sign-in succeeds', async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 Run: `pnpm e2e -- sso.spec.ts`
 
 Expected: FAIL. There's no SSO button or pending screen yet.
 
-- [ ] **Step 3: Implement the page**
+- [x] **Step 3: Implement the page**
 
 In `apps/web/src/routes/login/+page.svelte`, add to the `<script>` (after `devLogin`):
 
@@ -1401,13 +1401,13 @@ In the markup, directly inside the card and after the heading `<div class="mb-6 
 
 When `config.data?.sso` is set, change the token form's divider condition to also show "or use a token". Replace `{#if config.data?.devLogin && config.data.users?.length}` above the divider with `{#if (config.data?.devLogin && config.data.users?.length) || config.data?.sso}`.
 
-- [ ] **Step 4: Run the e2e tests and the full check**
+- [x] **Step 4: Run the e2e tests and the full check**
 
 Run: `pnpm e2e -- sso.spec.ts && pnpm check`
 
 Expected: PASS. Also run the full `pnpm e2e` once to make sure the other specs still sign in.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web
@@ -1423,7 +1423,7 @@ git commit -m "web: sign in with SSO, with a pending-approval screen"
 - Create: `docs/adr/0018-sso-via-shared-cookie-jwt.md`
 - Modify: `docs/adr/README.md` (index, if it lists ADRs), `docs/deployment.md`, `docs/security.md`, `docs/api.md`, `docs/data-model.md`
 
-- [ ] **Step 1: Write the ADR**
+- [x] **Step 1: Write the ADR**
 
 ```markdown
 # 0018. SSO via a parent-domain cookie JWT
@@ -1460,7 +1460,7 @@ per-project permissions, so a verified identity alone must not grant access.
   separate mode.
 ```
 
-- [ ] **Step 2: Update the docs**
+- [x] **Step 2: Update the docs**
 
 - **`docs/deployment.md`:**
   - Add the eight `TRACKER_SSO_*` rows to the configuration table. Meanings come from the spec's configuration table, with `TRACKER_SSO_ADMIN_ROLE` defaulting to `admin`.
@@ -1471,7 +1471,7 @@ per-project permissions, so a verified identity alone must not grant access.
   - add `users ||--o{ user_identities : "signs in as"` to the ER diagram;
   - add a `user_identities` row to the tables list: "External SSO identities (issuer + subject) linked to a user. Rows cascade with the user."
 
-- [ ] **Step 3: Run the check and commit**
+- [x] **Step 3: Run the check and commit**
 
 Run: `pnpm check`
 

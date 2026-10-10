@@ -90,7 +90,7 @@ export interface WorkerEnv {
 export function containerEnv(env: WorkerEnv): Record<string, string>;
 ```
 
-- [ ] **Step 1: Scaffold the package**
+- [x] **Step 1: Scaffold the package**
 
 `deploy/cloudflare/package.json`:
 
@@ -144,7 +144,7 @@ export function containerEnv(env: WorkerEnv): Record<string, string>;
 
 `vitest.config.ts`: change `projects` to `['packages/*', 'apps/server', 'apps/cli', 'deploy/cloudflare']`.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 `deploy/cloudflare/src/container-env.test.ts`:
 
@@ -203,13 +203,13 @@ describe('containerEnv', () => {
 });
 ```
 
-- [ ] **Step 3: Run it and confirm it fails**
+- [x] **Step 3: Run it and confirm it fails**
 
 Run: `pnpm install && pnpm vitest run --project @tracker/deploy-cloudflare`
 
 Expected: FAIL with "Cannot find module './container-env.ts'". If Vitest names the project after the directory, use `--project cloudflare`; check with `pnpm vitest list`.
 
-- [ ] **Step 4: Implement it**
+- [x] **Step 4: Implement it**
 
 `deploy/cloudflare/src/container-env.ts`:
 
@@ -272,13 +272,13 @@ export function containerEnv(env: WorkerEnv): Record<string, string> {
 }
 ```
 
-- [ ] **Step 5: Run the tests, typecheck and lint**
+- [x] **Step 5: Run the tests, typecheck and lint**
 
 Run: `pnpm vitest run --project @tracker/deploy-cloudflare && pnpm typecheck && pnpm lint`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add deploy/cloudflare pnpm-workspace.yaml pnpm-lock.yaml vitest.config.ts
@@ -298,7 +298,7 @@ git commit -m "deploy: Cloudflare package with the container environment mapping
 - Consumes: the root `Dockerfile`, built as `tracker:local`, and SeaweedFS from `docker-compose.yml`.
 - Produces: an image whose entrypoint restores and then replicates `/data/tracker.db`.
 
-- [ ] **Step 1: Write the failing end-to-end test script**
+- [x] **Step 1: Write the failing end-to-end test script**
 
 `deploy/cloudflare/test/restore.sh`:
 
@@ -350,13 +350,13 @@ echo "PASS: data survived container replacement"
 
 > The SeaweedFS S3 credentials `tracker` / `tracker-secret` come from `deploy/seaweedfs/s3.json`. If that file's identity can't create or write a second bucket, add `tracker-db` to its allowed actions or buckets.
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 Run: `deploy/cloudflare/test/restore.sh`
 
 Expected: FAIL at `docker build … deploy/cloudflare` (there's no Dockerfile yet).
 
-- [ ] **Step 3: Write the image files**
+- [x] **Step 3: Write the image files**
 
 `deploy/cloudflare/Dockerfile`:
 
@@ -407,7 +407,7 @@ set -eu
 exec litestream replicate -config /etc/litestream.yml -restore-if-db-not-exists -exec "node /app/dist/server.mjs"
 ```
 
-- [ ] **Step 4: Run the test and confirm it passes**
+- [x] **Step 4: Run the test and confirm it passes**
 
 Run: `deploy/cloudflare/test/restore.sh`
 
@@ -418,7 +418,7 @@ If it fails:
 - **No `litestream shut down` in the logs:** check that the tracker exits on `SIGTERM` within 60 s (`TRACKER_SHUTDOWN_TIMEOUT_MS` defaults to 10 s).
 - **Restore finds nothing:** check the SeaweedFS bucket permissions note in Step 1.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add deploy/cloudflare
@@ -440,7 +440,7 @@ git commit -m "deploy: tracker image with Litestream restore/replicate, with a l
   - Worker `poietic-issues`, whose default export `fetch` forwards to `getContainer(env.TRACKER, 'main')`;
   - Durable Object class `TrackerContainer`.
 
-- [ ] **Step 1: Write the Worker**
+- [x] **Step 1: Write the Worker**
 
 `deploy/cloudflare/src/worker.ts`:
 
@@ -476,7 +476,7 @@ export default {
 
 > If `@cloudflare/containers` types reject `override` on these fields (they may be declared as plain properties), drop `override`. The root `noImplicitOverride` doesn't apply here, because this tsconfig doesn't extend the base.
 
-- [ ] **Step 2: Write `wrangler.jsonc`**
+- [x] **Step 2: Write `wrangler.jsonc`**
 
 ```jsonc
 {
@@ -520,13 +520,13 @@ export default {
 
 > Check the `$schema` path against where pnpm puts `wrangler` (`deploy/cloudflare/node_modules/wrangler/config-schema.json` is likelier). The current Wrangler may prefer the `exports` form for Durable Objects (`"exports": { "TrackerContainer": { "type": "durable-object", "storage": "sqlite" } }`) over `migrations`. Use whichever `wrangler deploy --dry-run` accepts without a deprecation warning.
 
-- [ ] **Step 3: Verify with a dry run**
+- [x] **Step 3: Verify with a dry run**
 
 Run: `docker build -t tracker:local . && cd deploy/cloudflare && pnpm exec wrangler deploy --dry-run --outdir /tmp/wr-dry --var R2_ENDPOINT:https://example.r2.cloudflarestorage.com`
 
 Expected: the bundle builds, the container image builds from `./Dockerfile` (`FROM tracker:local` resolves locally), there are no config warnings, and no API calls are made. Then run `pnpm typecheck && pnpm lint` from the root: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add deploy/cloudflare
@@ -541,7 +541,7 @@ git commit -m "deploy: poietic-issues Worker fronting a single tracker container
 
 - Create: `.github/workflows/deploy.yml`
 
-- [ ] **Step 1: Write the workflow**
+- [x] **Step 1: Write the workflow**
 
 ```yaml
 name: Deploy
@@ -605,13 +605,13 @@ jobs:
 
 > **About `wrangler secret bulk` before the first deploy:** it applies to the existing placeholder Worker that OpenTofu created. If Wrangler refuses because the placeholder has no Durable Object bindings yet, move the step after `Deploy`. The first boot would then fail `containerEnv` and the smoke check retries, so also add a second `wrangler deploy` (or a container restart) after setting the secrets.
 
-- [ ] **Step 2: Lint the workflow**
+- [x] **Step 2: Lint the workflow**
 
 Run: `pnpm dlx @action-validator/cli .github/workflows/deploy.yml` (or `actionlint`, if installed). Also run `pnpm format:check` from the root.
 
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add .github/workflows/deploy.yml
@@ -627,7 +627,7 @@ git commit -m "ci: deploy issues.poietic.tech after CI passes on main"
 - Create: `docs/adr/0019-cloudflare-containers-with-litestream.md`
 - Modify: `docs/deployment.md`, and `docs/adr/README.md` if it indexes ADRs
 
-- [ ] **Step 1: Write the ADR**
+- [x] **Step 1: Write the ADR**
 
 ```markdown
 # 0019. Cloudflare Containers with Litestream for issues.poietic.tech
@@ -661,7 +661,7 @@ Containers have no persistent disk, Cloudflare offers no hosted Postgres, and D1
   Workers with Durable Object SQLite, which removes the container.
 ```
 
-- [ ] **Step 2: Update `docs/deployment.md`**
+- [x] **Step 2: Update `docs/deployment.md`**
 
 Add a section `## Cloudflare Containers (issues.poietic.tech)` after "Reverse proxy". It should cover:
 
@@ -671,7 +671,7 @@ Add a section `## Cloudflare Containers (issues.poietic.tech)` after "Reverse pr
 - **Admin.** There is no `docker exec`. Use the CLI in remote mode (`TRACKER_SERVER=https://issues.poietic.tech TRACKER_TOKEN=…`). Approve SSO users with `tracker user edit <handle> --reactivate`.
 - **Local test.** `deploy/cloudflare/test/restore.sh`.
 
-- [ ] **Step 3: Run the check and commit**
+- [x] **Step 3: Run the check and commit**
 
 Run: `pnpm check`
 
