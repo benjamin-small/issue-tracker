@@ -92,6 +92,45 @@ test('read-only members see issues without editing controls', async ({ page, bro
   await ctx.close();
 });
 
+test('a link can be removed by someone who can write either end', async ({ page, browser }) => {
+  const read = unique('LR');
+  const write = unique('LW');
+  const other = unique('LO');
+  for (const [key, role] of [
+    [read, 'viewer'],
+    [write, 'editor'],
+    [other, 'viewer'],
+  ] as const) {
+    await post(page.request, '/projects', { key, name: key });
+    await post(page.request, `/projects/${key}/members`, { user: 'grace', role });
+  }
+  const here = await post(page.request, `/projects/${read}/issues`, { title: 'Read-only end' });
+  const mine = await post(page.request, `/projects/${write}/issues`, { title: 'Writable end' });
+  const theirs = await post(page.request, `/projects/${other}/issues`, { title: 'Read-only too' });
+  await post(page.request, `/issues/${here.key}/links`, { type: 'blocks', target: mine.key });
+  await post(page.request, `/issues/${here.key}/links`, { type: 'relates', target: theirs.key });
+
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  await p.goto(`${origin}/i/${here.key}`);
+  const links = p.getByTestId('links');
+  const item = (key: string) => links.locator('li').filter({ hasText: key });
+  await expect(item(mine.key)).toBeVisible();
+  await expect(item(theirs.key)).toBeVisible();
+  // Grace can't write this issue's project, but she can write the other end's: she may remove that link.
+  await expect(item(theirs.key).getByRole('button', { name: 'Remove link' })).toHaveCount(0);
+  await expect(links.getByTestId('add-link')).toHaveCount(0);
+  await item(mine.key).hover();
+  await item(mine.key).getByRole('button', { name: 'Remove link' }).click();
+  await expect(item(mine.key)).toHaveCount(0);
+  await expect(item(theirs.key)).toBeVisible();
+  await ctx.close();
+});
+
 test('signed out, grouping by a person field keeps every issue on the board', async ({
   page,
   browser,
