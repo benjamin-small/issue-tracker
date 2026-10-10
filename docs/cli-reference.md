@@ -85,7 +85,7 @@ Aliases: `new`
 | `--parent <issue>` | parent issue key, or none |
 | `-e, --estimate <points>` | estimate, or none |
 | `--due <date>` | due date YYYY-MM-DD, or none |
-| `--repo <owner/name>` | one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it |
+| `--repo <owner/name>` | one of the project's linked GitHub repos (owner/name, URL or id); none, null or '' clears it |
 | `--set <field=value>` | custom field (repeatable), e.g. --set severity=high --set points=3 |
 | `--meta <key=value>` | metadata entry (repeatable; merged) |
 | `--input <json|@file|->` | full JSON payload (CreateIssueInput / UpdateIssueInput); flags override it |
@@ -112,7 +112,7 @@ Aliases: `update`
 | `--parent <issue>` | parent issue key, or none |
 | `-e, --estimate <points>` | estimate, or none |
 | `--due <date>` | due date YYYY-MM-DD, or none |
-| `--repo <owner/name>` | one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it |
+| `--repo <owner/name>` | one of the project's linked GitHub repos (owner/name, URL or id); none, null or '' clears it |
 | `--set <field=value>` | custom field (repeatable), e.g. --set severity=high --set points=3 |
 | `--meta <key=value>` | metadata entry (repeatable; merged) |
 | `--input <json|@file|->` | full JSON payload (CreateIssueInput / UpdateIssueInput); flags override it |

@@ -55,7 +55,7 @@ A project, issue or other resource the actor cannot read is reported as `NOT_FOU
 
 - Adds `projects.visibility` (default `private`), `project_members`, `project_repos` and `issues.repo_id`.
 - Backfills one `editor` membership for every existing project and every active, non-admin, non-`system` user, so nobody loses access on upgrade.
-- Migrations have no injected clock, so the backfill stamps all its rows with one `new Date()` computed in `up`.
+- Migrations have no injected clock, so the backfill stamps all its rows with one `new Date()` computed in `up`, so every backfilled membership shares one wall-clock timestamp from the migration run. This is the one exception to "timestamps come from the injected clock".
 
 ### Deviations from the design spec
 
@@ -64,6 +64,21 @@ A project, issue or other resource the actor cannot read is reported as `NOT_FOU
 3. **The anonymous actor keeps `role: 'member'`** and gets `kind: 'anonymous'`. `requireActor` is narrowed rather than removed: anonymous requests are allowed only for `GET` and `HEAD`, and core decides visibility.
 4. **Links into unreadable projects are omitted** from link lists and activity history, instead of being shown as an "inaccessible" marker. This leaks nothing and needs no change to `IssueLink`.
 5. **`myAccess` is on a separate response schema, `ProjectWithAccess`** (`Project` plus `myAccess`). `Project` is also embedded in event payloads, which are not per viewer.
+
+## Amendments (2026-10-10)
+
+Follow-up hardening after the first release. The text above stays as decided; this section records what changed.
+
+- **Deleted content needs write.** Trashed issues, deleted comments and deleted attachments are visible only at `write` or above. Below that:
+  - a trashed issue is `NOT_FOUND`, whatever the request asks for, so a viewer who tries to restore or delete one also gets `NOT_FOUND` (was `FORBIDDEN`), and an anonymous write to one is `NOT_FOUND` (was `UNAUTHENTICATED`);
+  - `includeDeleted` is silently ignored for projects the caller cannot write in, because cross-project lists mix writable and read-only projects;
+  - deleted comments, and attachments of deleted comments, are left out;
+  - a trashed parent is omitted from its children.
+- **The event log follows the same rule** for readers below write on the event's project, in `GET /events`, issue activity and the live stream alike: events of trashed issues and of deleted attachments are dropped, deleted comments keep their events with the body emptied, link events with a trashed end are dropped, and trashed parents are cut from snapshots. The rules read the current state, so restoring an issue makes its history visible again. Readers do not receive `issue.deleted` or `attachment.deleted` live; their views stay stale until they refetch. Writers, admins and webhooks (delivered as the system actor) see events unchanged.
+- **Streams close on `user.updated`.** This replaces "a connection's actor is fixed when it connects": the stream still follows membership and project changes live, and now it also ends after a `user.updated` event about the viewer, including a self-edit, because their role or status may have changed. The client reconnects. A connection also holds at most 1,000 pending events; one more sends `reset` and closes it. Errors while reading access are logged.
+- **`requireAdmin`** answers anonymous callers with `UNAUTHENTICATED` (401) and signed-in non-admins with `FORBIDDEN` (403).
+- **Email-only `user.updated` events** are not shown to other viewers, instead of arriving with empty `changes`.
+- **Repo references** accept the scheme and host in any case (`HTTPS://GitHub.com/Acme/App`); owner and name keep their case.
 
 ## Consequences
 

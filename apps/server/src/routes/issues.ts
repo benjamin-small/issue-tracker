@@ -81,7 +81,10 @@ const listQuery = z
     }),
     limit: LimitQuery,
     cursor: CursorQuery,
-    includeDeleted: BooleanQuery,
+    includeDeleted: BooleanQuery.openapi({
+      description:
+        'Trashed issues are included only for projects the caller can write in; for other projects this is ignored.',
+    }),
   })
   .catchall(z.string())
   .openapi({
@@ -126,7 +129,10 @@ export function registerIssueRoutes(app: TrackerApp) {
               sort: z.array(SortSpecSchema).max(5).optional(),
               limit: z.number().int().min(1).max(200).optional(),
               cursor: z.string().nullish(),
-              includeDeleted: z.boolean().optional(),
+              includeDeleted: z.boolean().optional().openapi({
+                description:
+                  'Trashed issues are included only for projects the caller can write in; for other projects this is ignored.',
+              }),
             })
             .openapi('SearchIssuesInput'),
         ),

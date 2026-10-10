@@ -7,6 +7,8 @@
 - **Browser sessions** come from `POST /auth/token-login`: a random cookie, stored hashed, valid for 30 days, `HttpOnly`, `SameSite=Lax`, and `Secure` in production. `POST /auth/logout` deletes the session.
 - **SSO sessions** (when `POIETIC_ISSUES_SSO_ISSUER` is set) come from `POST /auth/sso`, which verifies the issuer's JWT cookie (ES256, `iss`/`aud`/`exp`/`iat` claims) against the issuer's JWKS. The user's SSO role determines initial access: matching `POIETIC_ISSUES_SSO_ADMIN_ROLE` creates the user as an active admin; anyone else is created deactivated (answered with the `PENDING_APPROVAL` error) until an admin approves them. Signing out of the SSO provider does not end the tracker session (30 days).
 - **CSRF.** Cookie-authenticated `POST`/`PATCH`/`PUT`/`DELETE` requests must come from the server's own origin or one listed in `POIETIC_ISSUES_ALLOWED_ORIGINS`. Bearer-token requests carry no ambient credentials and are exempt.
+- **Credentials and anonymous access.** A request with no credentials, or with a stale, expired or unknown session cookie, is treated as anonymous: it can read public projects, and it gets 401 on anything that needs sign-in. A bearer token that is invalid, expired or revoked is different: the request fails with 401 at once and never falls back to anonymous.
+- **Sign-in redirect.** The web app's `/login?next=` target is sanitised by `safeNext` (`apps/web/src/lib/safe-next.ts`): only same-origin paths starting with a single `/` are followed, and backslashes, control characters and anything that resolves to another origin become `/`. The sign-in page, the SSO return target and the "Continue without signing in" link all use the sanitised value.
 - **Dev login.** `POIETIC_ISSUES_AUTH_MODE=dev` lets anyone sign in as any user, for local development only. The server refuses it when `NODE_ENV=production`.
 - **Trusted mode** is the CLI's local mode. It acts as a configured user without credentials, and only runs in-process: it can never be selected for a listening server. Anyone who can open the database file or connection can do this anyway.
 - **First admin.** `poietic-issues db bootstrap` creates it, and works only while no human admin exists.
@@ -20,7 +22,23 @@ See [ADR 0021](adr/0021-project-visibility-and-roles.md).
 - **Anonymous requests are `GET` and `HEAD` only.** Everything else needs sign-in and returns 401. `/me` answers `{ anonymous: true }`. `/users`, `/users/{user}` and the token endpoints need sign-in.
 - **Emails** are visible only to admins and to the user themself, including in `user.*` events. Anonymous readers see handles and names only where they are embedded in public resources, such as authors and assignees. The issue input schema (`GET /projects/{project}/schema/issue`) lists assignable handles only to signed-in callers, and only the users who can write the project.
 - **Links** into projects the viewer cannot read, and the events that create them, are hidden. Creating or removing a link needs write access to one of its issues and read access to the other.
-- **Live streams keep the access they connected with.** A demoted admin or deactivated user keeps their access on an already open `GET /events/stream` until it reconnects.
+- **Deleted content needs write.** Trashed issues, deleted comments and deleted attachments are visible only to actors with `write` (or more) on the project. Below that:
+  - a trashed issue is not found (`NOT_FOUND`), whatever the request, and so are its comments, attachments, links and activity;
+  - deleted comments and attachments of deleted comments are left out of lists, and fetching such an attachment is not found;
+  - `includeDeleted` is silently ignored for projects the caller cannot write in, so one cross-project list can show trash in some projects and not in others;
+  - a trashed parent is cut out of its children (`parent` and `parentId` are `null`);
+  - restoring an issue makes its history visible again, because the rules follow the current state of each row.
+- **The event log hides the same content.** `GET /events`, issue activity and the live stream apply these rules to readers below `write`, with the same result on replay and live:
+  - events of a trashed issue are dropped, and so are link events with a trashed end;
+  - events of a deleted attachment, or of one on a deleted comment, are dropped;
+  - events of a deleted comment stay, with the body emptied;
+  - snapshots cut a trashed parent.
+
+  Readers do not receive `issue.deleted` or `attachment.deleted` live, so their open views stay stale until they refetch. Writers, admins and webhooks see events unchanged.
+
+- **Live streams follow access changes.** `GET /events/stream` re-reads the viewer's access when memberships or projects change. A `user.updated` event about the viewer, including their own edits, ends the stream, and the client reconnects with the new account state. Each connection holds at most 1,000 pending events: one more sends `reset` and closes it, and the client reconnects and refetches. Email-only `user.updated` events are not shown to other viewers.
+- **Open anonymous streams cost resources.** Anyone can open `GET /events/stream` on public projects without signing in. On issues.poietic.tech an open stream counts as activity, so a stream left open keeps the Cloudflare container awake and prevents it from sleeping ([deployment.md](deployment.md#cloudflare-containers-issuespoietictech)).
+- **Admin-only endpoints** answer an anonymous request with 401 and a signed-in non-admin with 403.
 - **Roles** (`viewer`, `editor`, `manager`) are per project. Global admins always have `manage`, and no guard stops the last manager from leaving.
 
 ## Attachments
@@ -37,6 +55,7 @@ Uploaded files are untrusted content served from the app's origin, so:
 ## Webhooks
 
 - **Admins only.** Only admins can create webhooks.
+- **All projects, private ones included.** A webhook with no project receives the events of every project, and no per-viewer filtering applies: deliveries carry the raw events (emails, deleted content, private projects). Give a webhook's URL only to receivers you trust with the whole tracker.
 - **Signing.** Each delivery is signed with a per-webhook secret (Standard Webhooks, HMAC-SHA256). Receivers should verify the signature and reject old timestamps ([events.md](events.md#verifying-signatures)).
 - **SSRF guard.** Outgoing requests are restricted:
   - `https` only;

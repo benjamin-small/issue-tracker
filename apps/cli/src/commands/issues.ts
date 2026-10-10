@@ -32,7 +32,7 @@ function issueFieldOptions(cmd: Command, mode: 'create' | 'edit'): Command {
     .option('--due <date>', 'due date YYYY-MM-DD, or none')
     .option(
       '--repo <owner/name>',
-      "one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it",
+      "one of the project's linked GitHub repos (owner/name, URL or id); none, null or '' clears it",
     )
     .option(
       '--set <field=value>',
