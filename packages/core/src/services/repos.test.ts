@@ -9,6 +9,7 @@ import {
   listIssueActivity,
   listIssues,
   moveIssue,
+  updateIssue,
 } from './issues.ts';
 import { createTestContext, type TestContext } from '../testing.ts';
 
@@ -94,5 +95,17 @@ describe(`repo links (${testDialect()})`, () => {
       filter: { conditions: [{ field: 'repo', op: 'isNull', value: true }] },
     });
     expect(none.data.map((i) => i.title)).not.toContain('web bug');
+  });
+
+  it('names the project when a repo is not linked to it, on create and update', async () => {
+    const message = '"other/repo" is not linked to project ENG';
+    await expect(
+      createIssue(t.ctx, 'ENG', { title: 'bad', repo: 'other/repo' }),
+    ).rejects.toMatchObject({ code: 'INVALID_RELATION', message });
+    const issue = await createIssue(t.ctx, 'ENG', { title: 'fine' });
+    await expect(updateIssue(t.ctx, issue.key, { repo: 'other/repo' })).rejects.toMatchObject({
+      code: 'INVALID_RELATION',
+      message,
+    });
   });
 });

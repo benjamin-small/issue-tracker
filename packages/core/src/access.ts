@@ -22,22 +22,48 @@ function unrestricted(ctx: ServiceContext): boolean {
   return ctx.actor.role === 'admin' || ctx.actor.kind === 'system';
 }
 
+type Visibility = 'public' | 'private';
+
+/** A non-admin's level: the higher of their role's level and the public floor. */
+function levelOf(visibility: Visibility, role: Role | undefined): AccessLevel {
+  const floor: AccessLevel = visibility === 'public' ? 'read' : 'none';
+  const fromRole: AccessLevel = role ? ROLE_LEVEL[role] : 'none';
+  return atLeast(fromRole, floor) ? fromRole : floor;
+}
+
 export async function projectLevel(
   ctx: ServiceContext,
   db: Exec,
-  project: { id: string; visibility: 'public' | 'private' },
+  project: { id: string; visibility: Visibility },
 ): Promise<AccessLevel> {
   if (unrestricted(ctx)) return 'manage';
-  const floor: AccessLevel = project.visibility === 'public' ? 'read' : 'none';
-  if (ctx.actor.kind === 'anonymous') return floor;
+  if (ctx.actor.kind === 'anonymous') return levelOf(project.visibility, undefined);
   const member = await db
     .selectFrom('project_members')
     .select('role')
     .where('project_id', '=', project.id)
     .where('user_id', '=', ctx.actor.id)
     .executeTakeFirst();
-  const fromRole: AccessLevel = member ? ROLE_LEVEL[member.role] : 'none';
-  return atLeast(fromRole, floor) ? fromRole : floor;
+  return levelOf(project.visibility, member?.role);
+}
+
+/** `projectLevel` for many projects, from one membership query. Keyed by project id. */
+export async function projectLevels(
+  ctx: ServiceContext,
+  db: Exec,
+  projects: ReadonlyArray<{ id: string; visibility: Visibility }>,
+): Promise<Map<string, AccessLevel>> {
+  if (unrestricted(ctx)) return new Map(projects.map((p) => [p.id, 'manage']));
+  const roles = new Map<string, Role>();
+  if (ctx.actor.kind !== 'anonymous' && projects.length) {
+    const rows = await db
+      .selectFrom('project_members')
+      .select(['project_id', 'role'])
+      .where('user_id', '=', ctx.actor.id)
+      .execute();
+    for (const r of rows) roles.set(r.project_id, r.role);
+  }
+  return new Map(projects.map((p) => [p.id, levelOf(p.visibility, roles.get(p.id))]));
 }
 
 /**
@@ -103,15 +129,17 @@ export async function writableProjectIds(ctx: ServiceContext, db: Exec): Promise
 
 /**
  * Adds "the project id in `column` is readable" to a query (e.g. `'i.project_id'`). Admins and the system
- * actor are unrestricted; an actor who can read nothing gets no rows.
+ * actor are unrestricted; an actor who can read nothing gets no rows. Pass `readable` to reuse a
+ * `readableProjectIds` result.
  */
 export async function whereReadable<QB extends { where(expr: RawBuilder<boolean>): QB }>(
   ctx: ServiceContext,
   db: Exec,
   qb: QB,
   column: string,
+  known?: 'all' | string[],
 ): Promise<QB> {
-  const readable = await readableProjectIds(ctx, db);
+  const readable = known ?? (await readableProjectIds(ctx, db));
   if (readable === 'all') return qb;
   return qb.where(
     readable.length

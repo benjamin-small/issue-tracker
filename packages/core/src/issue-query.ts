@@ -398,16 +398,14 @@ export async function resolveFilterRefs(
   db: Exec,
   filter: IssueFilter,
   projectId: string | undefined,
+  known?: 'all' | string[],
 ): Promise<IssueFilter> {
   // Without a project, names are looked up across projects: only the ones the actor can read, so an
-  // "Unknown ..." error never confirms that a private project has such a status or label.
-  const readable = projectId ? 'all' : await readableProjectIds(ctx, db);
-  const readableOnly = <QB extends { where(expr: Bool): QB }>(q: QB): QB =>
-    readable === 'all'
-      ? q
-      : q.where(
-          readable.length ? sql<boolean>`project_id in (${list(readable)})` : sql<boolean>`1 = 0`,
-        );
+  // "Unknown ..." error never confirms that a private project has such a status or label. Pass `known` to
+  // reuse a `readableProjectIds` result.
+  const readable = projectId ? 'all' : (known ?? (await readableProjectIds(ctx, db)));
+  const readableOnly = <QB extends { where(expr: Bool): QB }>(q: QB) =>
+    whereReadable(ctx, db, q, 'project_id', readable);
   const conditions = [];
   for (const c of filter.conditions) {
     const resolve = async (v: unknown): Promise<unknown[]> => {
@@ -420,7 +418,7 @@ export async function resolveFilterRefs(
             .select('id')
             .where(sql`lower(name)`, '=', v.toLowerCase());
           if (projectId) q = q.where('project_id', '=', projectId);
-          q = readableOnly(q);
+          q = await readableOnly(q);
           const ids = (await q.execute()).map((r) => r.id);
           if (!ids.length) throw validationError(`Unknown status "${v}"`);
           return ids;
@@ -432,7 +430,7 @@ export async function resolveFilterRefs(
             .select('id')
             .where(sql`lower(name)`, '=', v.toLowerCase());
           if (projectId) q = q.where('project_id', '=', projectId);
-          q = readableOnly(q);
+          q = await readableOnly(q);
           const ids = (await q.execute()).map((r) => r.id);
           if (!ids.length) throw validationError(`Unknown label "${v}"`);
           return ids;
@@ -468,7 +466,7 @@ export async function resolveFilterRefs(
             .where(sql`lower(owner)`, '=', owner.toLowerCase())
             .where(sql`lower(name)`, '=', name.toLowerCase());
           if (projectId) q = q.where('project_id', '=', projectId);
-          else q = readableOnly(q);
+          else q = await readableOnly(q);
           const ids = (await q.execute()).map((r) => r.id);
           if (!ids.length) throw validationError(`Unknown repository "${v}"`);
           return ids;
@@ -514,7 +512,9 @@ export async function queryIssues(
       normalized.errors.join('; '),
       normalized.errors.map((m) => ({ path: `filter.${m.split(':')[0]}`, message: m })),
     );
-  const filter = await resolveFilterRefs(ctx, db, normalized.filter, params.projectId);
+  // Unscoped listings check readability twice (filter names and rows): read the readable set once.
+  const readable = params.projectId ? 'all' : await readableProjectIds(ctx, db);
+  const filter = await resolveFilterRefs(ctx, db, normalized.filter, params.projectId, readable);
 
   const exprs = sorts.map((s) => sortExpression(s.field, ctx.db.dialect));
   let q = db
@@ -528,7 +528,7 @@ export async function queryIssues(
   });
   q = q.orderBy('i.id', 'asc');
   if (params.projectId) q = q.where('i.project_id', '=', params.projectId);
-  else q = await whereReadable(ctx, db, q, 'i.project_id');
+  else q = await whereReadable(ctx, db, q, 'i.project_id', readable);
   if (params.includeDeleted) {
     // Trashed issues are shown only in projects the actor can write in (deleted content needs write).
     const writable = await writableProjectIds(ctx, db);

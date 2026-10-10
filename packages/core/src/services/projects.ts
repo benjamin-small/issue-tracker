@@ -16,7 +16,7 @@ import {
   type UpdateProjectInput,
   UpdateProjectInputSchema,
 } from '@poietic-tech/issues-schema';
-import { projectLevel, whereReadable } from '../access.ts';
+import { type AccessLevel, projectLevel, projectLevels, whereReadable } from '../access.ts';
 import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, isUniqueViolation, parseInput } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';
@@ -41,14 +41,18 @@ export const DEFAULT_STATUSES: ReadonlyArray<{
 
 type Exec = Kysely<Database>;
 
-/** The project plus the actor's access to it. A readable project never has level `none`; `read` is the type-only fallback. */
+/**
+ * The project plus the actor's access to it (pass `known` to skip the lookup). A readable project never has
+ * level `none`; `read` is the type-only fallback.
+ */
 async function withAccess(
   ctx: ServiceContext,
   db: Exec,
   row: Selectable<Database['projects']>,
   repos?: ProjectRepo[],
+  known?: AccessLevel,
 ): Promise<ProjectWithAccess> {
-  const level = await projectLevel(ctx, db, row);
+  const level = known ?? (await projectLevel(ctx, db, row));
   const linked = repos ?? (await reposOf(db, [row.id])).get(row.id) ?? [];
   return { ...toProject(row, linked), myAccess: level === 'none' ? 'read' : level };
 }
@@ -65,7 +69,10 @@ export async function listProjects(
     ctx.db.kysely,
     rows.map((r) => r.id),
   );
-  return Promise.all(rows.map((r) => withAccess(ctx, ctx.db.kysely, r, repos.get(r.id) ?? [])));
+  const levels = await projectLevels(ctx, ctx.db.kysely, rows);
+  return Promise.all(
+    rows.map((r) => withAccess(ctx, ctx.db.kysely, r, repos.get(r.id) ?? [], levels.get(r.id))),
+  );
 }
 
 export async function getProject(ctx: ServiceContext, ref: string): Promise<ProjectWithAccess> {

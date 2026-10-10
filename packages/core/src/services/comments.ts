@@ -12,8 +12,8 @@ import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, forbidden, notFound, parseInput } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { toComment, toUserSummary } from '../mappers.ts';
-import { atLeast, projectLevel } from '../access.ts';
-import { getIssueAccess, getIssueRow, requireProjectId } from '../refs.ts';
+import { atLeast } from '../access.ts';
+import { getIssueAccess, getIssueRow, requireProjectAccess } from '../refs.ts';
 
 async function loadComment(db: Tx, id: string): Promise<Comment | undefined> {
   const row = await db
@@ -124,8 +124,8 @@ async function editableComment(tx: Tx, ctx: ServiceContext, id: string) {
   const comment = isIdOf('comment', id) ? await loadComment(tx, id) : undefined;
   if (!comment || comment.deletedAt) throw notFound('Comment', id);
   const { projectId } = await issueRefFor(tx, comment.issueId);
-  const project = await requireProjectId(ctx, tx, projectId, 'write', 'Comment', id);
-  if (comment.authorId !== ctx.actor.id && !atLeast(await projectLevel(ctx, tx, project), 'manage'))
+  const { level } = await requireProjectAccess(ctx, tx, projectId, 'write', 'Comment', id);
+  if (comment.authorId !== ctx.actor.id && !atLeast(level, 'manage'))
     throw forbidden('You can only change your own comments');
   return comment;
 }

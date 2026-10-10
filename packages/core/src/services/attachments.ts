@@ -4,8 +4,8 @@ import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, DomainError, forbidden, notFound } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { toUserSummary } from '../mappers.ts';
-import { atLeast, projectLevel } from '../access.ts';
-import { getIssueAccess, getIssueRow, requireProjectAccess, requireProjectId } from '../refs.ts';
+import { atLeast } from '../access.ts';
+import { getIssueAccess, getIssueRow, requireProjectAccess } from '../refs.ts';
 import { type BlobStore, newBlobKey, sha256Hex } from '../storage/blob-store.ts';
 import { sanitizeFilename, sniffContentType } from '../storage/content-type.ts';
 
@@ -216,11 +216,8 @@ export async function deleteAttachment(
     const attachment = await loadAttachment(tx, id);
     if (!attachment || attachment.deletedAt) throw notFound('Attachment', id);
     const { ref, projectId } = await issueRef(tx, attachment.issueId);
-    const project = await requireProjectId(ctx, tx, projectId, 'write', 'Attachment', id);
-    if (
-      attachment.uploader.id !== ctx.actor.id &&
-      !atLeast(await projectLevel(ctx, tx, project), 'manage')
-    )
+    const { level } = await requireProjectAccess(ctx, tx, projectId, 'write', 'Attachment', id);
+    if (attachment.uploader.id !== ctx.actor.id && !atLeast(level, 'manage'))
       throw forbidden('You can only delete your own attachments');
     const now = nowIso(ctx);
     await tx.updateTable('attachments').set({ deleted_at: now }).where('id', '=', id).execute();

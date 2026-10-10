@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { addMember, listMembers, removeMember, updateMember } from './members.ts';
-import { createProject, getProject, updateProject } from './projects.ts';
+import { createProject, getProject, listProjects, updateProject } from './projects.ts';
 import { listEvents } from './events.ts';
+import { ANONYMOUS_ACTOR, withActor } from '../context.ts';
 import { createTestContext, grant, type TestContext } from '../testing.ts';
 
 describe(`project members (${testDialect()})`, () => {
@@ -79,5 +80,23 @@ describe(`project members (${testDialect()})`, () => {
     expect(same).toEqual(added);
     expect(await changed()).toBe(before);
     expect((await listMembers(t.ctx, 'SAME'))[0]!.updatedAt).toBe(added.updatedAt);
+  });
+
+  it('lists every project with the same myAccess as getting it one by one', async () => {
+    await createProject(t.ctx, { key: 'LPUB', name: 'Listed public', visibility: 'public' });
+    await createProject(t.ctx, { key: 'LVIEW', name: 'Listed viewer' });
+    await createProject(t.ctx, { key: 'LEDIT', name: 'Listed editor', visibility: 'public' });
+    await grant(t, 'LVIEW', t.agent, 'viewer');
+    await grant(t, 'LEDIT', t.agent, 'editor');
+    for (const who of [t.ctx, t.member, t.agent, withActor(t.ctx, ANONYMOUS_ACTOR)]) {
+      const listed = await listProjects(who);
+      expect(listed.length, who.actor.handle).toBeGreaterThan(0);
+      for (const p of listed)
+        expect(p.myAccess, `${who.actor.handle} ${p.key}`).toBe(
+          (await getProject(who, p.key)).myAccess,
+        );
+    }
+    const agent = Object.fromEntries((await listProjects(t.agent)).map((p) => [p.key, p.myAccess]));
+    expect(agent).toMatchObject({ LPUB: 'read', LVIEW: 'read', LEDIT: 'write' });
   });
 });
