@@ -11,6 +11,7 @@ import {
 import { isAnonymous, nowIso, type ServiceContext } from '../context.ts';
 import { DomainError, forbidden, notFound, parseInput } from '../errors.ts';
 import { toView } from '../mappers.ts';
+import { isAdmin } from '../permissions.ts';
 import { getProjectRow, requireProjectId } from '../refs.ts';
 
 /** Views visible to the actor in a project: shared ones plus the actor's personal ones. */
@@ -106,7 +107,7 @@ export async function deleteView(ctx: ServiceContext, id: string): Promise<View>
     const row = await visibleViewRow(ctx, id, tx);
     if (row.owner_id === null)
       await requireProjectId(ctx, tx, row.project_id, 'manage', 'View', id);
-    if (row.owner_id === null && ctx.actor.role !== 'admin') {
+    if (row.owner_id === null && !isAdmin(ctx)) {
       const others = await tx
         .selectFrom('views')
         .select('id')
