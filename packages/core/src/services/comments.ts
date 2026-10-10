@@ -13,7 +13,7 @@ import { conflict, forbidden, notFound, parseInput } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { toComment, toUserSummary } from '../mappers.ts';
 import { atLeast, projectLevel } from '../access.ts';
-import { getIssueRow, requireProjectId } from '../refs.ts';
+import { getIssueAccess, getIssueRow, requireProjectId } from '../refs.ts';
 
 async function loadComment(db: Tx, id: string): Promise<Comment | undefined> {
   const row = await db
@@ -50,13 +50,16 @@ async function issueRefFor(db: Tx, issueId: string) {
   };
 }
 
-/** Comments on an issue, oldest first. Deleted comments are excluded unless requested. */
+/**
+ * Comments on an issue, oldest first. Deleted comments are excluded unless requested, and only actors with
+ * `write` on the project get them: for anyone else `includeDeleted` is ignored.
+ */
 export async function listComments(
   ctx: ServiceContext,
   issueRef: string,
   opts: { includeDeleted?: boolean } = {},
 ): Promise<Comment[]> {
-  const issue = await getIssueRow(ctx, ctx.db.kysely, issueRef, 'read');
+  const { row: issue, level } = await getIssueAccess(ctx, ctx.db.kysely, issueRef, 'read');
   let q = ctx.db.kysely
     .selectFrom('comments as c')
     .innerJoin('users as u', 'u.id', 'c.author_id')
@@ -65,7 +68,7 @@ export async function listComments(
     .where('c.issue_id', '=', issue.id)
     .orderBy('c.created_at')
     .orderBy('c.id');
-  if (!opts.includeDeleted) q = q.where('c.deleted_at', 'is', null);
+  if (!(opts.includeDeleted && atLeast(level, 'write'))) q = q.where('c.deleted_at', 'is', null);
   const rows = await q.execute();
   return rows.map((row) =>
     toComment(

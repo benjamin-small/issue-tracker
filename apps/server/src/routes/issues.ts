@@ -167,7 +167,9 @@ export function registerIssueRoutes(app: TrackerApp) {
       path: '/issues/{issue}',
       tags,
       summary: 'Get an issue',
-      description: 'Returns trashed issues too (see `deletedAt`).',
+      description:
+        'Returns trashed issues too (see `deletedAt`) to actors who can write in the project; to anyone else a ' +
+        'trashed issue is not found.',
       request: { params: issueParam },
       responses: {
         200: { ...json(IssueSchema, 'Issue'), headers: etagHeader },

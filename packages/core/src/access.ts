@@ -8,6 +8,11 @@ type Exec = Kysely<Database>;
 export type AccessLevel = 'none' | 'read' | 'write' | 'manage';
 const ORDER: Record<AccessLevel, number> = { none: 0, read: 1, write: 2, manage: 3 };
 const ROLE_LEVEL = { viewer: 'read', editor: 'write', manager: 'manage' } as const;
+type Role = keyof typeof ROLE_LEVEL;
+/** Roles that grant at least `write` (the public floor is only `read`). */
+const WRITE_ROLES = (Object.keys(ROLE_LEVEL) as Role[]).filter(
+  (r) => ORDER[ROLE_LEVEL[r]] >= ORDER.write,
+);
 
 export function atLeast(have: AccessLevel, need: AccessLevel): boolean {
   return ORDER[have] >= ORDER[need];
@@ -78,6 +83,22 @@ export async function readableProjectIds(ctx: ServiceContext, db: Exec): Promise
       );
   }
   return (await q.execute()).map((r) => r.id);
+}
+
+/**
+ * Ids of projects the actor can write in, or `'all'` for admins and the system actor. Only a membership grants
+ * write, so anonymous actors get none. Used to show soft-deleted content, which needs write.
+ */
+export async function writableProjectIds(ctx: ServiceContext, db: Exec): Promise<'all' | string[]> {
+  if (unrestricted(ctx)) return 'all';
+  if (ctx.actor.kind === 'anonymous') return [];
+  const rows = await db
+    .selectFrom('project_members')
+    .select('project_id')
+    .where('user_id', '=', ctx.actor.id)
+    .where('role', 'in', WRITE_ROLES)
+    .execute();
+  return rows.map((r) => r.project_id);
 }
 
 /**

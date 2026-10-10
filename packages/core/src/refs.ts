@@ -1,6 +1,6 @@
 import type { Kysely, Database, Selectable } from '@poietic-tech/issues-db';
 import { isIdOf, parseIssueKey } from '@poietic-tech/issues-schema';
-import { type AccessLevel, projectLevel, requireLevel } from './access.ts';
+import { type AccessLevel, atLeast, projectLevel, requireLevel } from './access.ts';
 import type { ServiceContext } from './context.ts';
 import { notFound } from './errors.ts';
 
@@ -39,10 +39,23 @@ export async function requireProjectId(
   what: string,
   ref: string,
 ) {
-  const row = await findProject(db, projectId);
-  if (!row) throw notFound(what, ref);
-  requireLevel(ctx, await projectLevel(ctx, db, row), level, what, ref);
-  return row;
+  return (await requireProjectAccess(ctx, db, projectId, level, what, ref)).project;
+}
+
+/** `requireProjectId` that also returns the actor's level, for callers that check more than `need`. */
+export async function requireProjectAccess(
+  ctx: ServiceContext,
+  db: Exec,
+  projectId: string,
+  need: Need,
+  what: string,
+  ref: string,
+) {
+  const project = await findProject(db, projectId);
+  if (!project) throw notFound(what, ref);
+  const level = await projectLevel(ctx, db, project);
+  requireLevel(ctx, level, need, what, ref);
+  return { project, level };
 }
 
 /** Resolves an issue by id (`iss_…`) or key (`ENG-42`). Includes soft-deleted issues. */
@@ -63,13 +76,23 @@ export async function findIssue(
     .executeTakeFirst();
 }
 
-/** Resolves an issue whose project the actor may access at `level`. Includes soft-deleted issues. */
+/**
+ * Resolves an issue whose project the actor may access at `level`. Soft-deleted issues are included for actors
+ * with `write` on the project (restore, delete); below that a trashed issue is NOT_FOUND, whatever `level` asks.
+ */
 export async function getIssueRow(ctx: ServiceContext, db: Exec, ref: string, level: Need) {
+  return (await getIssueAccess(ctx, db, ref, level)).row;
+}
+
+/** `getIssueRow` that also returns the actor's level on the issue's project. */
+export async function getIssueAccess(ctx: ServiceContext, db: Exec, ref: string, need: Need) {
   const row = await findIssue(db, ref);
   if (!row) throw notFound('Issue', ref);
   const project = await findProject(db, row.project_id);
-  requireLevel(ctx, await projectLevel(ctx, db, project!), level, 'Issue', ref);
-  return row;
+  const level = await projectLevel(ctx, db, project!);
+  if (row.deleted_at && !atLeast(level, 'write')) throw notFound('Issue', ref);
+  requireLevel(ctx, level, need, 'Issue', ref);
+  return { row, level };
 }
 
 /**

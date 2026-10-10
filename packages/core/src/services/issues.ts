@@ -49,7 +49,7 @@ const TRACKED_FIELDS = [
 // Reads
 // ---------------------------------------------------------------------------
 
-/** Gets an issue by key (`ENG-42`) or id, including issues in the trash. */
+/** Gets an issue by key (`ENG-42`) or id. Issues in the trash are found only by actors with `write`. */
 export async function getIssue(ctx: ServiceContext, ref: string): Promise<Issue> {
   const row = await getIssueRow(ctx, ctx.db.kysely, ref, 'read');
   return loadIssue(ctx.db.kysely, row.id);
@@ -61,6 +61,7 @@ export interface ListIssuesInput {
   sort?: SortSpec[] | undefined;
   limit?: number | undefined;
   cursor?: string | null | undefined;
+  /** Include trashed issues, in projects where the actor has `write` only. */
   includeDeleted?: boolean | undefined;
 }
 

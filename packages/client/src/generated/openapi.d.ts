@@ -2469,7 +2469,7 @@ export interface paths {
         };
         /**
          * Get an issue
-         * @description Returns trashed issues too (see `deletedAt`).
+         * @description Returns trashed issues too (see `deletedAt`) to actors who can write in the project; to anyone else a trashed issue is not found.
          */
         get: {
             parameters: {

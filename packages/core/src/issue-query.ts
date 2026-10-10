@@ -19,7 +19,7 @@ import {
   SORTABLE_FIELDS,
   type SortSpec,
 } from '@poietic-tech/issues-schema';
-import { readableProjectIds, whereReadable } from './access.ts';
+import { readableProjectIds, whereReadable, writableProjectIds } from './access.ts';
 import type { ServiceContext } from './context.ts';
 import { DomainError, validationError } from './errors.ts';
 import { getIssueRow } from './refs.ts';
@@ -385,6 +385,7 @@ export interface ListIssuesParams {
   sort?: SortSpec[] | undefined;
   limit?: number | undefined;
   cursor?: string | null | undefined;
+  /** Include trashed issues, in projects where the actor has `write` only. */
   includeDeleted?: boolean | undefined;
 }
 
@@ -528,7 +529,16 @@ export async function queryIssues(
   q = q.orderBy('i.id', 'asc');
   if (params.projectId) q = q.where('i.project_id', '=', params.projectId);
   else q = await whereReadable(ctx, db, q, 'i.project_id');
-  if (!params.includeDeleted) q = q.where('i.deleted_at', 'is', null);
+  if (params.includeDeleted) {
+    // Trashed issues are shown only in projects the actor can write in (deleted content needs write).
+    const writable = await writableProjectIds(ctx, db);
+    if (writable !== 'all')
+      q = q.where((eb) =>
+        writable.length
+          ? eb.or([eb('i.deleted_at', 'is', null), eb('i.project_id', 'in', writable)])
+          : eb('i.deleted_at', 'is', null),
+      );
+  } else q = q.where('i.deleted_at', 'is', null);
   if (params.cursor)
     q = q.where(keysetCondition(exprs, sorts, decodeCursor(params.cursor, sorts.length)));
 
