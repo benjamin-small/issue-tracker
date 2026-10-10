@@ -22,8 +22,8 @@ See [ADR 0021](adr/0021-project-visibility-and-roles.md).
 - **Anonymous requests are `GET` and `HEAD` only.** Everything else needs sign-in and returns 401. `/me` answers `{ anonymous: true }`. `/users`, `/users/{user}` and the token endpoints need sign-in.
 - **Emails** are visible only to admins and to the user themself, including in `user.*` events. Anonymous readers see handles and names only where they are embedded in public resources, such as authors and assignees. The issue input schema (`GET /projects/{project}/schema/issue`) lists assignable handles only to signed-in callers, and only the users who can write the project.
 - **Links** into projects the viewer cannot read, and the events that create them, are hidden. Creating or removing a link needs write access to one of its issues and read access to the other.
-- **Deleted content needs write.** Trashed issues, deleted comments and deleted attachments are visible only to actors with `write` (or more) on the project. Below that:
-  - a trashed issue is not found (`NOT_FOUND`), whatever the request, and so are its comments, attachments, links and activity;
+- **Deleted content needs write.** Trashed issues, deleted comments and the attachments of either are visible only to actors with `write` (or more) on the project. A deleted attachment is visible to nobody: no one can list or fetch it, and writers see only its events. Below `write`:
+  - a trashed issue is not found (`NOT_FOUND`), whatever the request, and so are its comments, attachments, links and activity, including attempts to edit or delete them;
   - deleted comments and attachments of deleted comments are left out of lists, and fetching such an attachment is not found;
   - `includeDeleted` is silently ignored for projects the caller cannot write in, so one cross-project list can show trash in some projects and not in others;
   - a trashed parent is cut out of its children (`parent` and `parentId` are `null`);
@@ -32,11 +32,11 @@ See [ADR 0021](adr/0021-project-visibility-and-roles.md).
   - events of a trashed issue are dropped, and so are link events with a trashed end;
   - events of a deleted attachment, or of one on a deleted comment, are dropped;
   - events of a deleted comment stay, with the body emptied;
-  - snapshots cut a trashed parent.
+  - snapshots cut a trashed parent, and a parent change that names a trashed issue is left out of `changes`.
 
-  Readers do not receive `issue.deleted` or `attachment.deleted` live, so their open views stay stale until they refetch. Writers, admins and webhooks see events unchanged.
+  Readers do not receive `issue.deleted` or `attachment.deleted` live, so their open views stay stale until they refetch. These rules do not apply in projects the viewer can write in. Admins and webhooks (delivered as the system actor) see every event unchanged; other signed-in viewers, writers included, still have other users' emails hidden in `user.*` events and see link events only when both ends are visible to them.
 
-- **Live streams follow access changes.** `GET /events/stream` re-reads the viewer's access when memberships or projects change. A `user.updated` event about the viewer, including their own edits, ends the stream, and the client reconnects with the new account state. Each connection holds at most 1,000 pending events: one more sends `reset` and closes it, and the client reconnects and refetches. Email-only `user.updated` events are not shown to other viewers.
+- **Live streams follow access changes.** `GET /events/stream` re-reads the viewer's access when memberships or projects change. A `user.updated` event about the viewer, including their own edits, is delivered and then ends the stream, with or without `?project=`; the client refetches and reconnects with the new account state. Each connection holds at most 1,000 pending events: one more sends `reset` and closes it, and the client reconnects and refetches. Email-only `user.updated` events are not shown to other non-admin viewers.
 - **Open anonymous streams cost resources.** Anyone can open `GET /events/stream` on public projects without signing in. On issues.poietic.tech an open stream counts as activity, so a stream left open keeps the Cloudflare container awake and prevents it from sleeping ([deployment.md](deployment.md#cloudflare-containers-issuespoietictech)).
 - **Admin-only endpoints** answer an anonymous request with 401 and a signed-in non-admin with 403.
 - **Roles** (`viewer`, `editor`, `manager`) are per project. Global admins always have `manage`, and no guard stops the last manager from leaving.
