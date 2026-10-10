@@ -167,7 +167,7 @@ Notes:
 
 The production instance runs on Cloudflare Containers. See [ADR 0019](adr/0019-cloudflare-containers-with-litestream.md) for the design.
 
-**Layout:** `deploy/cloudflare/` holds the Worker (`src/worker.ts`), container configuration (`src/container-env.ts`, `wrangler.jsonc`, `Dockerfile`), and Litestream setup (`litestream.yml`, `entrypoint.sh`). Requests flow: browser → Worker (`poietic-issues`) at https://issues.poietic.tech → container on `:3000`. The route is owned by OpenTofu in benjamin-small/poietic-dot-tech.
+**Layout:** `deploy/cloudflare/` holds the Worker (`src/worker.ts`), container configuration (`src/container-env.ts`, `wrangler.jsonc`, `Dockerfile`), and Litestream setup (`litestream.yml`, `entrypoint.sh`). Requests flow: browser → Worker (`poietic-issues`) at https://issues.poietic.tech → container on `:3000`. The route is owned by OpenTofu in poietic-tech/poietic-dot-tech.
 
 **Data:** The database is SQLite at `/data/tracker.db` inside the container, replicated by Litestream 0.5 to the R2 bucket `poietic-issues-db`. Attachments are stored in R2 bucket `poietic-issues-attachments` via the S3 API. The container sleeps after 30 minutes without requests (`sleepAfter = '30m'`; an open live-update stream counts as activity), and Litestream syncs on the way down.
 

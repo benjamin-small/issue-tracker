@@ -1,5 +1,5 @@
 {
-  // OpenTofu in benjamin-small/poietic-dot-tech (infra/issues.tf) owns this Worker's existence, DNS and route.
+  // OpenTofu in poietic-tech/poietic-dot-tech (infra/issues.tf) owns this Worker's existence, DNS and route.
   // This file owns only what it serves. Never add routes or enable workers.dev here.
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "poietic-issues",
