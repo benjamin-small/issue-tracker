@@ -94,40 +94,43 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col">
-  <header
-    class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-3 py-2 sm:px-4"
-  >
-    <div class="flex items-center">
-      <ViewMenu {project} {view} {config} layout={effectiveLayout} {dirty} />
-      {#if dirty}<span class="ml-1 text-xs text-fg-subtle" data-testid="view-modified"
-          >· modified</span
-        >{/if}
-    </div>
-    <!-- Narrow screens: filters get their own scrolling row under the view name. -->
-    <div
-      class="order-last -mx-3 w-[calc(100%+1.5rem)] overflow-x-auto px-3 sm:order-none sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0"
+  <!-- A missing or failed project has no view to configure: only its message shows. -->
+  {#if !project.notFound && !project.error}
+    <header
+      class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-3 py-2 sm:px-4"
     >
-      <FilterBar
-        filter={config.filter}
-        {project}
-        issues={issues.data}
-        onchange={(filter) => setConfig({ ...config, filter })}
-      />
-    </div>
-    <div class="ml-auto flex items-center gap-2">
-      {#if dirty}
-        <button
-          class="text-xs text-fg-subtle hover:text-fg"
-          onclick={() => setConfig(saved)}
-          data-testid="view-reset">Reset</button
-        >
-      {/if}
-      <span class="text-xs text-fg-subtle" data-testid="issue-count"
-        >{issues.data?.length ?? '…'} issues</span
+      <div class="flex items-center">
+        <ViewMenu {project} {view} {config} layout={effectiveLayout} {dirty} />
+        {#if dirty}<span class="ml-1 text-xs text-fg-subtle" data-testid="view-modified"
+            >· modified</span
+          >{/if}
+      </div>
+      <!-- Narrow screens: filters get their own scrolling row under the view name. -->
+      <div
+        class="order-last -mx-3 w-[calc(100%+1.5rem)] overflow-x-auto px-3 sm:order-none sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0"
       >
-      <ViewConfigPanel {config} layout={effectiveLayout} {project} onchange={setConfig} />
-    </div>
-  </header>
+        <FilterBar
+          filter={config.filter}
+          {project}
+          issues={issues.data}
+          onchange={(filter) => setConfig({ ...config, filter })}
+        />
+      </div>
+      <div class="ml-auto flex items-center gap-2">
+        {#if dirty}
+          <button
+            class="text-xs text-fg-subtle hover:text-fg"
+            onclick={() => setConfig(saved)}
+            data-testid="view-reset">Reset</button
+          >
+        {/if}
+        <span class="text-xs text-fg-subtle" data-testid="issue-count"
+          >{issues.data?.length ?? '…'} issues</span
+        >
+        <ViewConfigPanel {config} layout={effectiveLayout} {project} onchange={setConfig} />
+      </div>
+    </header>
+  {/if}
 
   <div class="relative flex min-h-0 flex-1">
     {#if project.notFound}
@@ -141,6 +144,18 @@
           {:else}
             <a href={href('/')} class={btn.secondary}>Go to your projects</a>
           {/if}
+        {/snippet}
+      </EmptyState>
+    {:else if project.error}
+      <EmptyState
+        icon={TriangleAlert}
+        tone="danger"
+        title="Couldn’t load {projectKey}"
+        testid="project-error"
+      >
+        {project.error.message}
+        {#snippet actions()}
+          <button class={btn.secondary} onclick={() => project.retry()}>Try again</button>
         {/snippet}
       </EmptyState>
     {:else if issues.isError}

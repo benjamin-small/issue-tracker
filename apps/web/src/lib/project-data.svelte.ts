@@ -31,6 +31,13 @@ export interface ProjectData {
   readonly signedIn: boolean;
   /** The project does not exist or is not readable (both are a 404). */
   readonly notFound: boolean;
+  /**
+   * Why the project's data could not be loaded, other than a 404 (a server or network error), while some of it is
+   * still missing. A failed background refetch of data already shown is not an error here.
+   */
+  readonly error: Error | null;
+  /** Refetches whatever failed to load. */
+  retry(): void;
 }
 
 /**
@@ -72,6 +79,7 @@ export function useProjectData(key: () => string): ProjectData {
     queryFn: () => fetchers.fields(key()),
     enabled: !!key(),
   }));
+  const queries = [project, statuses, labels, users, views, fields];
   return {
     get key() {
       return key();
@@ -115,6 +123,18 @@ export function useProjectData(key: () => string): ProjectData {
     },
     get notFound() {
       return [project.error, statuses.error].some((e) => e instanceof ApiError && e.status === 404);
+    },
+    get error() {
+      // Read data and error of every query (no short-circuit), for the same reason as `loaded`.
+      const failures = queries.map((q) => [q.data, q.error] as const);
+      const failed = failures.find(
+        ([data, error]) =>
+          data === undefined && error && !(error instanceof ApiError && error.status === 404),
+      );
+      return failed?.[1] ?? null;
+    },
+    retry() {
+      for (const q of queries) if (q.isError) void q.refetch();
     },
   };
 }

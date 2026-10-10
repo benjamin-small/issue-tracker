@@ -2,6 +2,7 @@
   import { btn, input } from '$lib/styles.ts';
   import { href } from '$lib/nav.ts';
   import Lock from '@lucide/svelte/icons/lock';
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import EmptyState from '$components/EmptyState.svelte';
   import { page } from '$app/state';
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -166,6 +167,18 @@
       {#if !project.notFound}
         <a href={href(`/p/${key}`)} class={btn.primary}>Back to {key} issues</a>
       {/if}
+    {/snippet}
+  </EmptyState>
+{:else if project.error}
+  <EmptyState
+    icon={TriangleAlert}
+    tone="danger"
+    title="Couldn’t load {key} settings"
+    testid="project-error"
+  >
+    {project.error.message}
+    {#snippet actions()}
+      <button class={btn.secondary} onclick={() => project.retry()}>Try again</button>
     {/snippet}
   </EmptyState>
 {:else if readerOnly}
