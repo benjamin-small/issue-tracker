@@ -280,7 +280,20 @@ describe(`deleted content needs write (${testDialect()})`, () => {
         const reparent = listed.find(
           (e) => e.type === 'issue.updated' && (e.data.issue as { key: string }).key === 'PUB-4',
         )!;
-        expect(reparent.data.changes, name).toEqual({ parent: { from: null, to: null } });
+        // The parent change names the trashed PUB-2, so it is left out rather than read as "removed the parent".
+        expect(reparent.data.changes, name).toEqual({});
+        // Other changes in the same event stay.
+        const original = allEvents.find((e) => e.id === reparent.id)!;
+        const [mixed] = await filterEventsForViewer(who, [
+          {
+            ...original,
+            data: {
+              ...original.data,
+              changes: { ...original.data.changes!, title: { from: 'a', to: 'b' } },
+            },
+          },
+        ]);
+        expect(mixed!.data.changes, name).toEqual({ title: { from: 'a', to: 'b' } });
         // Live and replay apply the same rules.
         expect(await filterEventsForViewer(who, allEvents), name).toEqual(listed);
       }

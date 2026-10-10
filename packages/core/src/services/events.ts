@@ -135,8 +135,14 @@ function contentRefs(e: TrackerEvent, restricted: boolean) {
  *   permanently deleted) issue are dropped, and so are link events with a trashed end; comment events of a
  *   deleted comment keep their place in the activity but lose the body; attachment events of a deleted attachment,
  *   or of one on a deleted comment, are dropped (their filename, size and hash identify the file, and there is
- *   nothing left to show); a trashed parent is cut from issue snapshots and from `changes.parent`.
+ *   nothing left to show); a trashed parent is cut from issue snapshots, and a `changes.parent` that names a
+ *   trashed issue is left out of `changes`.
  */
+function withoutKey<T extends Record<string, unknown>>(record: T, key: string): T {
+  const { [key]: _dropped, ...rest } = record;
+  return rest as T;
+}
+
 async function applyContentRules(
   db: Tx,
   events: TrackerEvent[],
@@ -237,12 +243,9 @@ async function applyContentRules(
           data: {
             ...e.data,
             ...(cutParent && { issue: { ...issue, parentId: null, parent: null } }),
-            ...(cutChange && {
-              changes: {
-                ...changes,
-                parent: { from: hiddenParent(change.from), to: hiddenParent(change.to) },
-              },
-            }),
+            // A parent change naming a trashed issue is left out: with that end cut it would read as a change
+            // that never happened (e.g. "removed the parent"). The other changes stay.
+            ...(cutChange && { changes: withoutKey(changes!, 'parent') }),
           },
         },
       ];
