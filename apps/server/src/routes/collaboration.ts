@@ -50,7 +50,15 @@ export function registerCollaborationRoutes(app: TrackerApp) {
       path: '/issues/{issue}/comments',
       tags,
       summary: 'List comments (oldest first)',
-      request: { params: issueParam, query: z.object({ includeDeleted: BooleanQuery }) },
+      request: {
+        params: issueParam,
+        query: z.object({
+          includeDeleted: BooleanQuery.openapi({
+            description:
+              'Deleted comments are included only if the caller can write in the project; otherwise this is ignored.',
+          }),
+        }),
+      },
       responses: {
         200: json(z.object({ data: z.array(CommentSchema) }), 'Comments'),
         ...errorResponses('NOT_FOUND'),

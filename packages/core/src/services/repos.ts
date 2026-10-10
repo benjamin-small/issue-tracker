@@ -6,34 +6,12 @@ import {
   type ProjectRepo,
 } from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
-import { conflict, isUniqueViolation, notFound, parseInput, validationError } from '../errors.ts';
+import { conflict, isUniqueViolation, notFound, parseInput } from '../errors.ts';
 import { recordEvent } from '../events.ts';
-import { getProjectRow } from '../refs.ts';
+import { getProjectRow, parseRepoRef } from '../refs.ts';
 import { clearIssueRepo } from './issues.ts';
 
 type Exec = Kysely<Database>;
-const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
-const NAME = /^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$/;
-
-/** `owner/name`, or any github.com URL under the repository, reduced to owner and name. */
-export function parseRepoRef(input: string): { owner: string; name: string } {
-  const trimmed = input
-    .trim()
-    .replace(/^https?:\/\//, '')
-    .replace(/^www\./, '');
-  const urlForm = trimmed.startsWith('github.com/');
-  if (/^[^/]+\.[^/]+\//.test(trimmed) && !urlForm)
-    throw validationError(`Not a GitHub repository: "${input}"`);
-  const path = urlForm ? trimmed.slice('github.com/'.length).split(/[?#]/)[0]! : trimmed;
-  const [owner, rawName, ...rest] = path.split('/');
-  const name = rawName?.replace(/\.git$/, '');
-  if (!owner || !name || !OWNER.test(owner) || !NAME.test(name) || (!urlForm && rest.length))
-    throw validationError(
-      `Not a GitHub repository: "${input}" (expected owner/name or a github.com URL)`,
-    );
-  return { owner, name };
-}
-
 export function toRepo(r: {
   id: string;
   owner: string;

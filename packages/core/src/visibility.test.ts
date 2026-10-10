@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -19,7 +19,18 @@ describe(`project visibility (${testDialect()})`, () => {
     await createIssue(t.ctx, 'PUB', { title: 'open' });
     await createIssue(t.ctx, 'PRV', { title: 'secret' });
   });
-  afterAll(() => t.destroy());
+  afterAll(async () => {
+    await t.destroy();
+    for (const dir of blobDirs) rmSync(dir, { recursive: true, force: true });
+  });
+
+  /** A blob store in a temp directory that `afterAll` removes. */
+  const blobDirs: string[] = [];
+  function tempBlobStore() {
+    const dir = mkdtempSync(join(tmpdir(), 'vis-blobs-'));
+    blobDirs.push(dir);
+    return new LocalDiskBlobStore(join(dir, 'b'));
+  }
 
   it('hides private projects and their issues as not found', async () => {
     await expect(getProject(t.member, 'PRV')).rejects.toMatchObject({ code: 'NOT_FOUND' });
@@ -152,7 +163,7 @@ describe(`project visibility (${testDialect()})`, () => {
   it('lets managers moderate attachments and checks access on read', async () => {
     const { uploadAttachment, getAttachment, deleteAttachment } =
       await import('./services/attachments.ts');
-    const blobs = new LocalDiskBlobStore(join(mkdtempSync(join(tmpdir(), 'vis-blobs-')), 'b'));
+    const blobs = tempBlobStore();
     await grant(t, 'PRV', t.agent, 'editor');
     const file = await uploadAttachment(t.agent, blobs, 'PRV-1', {
       filename: 'a.txt',
@@ -175,8 +186,8 @@ describe(`project visibility (${testDialect()})`, () => {
 
   it('needs write on one end of a link, and read on both, to delete it', async () => {
     const { createLink, deleteLink } = await import('./services/links.ts');
-    await createIssue(t.ctx, 'PUB', { title: 'second' });
-    const link = await createLink(t.ctx, 'PUB-1', { type: 'relates', target: 'PUB-2' });
+    const second = await createIssue(t.ctx, 'PUB', { title: 'second' });
+    const link = await createLink(t.ctx, 'PUB-1', { type: 'relates', target: second.key });
     await revoke('PUB', t.member);
     await expect(deleteLink(t.member, link.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(deleteLink(withActor(t.ctx, ANONYMOUS_ACTOR), link.id)).rejects.toMatchObject({
@@ -309,7 +320,7 @@ describe(`project visibility (${testDialect()})`, () => {
     const { createView, getView } = await import('./services/views.ts');
     const { createLink, deleteLink } = await import('./services/links.ts');
     const { uploadAttachment, getAttachment } = await import('./services/attachments.ts');
-    const blobs = new LocalDiskBlobStore(join(mkdtempSync(join(tmpdir(), 'vis-blobs-')), 'b'));
+    const blobs = tempBlobStore();
 
     const label = await createLabel(t.ctx, 'PRV', { name: 'oracle-label' });
     const [status] = await listStatuses(t.ctx, 'PRV');
@@ -321,8 +332,8 @@ describe(`project visibility (${testDialect()})`, () => {
     });
     const comment = await createComment(t.ctx, 'PRV-1', { body: 'x' });
     const view = await createView(t.ctx, 'PRV', { name: 'Oracle', layout: 'list', shared: true });
-    await createIssue(t.ctx, 'PRV', { title: 'other' });
-    const link = await createLink(t.ctx, 'PRV-1', { type: 'relates', target: 'PRV-2' });
+    const other = await createIssue(t.ctx, 'PRV', { title: 'other' });
+    const link = await createLink(t.ctx, 'PRV-1', { type: 'relates', target: other.key });
     const file = await uploadAttachment(t.ctx, blobs, 'PRV-1', {
       filename: 'a.txt',
       data: new TextEncoder().encode('hi'),
@@ -655,6 +666,81 @@ describe(`project visibility (${testDialect()})`, () => {
       );
     }
   });
+
+  it('forbids viewers to delete labels and statuses, and asks anonymous actors to sign in', async () => {
+    const { createLabel, deleteLabel, listLabels } = await import('./services/labels.ts');
+    const { listStatuses, deleteStatus } = await import('./services/statuses.ts');
+    await createProject(t.ctx, { key: 'DELV', name: 'Delete levels', visibility: 'public' });
+    await createProject(t.ctx, { key: 'DELP', name: 'Delete hidden' });
+    const label = await createLabel(t.ctx, 'DELV', { name: 'keep-me' });
+    const hiddenLabel = await createLabel(t.ctx, 'DELP', { name: 'hidden-me' });
+    const statuses = await listStatuses(t.ctx, 'DELV');
+    const [status, spare] = statuses;
+    const hiddenStatus = (await listStatuses(t.ctx, 'DELP'))[0]!;
+    const anon = withActor(t.ctx, ANONYMOUS_ACTOR);
+    await grant(t, 'DELV', t.member, 'viewer');
+    await revoke('DELP', t.member);
+
+    await expect(deleteLabel(t.member, label.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(deleteStatus(t.member, status!.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(deleteLabel(anon, label.id)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(deleteStatus(anon, status!.id)).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+    });
+    // Without read access the project is not found, as for every other lookup by id.
+    for (const who of [t.member, anon]) {
+      await expect(deleteLabel(who, hiddenLabel.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      await expect(deleteStatus(who, hiddenStatus.id)).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+    }
+    expect((await listLabels(t.ctx, 'DELV')).map((l) => l.name)).toEqual(['keep-me']);
+    expect(await listStatuses(t.ctx, 'DELV')).toHaveLength(statuses.length);
+
+    // Write is enough to delete them.
+    await grant(t, 'DELV', t.member, 'editor');
+    expect((await deleteLabel(t.member, label.id)).id).toBe(label.id);
+    expect((await deleteStatus(t.member, spare!.id)).id).toBe(spare!.id);
+  });
+
+  it('lets a manager delete a comment written by someone else, but not an editor', async () => {
+    const { createComment, deleteComment, listComments } = await import('./services/comments.ts');
+    await createProject(t.ctx, { key: 'MODC', name: 'Moderation' });
+    await createIssue(t.ctx, 'MODC', { title: 'discussed' });
+    await grant(t, 'MODC', t.agent, 'editor');
+    const comment = await createComment(t.agent, 'MODC-1', { body: 'by the agent' });
+
+    await grant(t, 'MODC', t.member, 'editor');
+    await expect(deleteComment(t.member, comment.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await grant(t, 'MODC', t.member, 'manager');
+    const deleted = await deleteComment(t.member, comment.id);
+    expect(deleted).toMatchObject({ id: comment.id, authorId: t.agent.actor.id });
+    expect(deleted.deletedAt).not.toBeNull();
+    expect(await listComments(t.agent, 'MODC-1')).toEqual([]);
+    // Gone for everyone, managers included.
+    await expect(deleteComment(t.member, comment.id)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
+  it('keeps personal views to their owner, even from managers', async () => {
+    const { createView, getView, listViews, updateView, deleteView } =
+      await import('./services/views.ts');
+    await createProject(t.ctx, { key: 'PVW', name: 'Personal views', visibility: 'public' });
+    await grant(t, 'PVW', t.agent, 'manager');
+    await grant(t, 'PVW', t.member, 'manager');
+    const mine = await createView(t.agent, 'PVW', { name: 'Agent only', layout: 'list' });
+
+    await expect(getView(t.member, mine.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(updateView(t.member, mine.id, { name: 'taken' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    await expect(deleteView(t.member, mine.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect((await listViews(t.member, 'PVW')).map((v) => v.id)).not.toContain(mine.id);
+    // It is untouched, and still the owner's.
+    expect((await getView(t.agent, mine.id)).name).toBe('Agent only');
+    expect((await listViews(t.agent, 'PVW')).map((v) => v.id)).toContain(mine.id);
+  });
 });
 
 describe(`nothing readable (${testDialect()})`, () => {
@@ -711,5 +797,57 @@ describe(`nothing readable (${testDialect()})`, () => {
     }
     // Anonymous readers also get no project-less (user.*) events, so their log is empty.
     expect((await listEvents(anon, { limit: 1000 })).data).toEqual([]);
+  });
+});
+
+describe(`admin-only and user events (${testDialect()})`, () => {
+  let t: TestContext;
+  beforeAll(async () => {
+    t = await createTestContext();
+  });
+  afterAll(() => t.destroy());
+
+  it('asks anonymous actors to sign in for admin-only actions, and forbids members', async () => {
+    const { listWebhooks } = await import('./services/webhooks.ts');
+    const { createUser } = await import('./services/users.ts');
+    const anon = withActor(t.ctx, ANONYMOUS_ACTOR);
+    await expect(listWebhooks(anon)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(createProject(anon, { key: 'NOPE', name: 'x' })).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+    });
+    await expect(createUser(anon, { handle: 'nope', name: 'x' })).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+    });
+    await expect(listWebhooks(t.member)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(await listWebhooks(t.ctx)).toEqual([]);
+  });
+
+  it('drops user.updated events that only changed an email the viewer cannot see', async () => {
+    const { createUser, updateUser, toActor } = await import('./services/users.ts');
+    const { filterEventsForViewer, listEvents } = await import('./services/events.ts');
+    const ada = await createUser(t.ctx, { handle: 'ada', name: 'Ada', email: 'ada@x.io' });
+    const asAda = withActor(t.ctx, toActor(ada));
+    await updateUser(t.ctx, 'ada', { email: 'ada@new.io' }); // email only
+    await updateUser(t.ctx, 'ada', { name: 'Ada L', email: 'ada@newer.io' }); // name and email
+    const all = (await listEvents(t.ctx, { types: ['user.updated'], limit: 1000 })).data;
+    expect(all.map((e) => Object.keys(e.data.changes as object).sort())).toEqual([
+      ['email'],
+      ['email', 'name'],
+    ]);
+    // The member sees only the name change, without the email.
+    for (const events of [
+      (await listEvents(t.member, { types: ['user.updated'], limit: 1000 })).data,
+      await filterEventsForViewer(t.member, all),
+    ]) {
+      expect(events.map((e) => e.data.changes)).toEqual([{ name: { from: 'Ada', to: 'Ada L' } }]);
+      expect((events[0]!.data.user as { email: string | null }).email).toBeNull();
+    }
+    // The user themself and admins see both.
+    for (const who of [asAda, t.ctx]) {
+      expect((await listEvents(who, { types: ['user.updated'], limit: 1000 })).data).toHaveLength(
+        2,
+      );
+      expect(await filterEventsForViewer(who, all)).toHaveLength(2);
+    }
   });
 });

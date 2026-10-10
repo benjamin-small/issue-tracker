@@ -21,7 +21,7 @@ const projectParam = z.object({
   project: refParam('project', 'Project key (e.g. `ENG`) or id.', 'ENG'),
 });
 const memberParam = projectParam.extend({
-  user: refParam('user', 'User id, handle or `@handle`.', '@ada'),
+  user: refParam('user', 'User id, handle, `@handle` or `me`.', '@ada'),
 });
 const repoParam = projectParam.extend({
   repo: refParam(

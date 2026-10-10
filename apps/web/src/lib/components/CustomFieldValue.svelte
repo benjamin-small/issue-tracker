@@ -2,12 +2,22 @@
   import Check from '@lucide/svelte/icons/check';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import type { CustomField, Issue, User } from '../api.ts';
-  import { shortDate } from '../format.ts';
+  import { findPerson, shortDate, unknownUserLabel } from '../format.ts';
   import Avatar from './Avatar.svelte';
 
   /** Read-only rendering of one custom field value (cards, list cells). Unset values render nothing. */
   let { issue, field, users }: { issue: Issue; field: CustomField; users: User[] } = $props();
   const value = $derived(issue.customFields[field.key]);
+  /**
+   * A person field's user: from the directory, else from the people the issue embeds (signed-out visitors have no
+   * directory). Anyone else reads as an unknown user, with the id in the tooltip.
+   */
+  const person = $derived(
+    field.type === 'user' ? findPerson(value, users, [issue.assignee, issue.creator]) : undefined,
+  );
+  const title = $derived(
+    field.type === 'user' && !person ? `${field.name}: ${String(value)}` : field.name,
+  );
   const option = (v: unknown) => field.options.find((o) => o.value === v);
   const unit = $derived(typeof field.config.unit === 'string' ? ` ${field.config.unit}` : '');
 </script>
@@ -15,7 +25,7 @@
 {#if value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0)}
   <span
     class="inline-flex max-w-full items-center gap-1 text-xs text-fg-muted"
-    title={field.name}
+    {title}
     data-cf={field.key}
   >
     {#if field.type === 'select' || field.type === 'multi_select'}
@@ -27,8 +37,7 @@
         </span>
       {/each}
     {:else if field.type === 'user'}
-      {@const u = users.find((x) => x.id === value) ?? null}
-      <Avatar user={u} size={14} />{u?.name ?? '?'}
+      <Avatar user={person ?? null} size={14} />{person?.name ?? unknownUserLabel(String(value))}
     {:else if field.type === 'boolean'}
       {#if value}<Check size={12} />{field.name}{:else}<span class="line-through">{field.name}</span
         >{/if}

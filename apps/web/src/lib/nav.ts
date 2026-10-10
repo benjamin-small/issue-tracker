@@ -2,6 +2,8 @@ import { goto, pushState } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
 
+export { safeNext } from './safe-next.ts';
+
 /**
  * App-internal links and navigation that work with both routers: normal path routing (the served app) and hash
  * routing (the self-contained demo, which may be hosted at any URL). Always build internal URLs through these.

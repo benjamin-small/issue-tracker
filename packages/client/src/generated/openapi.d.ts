@@ -1930,7 +1930,7 @@ export interface paths {
                 path: {
                     /** @description Project key (e.g. `ENG`) or id. */
                     project: string;
-                    /** @description User id, handle or `@handle`. */
+                    /** @description User id, handle, `@handle` or `me`. */
                     user: string;
                 };
                 cookie?: never;
@@ -1995,7 +1995,7 @@ export interface paths {
                 path: {
                     /** @description Project key (e.g. `ENG`) or id. */
                     project: string;
-                    /** @description User id, handle or `@handle`. */
+                    /** @description User id, handle, `@handle` or `me`. */
                     user: string;
                 };
                 cookie?: never;
@@ -2256,6 +2256,7 @@ export interface paths {
                     limit?: number;
                     /** @description Opaque cursor from a previous `nextCursor`. */
                     cursor?: string;
+                    /** @description Trashed issues are included only for projects the caller can write in; for other projects this is ignored. */
                     includeDeleted?: "true" | "false";
                 };
                 header?: never;
@@ -2469,7 +2470,7 @@ export interface paths {
         };
         /**
          * Get an issue
-         * @description Returns trashed issues too (see `deletedAt`).
+         * @description Returns trashed issues too (see `deletedAt`) to actors who can write in the project; to anyone else a trashed issue is not found.
          */
         get: {
             parameters: {
@@ -3167,6 +3168,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
+                    /** @description Deleted comments are included only if the caller can write in the project; otherwise this is ignored. */
                     includeDeleted?: "true" | "false";
                 };
                 header?: never;
@@ -6243,6 +6245,7 @@ export interface components {
             sort?: components["schemas"]["SortSpec"][];
             limit?: number;
             cursor?: string | null;
+            /** @description Trashed issues are included only for projects the caller can write in; for other projects this is ignored. */
             includeDeleted?: boolean;
         };
         /**

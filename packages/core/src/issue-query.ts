@@ -19,11 +19,10 @@ import {
   SORTABLE_FIELDS,
   type SortSpec,
 } from '@poietic-tech/issues-schema';
-import { readableProjectIds, whereReadable } from './access.ts';
+import { readableProjectIds, unrestricted, whereReadable, writableProjectIds } from './access.ts';
 import type { ServiceContext } from './context.ts';
 import { DomainError, validationError } from './errors.ts';
-import { getIssueRow } from './refs.ts';
-import { parseRepoRef } from './services/repos.ts';
+import { getIssueRow, parseRepoRef } from './refs.ts';
 import {
   customFieldSql,
   loadCustomFieldValues,
@@ -174,6 +173,40 @@ export async function loadIssues(db: Exec, ids: string[]): Promise<Issue[]> {
     }
   }
   return ids.map((id) => byId.get(id)).filter((i): i is Issue => i !== undefined);
+}
+
+/**
+ * Cuts a trashed parent (key and title) out of issues shown to an actor below `write` on their project: the
+ * parent itself is NOT_FOUND to them. Writers keep it, since they can open and restore it. A parent is always in
+ * its child's project, so the child's project decides. Pass `writable` to reuse a `writableProjectIds` result.
+ */
+export async function hideTrashedParents(
+  ctx: ServiceContext,
+  db: Exec,
+  issues: Issue[],
+  writable?: 'all' | string[],
+): Promise<Issue[]> {
+  if (writable === 'all' || unrestricted(ctx)) return issues;
+  const parentIds = [...new Set(issues.flatMap((i) => (i.parentId ? [i.parentId] : [])))];
+  if (!parentIds.length) return issues;
+  const trashed = new Set(
+    (
+      await db
+        .selectFrom('issues')
+        .select('id')
+        .where('id', 'in', parentIds)
+        .where('deleted_at', 'is not', null)
+        .execute()
+    ).map((r) => r.id),
+  );
+  if (!trashed.size) return issues;
+  const canWrite = writable ?? (await writableProjectIds(ctx, db));
+  if (canWrite === 'all') return issues;
+  return issues.map((i) =>
+    i.parentId && trashed.has(i.parentId) && !canWrite.includes(i.projectId)
+      ? { ...i, parentId: null, parent: null }
+      : i,
+  );
 }
 
 export async function loadIssue(db: Exec, id: string): Promise<Issue> {
@@ -385,6 +418,7 @@ export interface ListIssuesParams {
   sort?: SortSpec[] | undefined;
   limit?: number | undefined;
   cursor?: string | null | undefined;
+  /** Include trashed issues, in projects where the actor has `write` only. */
   includeDeleted?: boolean | undefined;
 }
 
@@ -397,16 +431,14 @@ export async function resolveFilterRefs(
   db: Exec,
   filter: IssueFilter,
   projectId: string | undefined,
+  known?: 'all' | string[],
 ): Promise<IssueFilter> {
   // Without a project, names are looked up across projects: only the ones the actor can read, so an
-  // "Unknown ..." error never confirms that a private project has such a status or label.
-  const readable = projectId ? 'all' : await readableProjectIds(ctx, db);
-  const readableOnly = <QB extends { where(expr: Bool): QB }>(q: QB): QB =>
-    readable === 'all'
-      ? q
-      : q.where(
-          readable.length ? sql<boolean>`project_id in (${list(readable)})` : sql<boolean>`1 = 0`,
-        );
+  // "Unknown ..." error never confirms that a private project has such a status or label. Pass `known` to
+  // reuse a `readableProjectIds` result.
+  const readable = projectId ? 'all' : (known ?? (await readableProjectIds(ctx, db)));
+  const readableOnly = <QB extends { where(expr: Bool): QB }>(q: QB) =>
+    whereReadable(ctx, db, q, 'project_id', readable);
   const conditions = [];
   for (const c of filter.conditions) {
     const resolve = async (v: unknown): Promise<unknown[]> => {
@@ -419,7 +451,7 @@ export async function resolveFilterRefs(
             .select('id')
             .where(sql`lower(name)`, '=', v.toLowerCase());
           if (projectId) q = q.where('project_id', '=', projectId);
-          q = readableOnly(q);
+          q = await readableOnly(q);
           const ids = (await q.execute()).map((r) => r.id);
           if (!ids.length) throw validationError(`Unknown status "${v}"`);
           return ids;
@@ -431,7 +463,7 @@ export async function resolveFilterRefs(
             .select('id')
             .where(sql`lower(name)`, '=', v.toLowerCase());
           if (projectId) q = q.where('project_id', '=', projectId);
-          q = readableOnly(q);
+          q = await readableOnly(q);
           const ids = (await q.execute()).map((r) => r.id);
           if (!ids.length) throw validationError(`Unknown label "${v}"`);
           return ids;
@@ -467,7 +499,7 @@ export async function resolveFilterRefs(
             .where(sql`lower(owner)`, '=', owner.toLowerCase())
             .where(sql`lower(name)`, '=', name.toLowerCase());
           if (projectId) q = q.where('project_id', '=', projectId);
-          else q = readableOnly(q);
+          else q = await readableOnly(q);
           const ids = (await q.execute()).map((r) => r.id);
           if (!ids.length) throw validationError(`Unknown repository "${v}"`);
           return ids;
@@ -513,7 +545,9 @@ export async function queryIssues(
       normalized.errors.join('; '),
       normalized.errors.map((m) => ({ path: `filter.${m.split(':')[0]}`, message: m })),
     );
-  const filter = await resolveFilterRefs(ctx, db, normalized.filter, params.projectId);
+  // Unscoped listings check readability twice (filter names and rows): read the readable set once.
+  const readable = params.projectId ? 'all' : await readableProjectIds(ctx, db);
+  const filter = await resolveFilterRefs(ctx, db, normalized.filter, params.projectId, readable);
 
   const exprs = sorts.map((s) => sortExpression(s.field, ctx.db.dialect));
   let q = db
@@ -527,8 +561,19 @@ export async function queryIssues(
   });
   q = q.orderBy('i.id', 'asc');
   if (params.projectId) q = q.where('i.project_id', '=', params.projectId);
-  else q = await whereReadable(ctx, db, q, 'i.project_id');
-  if (!params.includeDeleted) q = q.where('i.deleted_at', 'is', null);
+  else q = await whereReadable(ctx, db, q, 'i.project_id', readable);
+  let writable: 'all' | string[] | undefined;
+  if (params.includeDeleted) {
+    // Trashed issues are shown only in projects the actor can write in (deleted content needs write).
+    const canWrite = await writableProjectIds(ctx, db);
+    writable = canWrite;
+    if (canWrite !== 'all')
+      q = q.where((eb) =>
+        canWrite.length
+          ? eb.or([eb('i.deleted_at', 'is', null), eb('i.project_id', 'in', canWrite)])
+          : eb('i.deleted_at', 'is', null),
+      );
+  } else q = q.where('i.deleted_at', 'is', null);
   if (params.cursor)
     q = q.where(keysetCondition(exprs, sorts, decodeCursor(params.cursor, sorts.length)));
 
@@ -541,11 +586,9 @@ export async function queryIssues(
     rows.length > limit && last
       ? encodeCursor({ v: sorts.map((_, k) => last[`s${k}`]), id: last.id })
       : null;
-  return {
-    data: await loadIssues(
-      db,
-      page.map((r) => r.id),
-    ),
-    nextCursor,
-  };
+  const issues = await loadIssues(
+    db,
+    page.map((r) => r.id),
+  );
+  return { data: await hideTrashedParents(ctx, db, issues, writable), nextCursor };
 }

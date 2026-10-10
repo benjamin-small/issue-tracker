@@ -4,6 +4,7 @@ export {
   projectLevel,
   readableProjectIds,
   requireLevel,
+  writableProjectIds,
 } from './access.ts';
 export * from './context.ts';
 export * from './errors.ts';

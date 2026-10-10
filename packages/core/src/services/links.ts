@@ -194,6 +194,8 @@ export async function deleteLink(ctx: ServiceContext, linkId: string): Promise<v
             't.key',
             's.project_id',
             'd.project_id as target_project_id',
+            's.deleted_at as source_deleted_at',
+            'd.deleted_at as target_deleted_at',
           ])
           .where('l.id', '=', linkId)
           .executeTakeFirst()
@@ -206,6 +208,11 @@ export async function deleteLink(ctx: ServiceContext, linkId: string): Promise<v
       }),
     );
     if (levels.some((level) => !atLeast(level, 'read'))) throw notFound('Link', linkId);
+    // A link with a trashed end exists only for those who can write that end's project (ADR 0021): below that
+    // it is NOT_FOUND, as in link lists and events, rather than FORBIDDEN or UNAUTHENTICATED.
+    const trashed = [row.source_deleted_at, row.target_deleted_at];
+    if (levels.some((level, i) => trashed[i] !== null && !atLeast(level, 'write')))
+      throw notFound('Link', linkId);
     const best = levels.find((level) => atLeast(level, 'write')) ?? 'read';
     requireLevel(ctx, best, 'write', 'Link', linkId);
     const link = {

@@ -16,7 +16,6 @@ import {
   type TrackerEvent,
   type UpdateWebhookInput,
   UpdateWebhookInputSchema,
-  type UserSummary,
   type Webhook,
   type WebhookDelivery,
   type WebhookDeliveryStatus,
@@ -214,12 +213,8 @@ export async function testWebhook(
     id: newId('event'),
     type: 'webhook.ping',
     actorId: ctx.actor.id,
-    // requireAdmin above rules out the anonymous actor, so the kind is a stored user kind.
-    actor: toUserSummary({
-      ...ctx.actor,
-      kind: ctx.actor.kind as UserSummary['kind'],
-      avatarUrl: null,
-    }),
+    // requireAdmin above narrows the actor to a stored user kind (never anonymous).
+    actor: toUserSummary({ ...ctx.actor, avatarUrl: null }),
     projectId: row.project_id,
     issueId: null,
     data: { webhook: { id: row.id, url: row.url } },

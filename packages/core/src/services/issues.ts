@@ -22,9 +22,10 @@ import {
 } from '../custom-field-values.ts';
 import { conflict, DomainError, invalidRelation, parseInput, validationError } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';
-import { loadIssue, queryIssues } from '../issue-query.ts';
+import { hideTrashedParents, loadIssue, queryIssues } from '../issue-query.ts';
+import { atLeast } from '../access.ts';
 import { requireAdmin } from '../permissions.ts';
-import { getIssueRow, getProjectRow, getStatusRow, getUserRow } from '../refs.ts';
+import { getIssueAccess, getIssueRow, getProjectRow, getStatusRow, getUserRow } from '../refs.ts';
 import { listEvents } from './events.ts';
 import { findRepo } from './repos.ts';
 
@@ -49,10 +50,13 @@ const TRACKED_FIELDS = [
 // Reads
 // ---------------------------------------------------------------------------
 
-/** Gets an issue by key (`ENG-42`) or id, including issues in the trash. */
+/** Gets an issue by key (`ENG-42`) or id. Issues in the trash are found only by actors with `write`. */
 export async function getIssue(ctx: ServiceContext, ref: string): Promise<Issue> {
-  const row = await getIssueRow(ctx, ctx.db.kysely, ref, 'read');
-  return loadIssue(ctx.db.kysely, row.id);
+  const { row, level } = await getIssueAccess(ctx, ctx.db.kysely, ref, 'read');
+  const issue = await loadIssue(ctx.db.kysely, row.id);
+  if (atLeast(level, 'write')) return issue;
+  const [shown] = await hideTrashedParents(ctx, ctx.db.kysely, [issue], []);
+  return shown!;
 }
 
 export interface ListIssuesInput {
@@ -61,6 +65,7 @@ export interface ListIssuesInput {
   sort?: SortSpec[] | undefined;
   limit?: number | undefined;
   cursor?: string | null | undefined;
+  /** Include trashed issues, in projects where the actor has `write` only. */
   includeDeleted?: boolean | undefined;
 }
 
@@ -260,13 +265,19 @@ async function resolveParent(
 /** Resolves a repo ref (`rpo_` id, `owner/name` or URL) to one of the project's linked repos. */
 async function resolveRepoId(
   tx: Tx,
-  project: { id: string; key: string },
+  projectId: string,
   ref: string | null,
 ): Promise<string | null> {
   if (ref === null) return null;
-  const repo = await findRepo(tx, project.id, ref);
-  if (!repo) throw invalidRelation(`"${ref}" is not linked to project ${project.key}`);
-  return repo.id;
+  const repo = await findRepo(tx, projectId, ref);
+  if (repo) return repo.id;
+  // Only the error needs the project's key.
+  const { key } = await tx
+    .selectFrom('projects')
+    .select('key')
+    .where('id', '=', projectId)
+    .executeTakeFirstOrThrow();
+  throw invalidRelation(`"${ref}" is not linked to project ${key}`);
 }
 
 /**
@@ -331,7 +342,7 @@ export async function createIssue(
       : await defaultStatus(tx, project.id);
     const assigneeId = await resolveAssignee(ctx, tx, data.assignee ?? null);
     const parentId = await resolveParent(ctx, tx, { projectId: project.id }, data.parent ?? null);
-    const repoId = await resolveRepoId(tx, project, data.repo ?? null);
+    const repoId = await resolveRepoId(tx, project.id, data.repo ?? null);
     const labelIds = await resolveLabelIds(tx, project.id, data.labels);
     const customValues = await resolveCustomFieldValues(tx, ctx, project.id, data.customFields);
     const { next_issue_number } = await tx
@@ -438,8 +449,7 @@ export async function updateIssueInTx(
     if (parentId !== row.parent_id) set.parent_id = parentId;
   }
   if (patch.repo !== undefined) {
-    const project = await getProjectRow(ctx, tx, row.project_id, 'read');
-    const repoId = await resolveRepoId(tx, project, patch.repo);
+    const repoId = await resolveRepoId(tx, row.project_id, patch.repo);
     if (repoId !== row.repo_id) set.repo_id = repoId;
   }
 

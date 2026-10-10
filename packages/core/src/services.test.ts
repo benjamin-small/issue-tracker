@@ -15,6 +15,7 @@ import {
   deleteLink,
   deleteStatus,
   getIssue,
+  getProject,
   listComments,
   listEvents,
   listIssueActivity,
@@ -73,6 +74,40 @@ describe(`projects (${testDialect()})`, () => {
     await expect(createProject(t.ctx, { key: '1X', name: 'Bad' })).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
     });
+  });
+
+  it('persists the visibility it is created with, and defaults to private', async () => {
+    const stored = async (key: string) =>
+      (
+        await t.db.kysely
+          .selectFrom('projects')
+          .select('visibility')
+          .where('key', '=', key)
+          .executeTakeFirstOrThrow()
+      ).visibility;
+    const open = await createProject(t.ctx, { key: 'VPUB', name: 'Open', visibility: 'public' });
+    const closed = await createProject(t.ctx, {
+      key: 'VPRV',
+      name: 'Closed',
+      visibility: 'private',
+    });
+    const unspecified = await createProject(t.ctx, { key: 'VDEF', name: 'Default' });
+    expect([open, closed, unspecified].map((p) => p.visibility)).toEqual([
+      'public',
+      'private',
+      'private',
+    ]);
+    expect([await stored('VPUB'), await stored('VPRV'), await stored('VDEF')]).toEqual([
+      'public',
+      'private',
+      'private',
+    ]);
+    expect((await getProject(t.ctx, 'VPUB')).visibility).toBe('public');
+    const created = (await listEvents(t.ctx, { types: ['project.created'], limit: 1000 })).data;
+    const payload = created.find((e) => e.projectId === open.id)!.data as {
+      project: { visibility: string };
+    };
+    expect(payload.project.visibility).toBe('public');
   });
 });
 

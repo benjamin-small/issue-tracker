@@ -20,9 +20,7 @@ export function toActor(user: Pick<User, 'id' | 'handle' | 'name' | 'kind' | 'ro
 
 /** Emails are private: only admins and the user themselves see them. */
 function redact(ctx: ServiceContext, u: User): User {
-  return ctx.actor.role === 'admin' || ctx.actor.kind === 'system' || u.id === ctx.actor.id
-    ? u
-    : { ...u, email: null };
+  return isAdmin(ctx) || u.id === ctx.actor.id ? u : { ...u, email: null };
 }
 
 /** Lists users. Deactivated users are included only when asked. */

@@ -121,6 +121,7 @@
       <div
         class="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-bg-subtle px-4 py-1.5 text-sm sm:top-[29px]"
         data-testid="list-group"
+        data-group={group.label}
       >
         <button
           class="flex items-center gap-2"

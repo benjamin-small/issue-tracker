@@ -125,3 +125,64 @@ test('never asks the API for project data without a project key', async ({ page 
   await expect(page.getByTestId('nav-board')).toBeVisible();
   expect(keyless).toEqual([]);
 });
+
+test('a project that fails to load says so, with a retry, in the view and in settings', async ({
+  page,
+}) => {
+  let fail = true;
+  await page.route(/\/api\/v1\/projects\/ENG(\?.*)?$/, (route) =>
+    fail
+      ? route.fulfill({
+          status: 500,
+          contentType: 'application/problem+json',
+          body: JSON.stringify({ title: 'Internal error', status: 500, code: 'INTERNAL' }),
+        })
+      : route.fallback(),
+  );
+  // Server errors are retried twice (1s, then 2s) before the error shows.
+  await page.goto('/p/ENG');
+  const error = page.getByTestId('project-error');
+  await expect(error).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('filter-bar')).toHaveCount(0);
+  await expect(page.getByLabel('Loading issues')).toHaveCount(0);
+  fail = false;
+  await error.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.getByTestId('issue-row').first()).toBeVisible();
+
+  fail = true;
+  await page.goto('/p/ENG/settings');
+  await expect(error).toBeVisible({ timeout: 10_000 });
+  fail = false;
+  await error.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.getByTestId('settings-statuses')).toBeVisible();
+});
+
+test('saved views that fail to load do not block the project', async ({ page }) => {
+  let attempts = 0;
+  await page.route(/\/api\/v1\/projects\/ENG\/views(\?.*)?$/, (route) => {
+    attempts++;
+    return route.fulfill({
+      status: 500,
+      contentType: 'application/problem+json',
+      body: JSON.stringify({ title: 'Internal error', status: 500, code: 'INTERNAL' }),
+    });
+  });
+  await page.goto('/p/ENG');
+  await expect(page.getByTestId('issue-row').first()).toBeVisible();
+  // Server errors are retried twice (1s, then 2s); once the views query has given up, the project still shows.
+  await expect.poll(() => attempts, { timeout: 10_000 }).toBe(3);
+  await page.waitForTimeout(500); // let the last failure settle before checking it is not shown
+  await expect(page.getByTestId('project-error')).toHaveCount(0);
+  await expect(page.getByTestId('issue-row').first()).toBeVisible();
+});
+
+test('a missing project shows only the not-found state, without the view header', async ({
+  page,
+}) => {
+  await page.goto('/p/NOSUCH');
+  await expect(page.getByTestId('project-not-found')).toBeVisible();
+  await expect(page.getByTestId('view-menu')).toHaveCount(0);
+  await expect(page.getByTestId('filter-bar')).toHaveCount(0);
+  await expect(page.getByTestId('issue-count')).toHaveCount(0);
+  await expect(page.getByTestId('display-options')).toHaveCount(0);
+});

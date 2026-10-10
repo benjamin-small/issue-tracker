@@ -32,7 +32,7 @@ function issueFieldOptions(cmd: Command, mode: 'create' | 'edit'): Command {
     .option('--due <date>', 'due date YYYY-MM-DD, or none')
     .option(
       '--repo <owner/name>',
-      "one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it",
+      "one of the project's linked GitHub repos (owner/name, URL or id); none, null or '' clears it",
     )
     .option(
       '--set <field=value>',
@@ -121,7 +121,10 @@ export function issueCommand(io: CliIO): Command {
     .option('--limit <n>', 'page size (1-200)', parseIntStrict('--limit'))
     .option('--cursor <cursor>', 'continue from a previous page')
     .option('--all', 'fetch every page')
-    .option('--include-deleted', 'include issues in the trash')
+    .option(
+      '--include-deleted',
+      'include issues in the trash (only in projects you can write in; ignored elsewhere)',
+    )
     .option('--all-projects', 'search across all projects')
     .action(
       act(async (rt, _args, o) => {

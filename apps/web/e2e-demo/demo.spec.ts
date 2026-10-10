@@ -86,3 +86,18 @@ test('signs out and resets', async ({ page }) => {
     .click();
   await expect(page.getByText('Grace Hopper')).toBeVisible();
 });
+
+test('the sign-in page only leads back within the demo', async ({ page }) => {
+  // Fresh pages: changing only the hash of a loaded page makes the hash router reload by itself.
+  const login = async (next: string) => {
+    const p = await page.context().newPage();
+    await p.goto(`index.html#/login?next=${encodeURIComponent(next)}`);
+    return { p, link: p.getByRole('link', { name: 'Continue without signing in' }) };
+  };
+  const evil = await login('/\\evil.com');
+  await expect(evil.link).toHaveAttribute('href', '#/');
+  const ok = await login('/p/ENG');
+  await expect(ok.link).toHaveAttribute('href', '#/p/ENG');
+  await ok.link.click();
+  await expect(ok.p).toHaveURL(/index\.html#\/p\/ENG$/);
+});

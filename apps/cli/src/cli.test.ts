@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createProject, LocalDiskBlobStore } from '@poietic-tech/issues-core';
-import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
+import { createTestContext, grant, type TestContext } from '@poietic-tech/issues-core/testing';
 import { latestMigrationName } from '@poietic-tech/issues-db';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { createApp } from '@poietic-tech/issues-server';
@@ -509,6 +509,79 @@ describe(`project access commands (${testDialect()})`, () => {
   });
 });
 
+describe(`project access commands without manage (${testDialect()})`, () => {
+  it('exits with 5 when a non-manager changes members, and 3 when the project is hidden', async () => {
+    await createProject(t.ctx, { key: 'CLIB', name: 'Members guard' });
+    await createProject(t.ctx, { key: 'CLIH', name: 'Hidden' });
+    await grant(t, 'CLIB', t.member, 'viewer');
+    await grant(t, 'CLIB', t.agent, 'editor');
+    const asActor = (actor: string) => {
+      const app = createApp({ db: t.db, auth: { mode: 'trusted', actor } });
+      const fetch: CliIO['fetch'] = (r) => Promise.resolve(app.fetch(r as Request));
+      return (args: string[]) => cli(args, { fetch });
+    };
+
+    for (const actor of ['member', 'bot']) {
+      const run = asActor(actor);
+      const add = await run([
+        'project',
+        'members',
+        'add',
+        '@admin',
+        '--role',
+        'viewer',
+        '-P',
+        'CLIB',
+      ]);
+      expect(add.code, `${actor} adding`).toBe(5);
+      expect(add.stderr).toMatch(/Only project managers can do this/);
+      expect(add.stdout).toBe('');
+      const json = await run([
+        'project',
+        'members',
+        'add',
+        '@admin',
+        '--role',
+        'viewer',
+        '-P',
+        'CLIB',
+        '--json',
+      ]);
+      expect(json.code).toBe(5);
+      expect(JSON.parse(json.stderr)).toMatchObject({ code: 'FORBIDDEN' });
+      expect(
+        (await run(['project', 'members', 'set', '@bot', '--role', 'manager', '-P', 'CLIB'])).code,
+      ).toBe(5);
+      expect((await run(['project', 'members', 'remove', '@member', '-P', 'CLIB'])).code).toBe(5);
+      expect((await run(['project', 'repo', 'add', 'acme/guarded', '-P', 'CLIB'])).code).toBe(5);
+      // Readers can still look.
+      expect((await run(['project', 'members', 'list', '-P', 'CLIB', '-q'])).stdout).toBe(
+        'bot\nmember\n',
+      );
+    }
+
+    // A project the actor cannot read is not found (3), not forbidden (5).
+    const hidden = await asActor('member')([
+      'project',
+      'members',
+      'add',
+      '@bot',
+      '--role',
+      'viewer',
+      '-P',
+      'CLIH',
+    ]);
+    expect(hidden.code).toBe(3);
+
+    // Nothing changed.
+    const members = await cli(['project', 'members', 'list', '-P', 'CLIB', '-q']);
+    expect(members.stdout).toBe('bot\nmember\n');
+    expect((await cli(['project', 'repo', 'list', '-P', 'CLIB', '--json'])).json().data).toEqual(
+      [],
+    );
+  });
+});
+
 describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transports)', () => {
   it('runs in-process against a local SQLite file', async () => {
     const db = join(dir, 'local.db');
@@ -568,11 +641,12 @@ describe.runIf(testDialect() === 'sqlite')('local and remote modes (real transpo
     expect((await local(['project', 'repo', 'add', 'acme/app', '-P', 'ENG', '-q'])).code).toBe(0);
     // The seeded ENG project is already public (and has the demo repo), so flip it to private.
     const project = await local(['project', 'edit', 'ENG', '--visibility', 'private', '--json']);
-    expect(project.json()).toMatchObject({
-      visibility: 'private',
-      repos: expect.arrayContaining([expect.objectContaining({ fullName: 'acme/app' })]),
-      myAccess: 'manage',
-    });
+    expect(project.json()).toMatchObject({ visibility: 'private', myAccess: 'manage' });
+    // Exactly the seeded demo repo and the one added above (listed by owner, then name).
+    expect(project.json().repos.map((r: { fullName: string }) => r.fullName)).toEqual([
+      'acme/app',
+      'poietic-tech/poietic-issues',
+    ]);
     expect((await local(['project', 'members', 'list', '-P', 'ENG', '-q'])).stdout).toContain(
       'zed',
     );

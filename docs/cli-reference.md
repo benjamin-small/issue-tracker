@@ -55,7 +55,7 @@ Aliases: `ls`
 | `--limit <n>` | page size (1-200) |
 | `--cursor <cursor>` | continue from a previous page |
 | `--all` | fetch every page |
-| `--include-deleted` | include issues in the trash |
+| `--include-deleted` | include issues in the trash (only in projects you can write in; ignored elsewhere) |
 | `--all-projects` | search across all projects |
 
 ### `tracker issue view <issue>`
@@ -85,7 +85,7 @@ Aliases: `new`
 | `--parent <issue>` | parent issue key, or none |
 | `-e, --estimate <points>` | estimate, or none |
 | `--due <date>` | due date YYYY-MM-DD, or none |
-| `--repo <owner/name>` | one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it |
+| `--repo <owner/name>` | one of the project's linked GitHub repos (owner/name, URL or id); none, null or '' clears it |
 | `--set <field=value>` | custom field (repeatable), e.g. --set severity=high --set points=3 |
 | `--meta <key=value>` | metadata entry (repeatable; merged) |
 | `--input <json|@file|->` | full JSON payload (CreateIssueInput / UpdateIssueInput); flags override it |
@@ -112,7 +112,7 @@ Aliases: `update`
 | `--parent <issue>` | parent issue key, or none |
 | `-e, --estimate <points>` | estimate, or none |
 | `--due <date>` | due date YYYY-MM-DD, or none |
-| `--repo <owner/name>` | one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it |
+| `--repo <owner/name>` | one of the project's linked GitHub repos (owner/name, URL or id); none, null or '' clears it |
 | `--set <field=value>` | custom field (repeatable), e.g. --set severity=high --set points=3 |
 | `--meta <key=value>` | metadata entry (repeatable; merged) |
 | `--input <json|@file|->` | full JSON payload (CreateIssueInput / UpdateIssueInput); flags override it |

@@ -7,7 +7,7 @@ This file is for AI coding agents (and humans) working **on this repository**. F
 ```sh
 pnpm install          # install (pnpm 10; native deps are allowlisted in pnpm-workspace.yaml)
 pnpm check            # typecheck + lint + format:check + test — must pass before every commit
-pnpm test             # Vitest, all packages, SQLite
+pnpm test             # Vitest, all projects (packages, server, CLI, web, deploy), SQLite
 pnpm test:pg          # same suites against Postgres (run `pnpm pg start` first)
 pnpm format           # apply Prettier
 pnpm pg start|stop|reset|status|url   # throwaway local Postgres (local binaries, else Docker)
@@ -39,6 +39,6 @@ Run a single package's tests with `pnpm vitest run --project <name>`, for exampl
 
 - TypeScript strict, ESM only. Relative imports use explicit `.ts` extensions.
 - Internal packages export `src/*.ts` directly. There is no build step inside the monorepo.
-- Tests sit next to the code as `*.test.ts`. Tests that touch the database must pass under both `TEST_DB=sqlite` and `TEST_DB=postgres`.
+- Tests sit next to the code as `*.test.ts`. The web app has its own Vitest project (`apps/web`, `src/**/*.test.ts`) for plain modules under `src/lib`, such as `safe-next.ts`; `pnpm test` and `pnpm check` run it. Components are covered by `pnpm e2e`. Tests that touch the database must pass under both `TEST_DB=sqlite` and `TEST_DB=postgres`.
 - Ids are TypeID-style with fixed prefixes (`packages/schema/src/ids.ts`). Never change an existing prefix.
 - Keep commits scoped to one concern, and make sure `pnpm check` passes before each one.

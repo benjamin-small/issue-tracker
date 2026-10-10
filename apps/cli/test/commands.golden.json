@@ -109,7 +109,7 @@
         {
           "flags": "--include-deleted",
           "name": "includeDeleted",
-          "description": "include issues in the trash",
+          "description": "include issues in the trash (only in projects you can write in; ignored elsewhere)",
           "required": false,
           "takesValue": false
         },
@@ -212,7 +212,7 @@
         {
           "flags": "--repo <owner/name>",
           "name": "repo",
-          "description": "one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it",
+          "description": "one of the project's linked GitHub repos (owner/name, URL or id); none, null or '' clears it",
           "required": false,
           "takesValue": true
         },
@@ -327,7 +327,7 @@
         {
           "flags": "--repo <owner/name>",
           "name": "repo",
-          "description": "one of the project's linked GitHub repos (owner/name, URL or id); none or '' clears it",
+          "description": "one of the project's linked GitHub repos (owner/name, URL or id); none, null or '' clears it",
           "required": false,
           "takesValue": true
         },

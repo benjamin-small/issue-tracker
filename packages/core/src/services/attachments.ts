@@ -4,8 +4,8 @@ import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, DomainError, forbidden, notFound } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { toUserSummary } from '../mappers.ts';
-import { atLeast, projectLevel } from '../access.ts';
-import { getIssueRow, requireProjectId } from '../refs.ts';
+import { atLeast, requireLevel } from '../access.ts';
+import { getIssueAccess, getIssueRow, requireProjectAccess } from '../refs.ts';
 import { type BlobStore, newBlobKey, sha256Hex } from '../storage/blob-store.ts';
 import { sanitizeFilename, sniffContentType } from '../storage/content-type.ts';
 
@@ -73,12 +73,13 @@ async function issueRef(db: Tx, issueId: string) {
   const r = await db
     .selectFrom('issues as i')
     .innerJoin('projects as p', 'p.id', 'i.project_id')
-    .select(['i.id', 'i.number', 'i.title', 'i.project_id', 'p.key'])
+    .select(['i.id', 'i.number', 'i.title', 'i.project_id', 'i.deleted_at', 'p.key'])
     .where('i.id', '=', issueId)
     .executeTakeFirstOrThrow();
   return {
     ref: { id: r.id, key: formatIssueKey(r.key, r.number), title: r.title },
     projectId: r.project_id,
+    issueDeleted: r.deleted_at !== null,
   };
 }
 
@@ -155,32 +156,54 @@ export async function uploadAttachment(
   }
 }
 
+/**
+ * Attachments of an issue, oldest first. Attachments of a deleted comment (like those of a trashed issue) are
+ * deleted content: only actors with `write` on the project see them.
+ */
 export async function listAttachments(
   ctx: ServiceContext,
   issueRefOrId: string,
 ): Promise<Attachment[]> {
-  const issue = await getIssueRow(ctx, ctx.db.kysely, issueRefOrId, 'read');
-  const rows = await ctx.db.kysely
+  const { row: issue, level } = await getIssueAccess(ctx, ctx.db.kysely, issueRefOrId, 'read');
+  let q = ctx.db.kysely
     .selectFrom('attachments as a')
     .innerJoin('users as u', 'u.id', 'a.uploader_id')
+    .leftJoin('comments as c', 'c.id', 'a.comment_id')
     .selectAll('a')
     .select(['u.handle', 'u.name', 'u.kind', 'u.avatar_url'])
     .where('a.issue_id', '=', issue.id)
     .where('a.deleted_at', 'is', null)
-    .orderBy('a.created_at')
-    .execute();
-  return rows.map((r) => publicView(toAttachment(r)));
+    .orderBy('a.created_at');
+  // No comment, or a comment that isn't deleted (the left join yields null for both).
+  if (!atLeast(level, 'write')) q = q.where('c.deleted_at', 'is', null);
+  return (await q.execute()).map((r) => publicView(toAttachment(r)));
 }
 
 export async function getAttachment(
   ctx: ServiceContext,
   id: string,
 ): Promise<Attachment & { storageKey: string }> {
-  const attachment = await loadAttachment(ctx.db.kysely, id);
+  const db = ctx.db.kysely;
+  const attachment = await loadAttachment(db, id);
   if (!attachment || attachment.deletedAt) throw notFound('Attachment', id);
-  const { projectId } = await issueRef(ctx.db.kysely, attachment.issueId);
-  await requireProjectId(ctx, ctx.db.kysely, projectId, 'read', 'Attachment', id);
+  const { projectId, issueDeleted } = await issueRef(db, attachment.issueId);
+  const { level } = await requireProjectAccess(ctx, db, projectId, 'read', 'Attachment', id);
+  if (
+    !atLeast(level, 'write') &&
+    (issueDeleted || (await commentDeleted(db, attachment.commentId)))
+  )
+    throw notFound('Attachment', id);
   return attachment;
+}
+
+async function commentDeleted(db: Tx, commentId: string | null): Promise<boolean> {
+  if (!commentId) return false;
+  const row = await db
+    .selectFrom('comments')
+    .select('deleted_at')
+    .where('id', '=', commentId)
+    .executeTakeFirst();
+  return row?.deleted_at != null;
 }
 
 /** Deletes an attachment (uploader or admin). The row is kept for history; the bytes are removed. */
@@ -192,12 +215,17 @@ export async function deleteAttachment(
   const deleted = await withWriteTx(ctx.db, async (tx) => {
     const attachment = await loadAttachment(tx, id);
     if (!attachment || attachment.deletedAt) throw notFound('Attachment', id);
-    const { ref, projectId } = await issueRef(tx, attachment.issueId);
-    const project = await requireProjectId(ctx, tx, projectId, 'write', 'Attachment', id);
+    const { ref, projectId, issueDeleted } = await issueRef(tx, attachment.issueId);
+    const { level } = await requireProjectAccess(ctx, tx, projectId, 'read', 'Attachment', id);
+    // Below write, an attachment of a trashed issue or a deleted comment does not exist (as in getAttachment),
+    // so trying to delete it is NOT_FOUND rather than FORBIDDEN or UNAUTHENTICATED.
     if (
-      attachment.uploader.id !== ctx.actor.id &&
-      !atLeast(await projectLevel(ctx, tx, project), 'manage')
+      !atLeast(level, 'write') &&
+      (issueDeleted || (await commentDeleted(tx, attachment.commentId)))
     )
+      throw notFound('Attachment', id);
+    requireLevel(ctx, level, 'write', 'Attachment', id);
+    if (attachment.uploader.id !== ctx.actor.id && !atLeast(level, 'manage'))
       throw forbidden('You can only delete your own attachments');
     const now = nowIso(ctx);
     await tx.updateTable('attachments').set({ deleted_at: now }).where('id', '=', id).execute();

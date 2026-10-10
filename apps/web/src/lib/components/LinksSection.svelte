@@ -5,7 +5,8 @@
   import Link2 from '@lucide/svelte/icons/link-2';
   import X from '@lucide/svelte/icons/x';
   import { api, call, errorMessage, type Issue } from '../api.ts';
-  import { fetchers, keys } from '../queries.ts';
+  import { projectKeyOf } from '../issues.ts';
+  import { canWrite as writes, fetchers, keys } from '../queries.ts';
   import { toast } from '../toast.svelte.ts';
   import StatusIcon from './StatusIcon.svelte';
 
@@ -19,6 +20,13 @@
     queryKey: keys.links(issue.key),
     queryFn: () => fetchers.links(issue.key),
   }));
+  const projects = createQuery(() => ({ queryKey: keys.projects, queryFn: fetchers.projects }));
+  /**
+   * Removing a link needs write on either end (the core rule). The other end's level comes from the projects list,
+   * by its key prefix; unknown means no button. Cosmetic: the server decides.
+   */
+  const canRemove = (otherKey: string) =>
+    canWrite || writes(projects.data?.find((p) => p.key === projectKeyOf(otherKey))?.myAccess);
 
   const RELATIONS = [
     { value: 'blocks', label: 'blocks', type: 'blocks', direction: 'outward' },
@@ -123,7 +131,7 @@
             <span class="font-mono text-xs text-fg-subtle">{l.issue.key}</span>
             <span class="truncate">{l.issue.title}</span>
           </button>
-          {#if canWrite}
+          {#if canRemove(l.issue.key)}
             <button
               class="rounded p-0.5 text-fg-subtle opacity-0 group-hover:opacity-100 hover:text-danger focus:opacity-100"
               aria-label="Remove link"

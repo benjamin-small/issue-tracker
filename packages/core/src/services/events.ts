@@ -1,8 +1,9 @@
 import { fromJson, sql, type Tx } from '@poietic-tech/issues-db';
 import type { EventType, Page, TrackerEvent } from '@poietic-tech/issues-schema';
-import { readableProjectIds } from '../access.ts';
+import { readableProjectIds, writableProjectIds } from '../access.ts';
 import { isAnonymous, type ServiceContext } from '../context.ts';
 import { validationError } from '../errors.ts';
+import { isAdmin } from '../permissions.ts';
 
 export interface ListEventsInput {
   /** Only events with `seq` greater than this (exclusive cursor). */
@@ -61,8 +62,7 @@ export function redactEventForViewer(
   ctx: Pick<ServiceContext, 'actor'>,
   event: TrackerEvent,
 ): TrackerEvent {
-  if (!event.type.startsWith('user.') || ctx.actor.role === 'admin' || ctx.actor.kind === 'system')
-    return event;
+  if (!event.type.startsWith('user.') || isAdmin(ctx)) return event;
   const user = event.data.user as { id?: string } | undefined;
   if (!user || user.id === ctx.actor.id) return event;
   const { email: _hidden, ...changes } = (event.data.changes ?? {}) as Record<string, unknown>;
@@ -76,6 +76,21 @@ export function redactEventForViewer(
   };
 }
 
+/**
+ * Redacts events for the viewer (`redactEventForViewer`) and drops a `user.updated` whose only change was the
+ * email they cannot see: it would reach them as `changes: {}`.
+ */
+function forViewer(ctx: Pick<ServiceContext, 'actor'>, events: TrackerEvent[]): TrackerEvent[] {
+  return events.flatMap((e) => {
+    const r = redactEventForViewer(ctx, e);
+    const emptied =
+      r.type === 'user.updated' &&
+      Object.keys((r.data.changes ?? {}) as object).length === 0 &&
+      Object.keys((e.data.changes ?? {}) as object).length > 0;
+    return emptied ? [] : [r];
+  });
+}
+
 /** Ids of the two issues a `link.*` event connects. */
 function linkEnds(event: TrackerEvent): string[] {
   const link = event.data.link as
@@ -83,48 +98,184 @@ function linkEnds(event: TrackerEvent): string[] {
   return [link?.source?.id, link?.target?.id].filter((id): id is string => typeof id === 'string');
 }
 
+type Access = 'all' | string[];
+type IssueRef = { id?: string } | null | undefined;
+
+/** Ids an event's content depends on, looked up in one batch per table by `applyContentRules`. */
+function contentRefs(e: TrackerEvent, restricted: boolean) {
+  const issues: string[] = [];
+  const comments: string[] = [];
+  const attachments: string[] = [];
+  if (e.type.startsWith('link.')) issues.push(...linkEnds(e));
+  if (restricted) {
+    if (e.issueId) issues.push(e.issueId);
+    if (e.type.startsWith('issue.')) {
+      const parent = (e.data.issue as { parentId?: string | null } | undefined)?.parentId;
+      if (parent) issues.push(parent);
+      const change = (e.data.changes as { parent?: { from: IssueRef; to: IssueRef } } | undefined)
+        ?.parent;
+      for (const ref of [change?.from, change?.to]) if (ref?.id) issues.push(ref.id);
+    }
+    const comment = (e.data.comment as IssueRef)?.id;
+    if (e.type.startsWith('comment.') && comment) comments.push(comment);
+    const attachment = (e.data.attachment as IssueRef)?.id;
+    if (e.type.startsWith('attachment.') && attachment) attachments.push(attachment);
+  }
+  return { issues, comments, attachments };
+}
+
 /**
- * Link events name both issues, so they are hidden when either end is in a project the actor cannot read.
- * A link event whose two ends cannot both be resolved is hidden too (fails closed on malformed data).
+ * The per-viewer rules that depend on the current state of issues, comments and attachments, applied to a batch
+ * of already project-filtered events with one lookup per table (shared by `listEvents` and the live stream, so
+ * replay and live agree):
+ *
+ * - Link events name both issues, so they need both ends readable; a link event whose two ends cannot both be
+ *   resolved is hidden (fails closed on malformed data or permanently deleted ends).
+ * - Deleted content needs `write` on its project (ADR 0021 follow-up). Below that: events of a trashed (or
+ *   permanently deleted) issue are dropped, and so are link events with a trashed end; comment events of a
+ *   deleted comment keep their place in the activity but lose the body; attachment events of a deleted attachment,
+ *   or of one on a deleted comment, are dropped (their filename, size and hash identify the file, and there is
+ *   nothing left to show); a trashed parent is cut from issue snapshots, and a `changes.parent` that names a
+ *   trashed issue is left out of `changes`.
  */
-async function dropUnreadableLinks(
+function withoutKey<T extends Record<string, unknown>>(record: T, key: string): T {
+  const { [key]: _dropped, ...rest } = record;
+  return rest as T;
+}
+
+async function applyContentRules(
   db: Tx,
   events: TrackerEvent[],
-  readable: string[],
+  readable: Access,
+  writable: Access,
 ): Promise<TrackerEvent[]> {
-  const linkEvents = events.filter((e) => e.type.startsWith('link.'));
-  if (linkEvents.length === 0) return events;
-  const ids = [...new Set(linkEvents.flatMap(linkEnds))];
-  const rows = ids.length
-    ? await db.selectFrom('issues').select(['id', 'project_id']).where('id', 'in', ids).execute()
-    : [];
-  const ok = new Set(rows.filter((r) => readable.includes(r.project_id)).map((r) => r.id));
-  return events.filter((e) => {
-    if (!e.type.startsWith('link.')) return true;
-    const ends = linkEnds(e);
-    return ends.length === 2 && ends.every((id) => ok.has(id));
+  if (readable === 'all' && writable === 'all') return events;
+  const canRead = (projectId: string) => readable === 'all' || readable.includes(projectId);
+  const canWrite = (projectId: string | null) =>
+    writable === 'all' || (projectId !== null && writable.includes(projectId));
+  const refs = events.map((e) => contentRefs(e, !canWrite(e.projectId)));
+  const unique = (pick: (r: (typeof refs)[number]) => string[]) => [...new Set(refs.flatMap(pick))];
+  const issueIds = unique((r) => r.issues);
+  const commentIds = unique((r) => r.comments);
+  const attachmentIds = unique((r) => r.attachments);
+  const issues = new Map(
+    (issueIds.length
+      ? await db
+          .selectFrom('issues')
+          .select(['id', 'project_id', 'deleted_at'])
+          .where('id', 'in', issueIds)
+          .execute()
+      : []
+    ).map((r) => [r.id, r]),
+  );
+  const comments = new Map(
+    (commentIds.length
+      ? await db
+          .selectFrom('comments')
+          .select(['id', 'deleted_at'])
+          .where('id', 'in', commentIds)
+          .execute()
+      : []
+    ).map((r) => [r.id, r.deleted_at]),
+  );
+  const liveAttachments = new Set(
+    (attachmentIds.length
+      ? await db
+          .selectFrom('attachments as a')
+          .leftJoin('comments as c', 'c.id', 'a.comment_id')
+          .select('a.id')
+          .where('a.id', 'in', attachmentIds)
+          .where('a.deleted_at', 'is', null)
+          .where('c.deleted_at', 'is', null)
+          .execute()
+      : []
+    ).map((r) => r.id),
+  );
+  /** A live issue, or a trashed one the viewer can write in. Missing (permanently deleted) is never visible. */
+  const visibleIssue = (id: string) => {
+    const row = issues.get(id);
+    return row !== undefined && (row.deleted_at === null || canWrite(row.project_id));
+  };
+  const hiddenParent = (ref: IssueRef) => (ref?.id && !visibleIssue(ref.id) ? null : ref);
+
+  return events.flatMap((e): TrackerEvent[] => {
+    if (e.type.startsWith('link.')) {
+      const ends = linkEnds(e);
+      const ok = (id: string) => {
+        const row = issues.get(id);
+        return row !== undefined && canRead(row.project_id) && visibleIssue(id);
+      };
+      if (ends.length !== 2 || !ends.every(ok)) return [];
+    }
+    if (canWrite(e.projectId)) return [e];
+    if (e.issueId && !visibleIssue(e.issueId)) return [];
+    if (e.type.startsWith('attachment.')) {
+      const id = (e.data.attachment as IssueRef)?.id;
+      return id && liveAttachments.has(id) ? [e] : [];
+    }
+    if (e.type.startsWith('comment.')) {
+      const comment = e.data.comment as { id?: string; deletedAt?: string | null } | undefined;
+      if (!comment?.id) return [e];
+      const deletedAt = comments.get(comment.id);
+      if (deletedAt === null) return [e]; // the comment is live
+      return [
+        {
+          ...e,
+          data: {
+            ...e.data,
+            comment: { ...comment, body: '', deletedAt: deletedAt ?? comment.deletedAt ?? null },
+          },
+        },
+      ];
+    }
+    if (e.type.startsWith('issue.')) {
+      const issue = e.data.issue as { parentId?: string | null; parent?: IssueRef } | undefined;
+      const changes = e.data.changes as Record<string, { from: unknown; to: unknown }> | undefined;
+      const cutParent = !!issue?.parentId && !visibleIssue(issue.parentId);
+      const change = changes?.parent as { from: IssueRef; to: IssueRef } | undefined;
+      const cutChange =
+        !!change &&
+        (hiddenParent(change.from) !== change.from || hiddenParent(change.to) !== change.to);
+      if (!cutParent && !cutChange) return [e];
+      return [
+        {
+          ...e,
+          data: {
+            ...e.data,
+            ...(cutParent && { issue: { ...issue, parentId: null, parent: null } }),
+            // A parent change naming a trashed issue is left out: with that end cut it would read as a change
+            // that never happened (e.g. "removed the parent"). The other changes stay.
+            ...(cutChange && { changes: withoutKey(changes!, 'parent') }),
+          },
+        },
+      ];
+    }
+    return [e];
   });
 }
 
 /**
  * Applies `listEvents`' per-viewer rules to events read some other way (the live stream reads every event as
  * the system actor and fans it out): only readable projects, project-less (`user.*`) events only for signed-in
- * viewers, link events only when both issues are readable, and user events redacted. Pass `readable` to reuse
- * a `readableProjectIds` result.
+ * viewers, link events only when both issues are readable, user events redacted, and deleted content only for
+ * writers (`applyContentRules`). Pass `readable` and `writable` to reuse `readableProjectIds` and
+ * `writableProjectIds` results.
  */
 export async function filterEventsForViewer(
   ctx: ServiceContext,
   events: TrackerEvent[],
-  readable?: 'all' | string[],
+  readable?: Access,
+  writable?: Access,
 ): Promise<TrackerEvent[]> {
   const access = readable ?? (await readableProjectIds(ctx, ctx.db.kysely));
-  const redacted = (list: TrackerEvent[]) => list.map((e) => redactEventForViewer(ctx, e));
-  if (access === 'all') return redacted(events);
+  const redacted = forViewer(ctx, events);
+  if (access === 'all') return redacted;
   const signedIn = !isAnonymous(ctx);
-  const visible = events.filter((e) =>
+  const visible = redacted.filter((e) =>
     e.projectId === null ? signedIn : access.includes(e.projectId),
   );
-  return dropUnreadableLinks(ctx.db.kysely, redacted(visible), access);
+  const canWrite = writable ?? (await writableProjectIds(ctx, ctx.db.kysely));
+  return applyContentRules(ctx.db.kysely, visible, access, canWrite);
 }
 
 /** Loads events by seq (in seq order); missing seqs are skipped. */
@@ -177,9 +328,17 @@ export async function listEvents(
   }
   const rows = await q.execute();
   const page = rows.slice(0, limit);
-  const events = page.map((r) => redactEventForViewer(ctx, toTrackerEvent(r)));
+  const events = forViewer(ctx, page.map(toTrackerEvent));
   return {
-    data: readable === 'all' ? events : await dropUnreadableLinks(ctx.db.kysely, events, readable),
+    data:
+      readable === 'all'
+        ? events
+        : await applyContentRules(
+            ctx.db.kysely,
+            events,
+            readable,
+            await writableProjectIds(ctx, ctx.db.kysely),
+          ),
     nextCursor: rows.length > limit ? String(page.at(-1)!.seq) : null,
   };
 }

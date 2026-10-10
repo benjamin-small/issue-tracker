@@ -38,16 +38,16 @@ Lists return `{ "data": [...], "nextCursor": "…" | null }`. Pass `cursor=<next
 
 `GET /projects/{project}/issues` takes filters as query parameters:
 
-| Form                  | Meaning                                    | Example                                                         |
-| --------------------- | ------------------------------------------ | --------------------------------------------------------------- |
-| `field=a,b`           | any of (`eq` for one value)                | `status=Todo,In Progress`, `assignee=me,none`                   |
-| `field.op=value`      | explicit operator                          | `priority.gte=2`, `dueDate.isNull=true`, `title.contains=crash` |
-| `label=…`             | has any of these labels                    | `label=bug`                                                     |
-| `cf.<key>=…`          | custom field                               | `cf.severity=high`, `cf.points.gte=3`                           |
-| `q=…`                 | text in key, title, description            | `q=login`                                                       |
-| `filter=<json>`       | a full `IssueFilter`, ANDed with the rest  |                                                                 |
-| `sort=`               | comma-separated fields, `-` for descending | `sort=-priority,updatedAt`                                      |
-| `includeDeleted=true` | include trashed issues                     |                                                                 |
+| Form                  | Meaning                                                                    | Example                                                         |
+| --------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `field=a,b`           | any of (`eq` for one value)                                                | `status=Todo,In Progress`, `assignee=me,none`                   |
+| `field.op=value`      | explicit operator                                                          | `priority.gte=2`, `dueDate.isNull=true`, `title.contains=crash` |
+| `label=…`             | has any of these labels                                                    | `label=bug`                                                     |
+| `cf.<key>=…`          | custom field                                                               | `cf.severity=high`, `cf.points.gte=3`                           |
+| `q=…`                 | text in key, title, description                                            | `q=login`                                                       |
+| `filter=<json>`       | a full `IssueFilter`, ANDed with the rest                                  |                                                                 |
+| `sort=`               | comma-separated fields, `-` for descending                                 | `sort=-priority,updatedAt`                                      |
+| `includeDeleted=true` | include trashed issues, in projects where you can write; ignored elsewhere |                                                                 |
 
 - **Operators:** `eq neq in nin gt gte lt lte isNull contains`. `none` / `null` in a list means "empty".
 - **Structured search:** `POST /issues/search` takes `{ project?, filter, sort, limit, cursor }`. Omit `project` to search every project.

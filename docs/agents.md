@@ -17,6 +17,8 @@ export POIETIC_ISSUES_DATABASE_URL=sqlite:/path/to/tracker.db POIETIC_ISSUES_ACT
 
 Give every agent its own user (`poietic-issues user create --kind agent …`), so history shows who did what. Give every agent user a role on each private project it works in: `poietic-issues project members add @agent --role editor -P <KEY>`. Without a membership, a private project returns exit code 3 (not found), and a public one is read-only. A user created after the upgrade has no memberships, and admins always have full access. See [ADR 0021](adr/0021-project-visibility-and-roles.md).
 
+In remote mode without a token (`POIETIC_ISSUES_TOKEN` unset and none stored by `auth login`), the CLI reads as anonymous: public projects can be read, private projects return exit code 3 (not found), writes fail with exit code 5 (`UNAUTHENTICATED`), and `poietic-issues auth status` reports "Not signed in". A missing token therefore looks like missing access, so check `auth status` first. A token that is invalid, expired or revoked is rejected outright instead (401).
+
 Committing a `.poietic-issues.json` (`poietic-issues init --project ENG --server …`) in a repository lets any agent working there find the right project.
 
 ### issues.poietic.tech identities

@@ -265,6 +265,33 @@ describe(`database layer (${dialect})`, () => {
       .execute();
     expect(rows.map((r) => r.number)).toEqual([300]);
   });
+
+  it('keeps repo links unique per project, ignoring case in owner and name', async () => {
+    await seedBasics(db, 'REPO');
+    await seedBasics(db, 'REPX');
+    const link = (id: string, project: string, owner: string, name: string) =>
+      withWriteTx(db, (tx) =>
+        tx
+          .insertInto('project_repos')
+          .values({ id, project_id: `prj_${project}`, owner, name, created_at: NOW })
+          .execute(),
+      );
+    await link('rpo_1', 'REPO', 'Acme', 'App');
+    for (const [id, owner, name] of [
+      ['rpo_2', 'Acme', 'App'],
+      ['rpo_3', 'acme', 'app'],
+      ['rpo_4', 'ACME', 'aPP'],
+      ['rpo_5', 'acme', 'App'],
+      ['rpo_6', 'Acme', 'APP'],
+    ] as const)
+      await expect(link(id, 'REPO', owner, name), `${owner}/${name}`).rejects.toThrow(
+        /project_repos_unique/,
+      );
+    // Different names, or the same name in another project, are fine.
+    await link('rpo_7', 'REPO', 'Acme', 'Other');
+    await link('rpo_8', 'REPO', 'Other', 'App');
+    await link('rpo_9', 'REPX', 'acme', 'app');
+  });
 });
 
 describe(`migrations (${dialect})`, () => {
@@ -334,6 +361,31 @@ describe(`migrations (${dialect})`, () => {
         db.kysely,
       );
       expect(vis.rows).toEqual([{ visibility: 'private' }]);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  it('0004 does not make the system user a member of existing projects', async () => {
+    const db = await createTestDb();
+    try {
+      await migrateDown(db); // back to 0003
+      const ts = '2026-01-01T00:00:00.000Z';
+      // Even a system user whose role is `member` (the built-in one is an admin) must be skipped.
+      for (const [id, handle, role, kind] of [
+        ['usr_sys', 'sys', 'member', 'system'],
+        ['usr_human', 'human', 'member', 'human'],
+      ] as const)
+        await sql`insert into users (id, handle, name, email, kind, role, avatar_url, created_at, updated_at, deactivated_at)
+          values (${id}, ${handle}, ${handle}, null, ${kind}, ${role}, null, ${ts}, ${ts}, null)`.execute(
+          db.kysely,
+        );
+      await sql`insert into projects (id, key, name, description, next_issue_number, created_at, updated_at, archived_at)
+              values ('prj_1', 'ENG', 'Eng', '', 1, ${ts}, ${ts}, null)`.execute(db.kysely);
+      await migrateToLatest(db);
+      const rows = await sql<{ user_id: string }>`
+        select user_id from project_members order by user_id`.execute(db.kysely);
+      expect(rows.rows).toEqual([{ user_id: 'usr_human' }]);
     } finally {
       await db.destroy();
     }
