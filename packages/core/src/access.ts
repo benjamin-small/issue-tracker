@@ -91,24 +91,24 @@ export function requireLevel(
 /** Ids of projects the actor can read, or `'all'` for admins and the system actor. */
 export async function readableProjectIds(ctx: ServiceContext, db: Exec): Promise<'all' | string[]> {
   if (unrestricted(ctx)) return 'all';
-  let q = db.selectFrom('projects').select('id').where('visibility', '=', 'public');
-  if (ctx.actor.kind !== 'anonymous') {
-    const actorId = ctx.actor.id;
-    q = db
-      .selectFrom('projects')
-      .select('id')
-      .where((eb) =>
-        eb.or([
-          eb('visibility', '=', 'public'),
-          eb(
-            'id',
-            'in',
-            eb.selectFrom('project_members').select('project_id').where('user_id', '=', actorId),
-          ),
-        ]),
-      );
-  }
-  return (await q.execute()).map((r) => r.id);
+  const actor = ctx.actor;
+  const rows = await db
+    .selectFrom('projects')
+    .select('id')
+    .where((eb) =>
+      actor.kind === 'anonymous'
+        ? eb('visibility', '=', 'public')
+        : eb.or([
+            eb('visibility', '=', 'public'),
+            eb(
+              'id',
+              'in',
+              eb.selectFrom('project_members').select('project_id').where('user_id', '=', actor.id),
+            ),
+          ]),
+    )
+    .execute();
+  return rows.map((r) => r.id);
 }
 
 /**
@@ -129,7 +129,7 @@ export async function writableProjectIds(ctx: ServiceContext, db: Exec): Promise
 
 /**
  * Adds "the project id in `column` is readable" to a query (e.g. `'i.project_id'`). Admins and the system
- * actor are unrestricted; an actor who can read nothing gets no rows. Pass `readable` to reuse a
+ * actor are unrestricted; an actor who can read nothing gets no rows. Pass `known` to reuse a
  * `readableProjectIds` result.
  */
 export async function whereReadable<QB extends { where(expr: RawBuilder<boolean>): QB }>(

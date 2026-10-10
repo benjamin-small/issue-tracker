@@ -3,6 +3,7 @@ import type { EventType, Page, TrackerEvent } from '@poietic-tech/issues-schema'
 import { readableProjectIds } from '../access.ts';
 import { isAnonymous, type ServiceContext } from '../context.ts';
 import { validationError } from '../errors.ts';
+import { isAdmin } from '../permissions.ts';
 
 export interface ListEventsInput {
   /** Only events with `seq` greater than this (exclusive cursor). */
@@ -61,8 +62,7 @@ export function redactEventForViewer(
   ctx: Pick<ServiceContext, 'actor'>,
   event: TrackerEvent,
 ): TrackerEvent {
-  if (!event.type.startsWith('user.') || ctx.actor.role === 'admin' || ctx.actor.kind === 'system')
-    return event;
+  if (!event.type.startsWith('user.') || isAdmin(ctx)) return event;
   const user = event.data.user as { id?: string } | undefined;
   if (!user || user.id === ctx.actor.id) return event;
   const { email: _hidden, ...changes } = (event.data.changes ?? {}) as Record<string, unknown>;
@@ -74,6 +74,21 @@ export function redactEventForViewer(
       ...(event.data.changes !== undefined && { changes }),
     },
   };
+}
+
+/**
+ * Redacts events for the viewer (`redactEventForViewer`) and drops a `user.updated` whose only change was the
+ * email they cannot see: it would reach them as `changes: {}`.
+ */
+function forViewer(ctx: Pick<ServiceContext, 'actor'>, events: TrackerEvent[]): TrackerEvent[] {
+  return events.flatMap((e) => {
+    const r = redactEventForViewer(ctx, e);
+    const emptied =
+      r.type === 'user.updated' &&
+      Object.keys((r.data.changes ?? {}) as object).length === 0 &&
+      Object.keys((e.data.changes ?? {}) as object).length > 0;
+    return emptied ? [] : [r];
+  });
 }
 
 /** Ids of the two issues a `link.*` event connects. */
@@ -118,7 +133,7 @@ export async function filterEventsForViewer(
   readable?: 'all' | string[],
 ): Promise<TrackerEvent[]> {
   const access = readable ?? (await readableProjectIds(ctx, ctx.db.kysely));
-  const redacted = (list: TrackerEvent[]) => list.map((e) => redactEventForViewer(ctx, e));
+  const redacted = (list: TrackerEvent[]) => forViewer(ctx, list);
   if (access === 'all') return redacted(events);
   const signedIn = !isAnonymous(ctx);
   const visible = events.filter((e) =>
@@ -177,7 +192,7 @@ export async function listEvents(
   }
   const rows = await q.execute();
   const page = rows.slice(0, limit);
-  const events = page.map((r) => redactEventForViewer(ctx, toTrackerEvent(r)));
+  const events = forViewer(ctx, page.map(toTrackerEvent));
   return {
     data: readable === 'all' ? events : await dropUnreadableLinks(ctx.db.kysely, events, readable),
     nextCursor: rows.length > limit ? String(page.at(-1)!.seq) : null,

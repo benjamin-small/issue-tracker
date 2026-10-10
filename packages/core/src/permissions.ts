@@ -1,11 +1,23 @@
-import { isAnonymous, type ServiceContext } from './context.ts';
+import { type Actor, isAnonymous, type ServiceContext } from './context.ts';
 import { DomainError, forbidden } from './errors.ts';
 
-export function requireAdmin(ctx: ServiceContext, action = 'do this'): void {
+/** An actor that is not anonymous: a stored user (human, agent) or the system actor. */
+export type KnownActor = Actor & { kind: Exclude<Actor['kind'], 'anonymous'> };
+
+/**
+ * Admin-only actions. Anonymous actors get UNAUTHENTICATED (401), so signing in is the answer; signed-in
+ * non-admins get FORBIDDEN. Narrows `ctx.actor` to a known (non-anonymous) actor.
+ */
+export function requireAdmin(
+  ctx: ServiceContext,
+  action = 'do this',
+): asserts ctx is ServiceContext & { actor: KnownActor } {
+  if (isAnonymous(ctx)) throw new DomainError('UNAUTHENTICATED', `Sign in to ${action}`);
   if (ctx.actor.role !== 'admin') throw forbidden(`Only admins can ${action}`);
 }
 
-export function isAdmin(ctx: ServiceContext): boolean {
+/** Admins and the system actor (whose role is admin). */
+export function isAdmin(ctx: Pick<ServiceContext, 'actor'>): boolean {
   return ctx.actor.role === 'admin';
 }
 

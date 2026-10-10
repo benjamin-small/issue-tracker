@@ -75,7 +75,29 @@ describe(`anonymous HTTP access (${testDialect()})`, () => {
     });
     expect(post.status).toBe(401);
     const admin = await app.request(`${BASE}/api/v1/webhooks`);
-    expect(admin.status).not.toBe(200);
+    expect(admin.status).toBe(401);
+  });
+
+  it('answers 401, not 403, to anonymous reads of admin-only routes, before any lookup', async () => {
+    const created = await asAdmin('/webhooks', {
+      method: 'POST',
+      body: { url: 'https://hooks.example.com/x', events: ['issue.created'] },
+    });
+    expect(created.status).toBe(201);
+    const hook = (await created.json()) as { id: string };
+    for (const path of [
+      '/webhooks',
+      `/webhooks/${hook.id}`,
+      `/webhooks/${hook.id}/deliveries`,
+      '/webhooks/whk_00000000000000000000000000/deliveries',
+      '/webhook-deliveries/whd_00000000000000000000000000',
+    ]) {
+      const res = await app.request(`${BASE}/api/v1${path}`);
+      expect(res.status, path).toBe(401);
+      expect(((await res.json()) as { code: string }).code, path).toBe('UNAUTHENTICATED');
+      // Signed-in non-admins are still forbidden.
+      expect((await as(memberToken, 'GET', path)).status, path).toBe(403);
+    }
   });
 
   it('reports the access level of signed-in callers on project responses', async () => {

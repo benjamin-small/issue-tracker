@@ -713,3 +713,55 @@ describe(`nothing readable (${testDialect()})`, () => {
     expect((await listEvents(anon, { limit: 1000 })).data).toEqual([]);
   });
 });
+
+describe(`admin-only and user events (${testDialect()})`, () => {
+  let t: TestContext;
+  beforeAll(async () => {
+    t = await createTestContext();
+  });
+  afterAll(() => t.destroy());
+
+  it('asks anonymous actors to sign in for admin-only actions, and forbids members', async () => {
+    const { listWebhooks } = await import('./services/webhooks.ts');
+    const { createUser } = await import('./services/users.ts');
+    const anon = withActor(t.ctx, ANONYMOUS_ACTOR);
+    await expect(listWebhooks(anon)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(createProject(anon, { key: 'NOPE', name: 'x' })).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+    });
+    await expect(createUser(anon, { handle: 'nope', name: 'x' })).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+    });
+    await expect(listWebhooks(t.member)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(await listWebhooks(t.ctx)).toEqual([]);
+  });
+
+  it('drops user.updated events that only changed an email the viewer cannot see', async () => {
+    const { createUser, updateUser, toActor } = await import('./services/users.ts');
+    const { filterEventsForViewer, listEvents } = await import('./services/events.ts');
+    const ada = await createUser(t.ctx, { handle: 'ada', name: 'Ada', email: 'ada@x.io' });
+    const asAda = withActor(t.ctx, toActor(ada));
+    await updateUser(t.ctx, 'ada', { email: 'ada@new.io' }); // email only
+    await updateUser(t.ctx, 'ada', { name: 'Ada L', email: 'ada@newer.io' }); // name and email
+    const all = (await listEvents(t.ctx, { types: ['user.updated'], limit: 1000 })).data;
+    expect(all.map((e) => Object.keys(e.data.changes as object).sort())).toEqual([
+      ['email'],
+      ['email', 'name'],
+    ]);
+    // The member sees only the name change, without the email.
+    for (const events of [
+      (await listEvents(t.member, { types: ['user.updated'], limit: 1000 })).data,
+      await filterEventsForViewer(t.member, all),
+    ]) {
+      expect(events.map((e) => e.data.changes)).toEqual([{ name: { from: 'Ada', to: 'Ada L' } }]);
+      expect((events[0]!.data.user as { email: string | null }).email).toBeNull();
+    }
+    // The user themself and admins see both.
+    for (const who of [asAda, t.ctx]) {
+      expect((await listEvents(who, { types: ['user.updated'], limit: 1000 })).data).toHaveLength(
+        2,
+      );
+      expect(await filterEventsForViewer(who, all)).toHaveLength(2);
+    }
+  });
+});
