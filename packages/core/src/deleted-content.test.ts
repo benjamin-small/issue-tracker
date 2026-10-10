@@ -29,6 +29,7 @@ import { createProject } from './services/projects.ts';
 import { createUser, toActor } from './services/users.ts';
 import { LocalDiskBlobStore } from './storage/blob-store.ts';
 import { createTestContext, grant, type TestContext } from './testing.ts';
+import { hideTrashedParents } from './issue-query.ts';
 
 /**
  * Soft-deleted content (trashed issues, deleted comments and what hangs off them) is visible only to actors with
@@ -222,6 +223,17 @@ describe(`deleted content needs write (${testDialect()})`, () => {
       );
       expect(listed!.parent?.key, who.actor.handle).toBe('PUB-2');
     }
+  });
+
+  it('leaves parents alone for unrestricted actors without querying', async () => {
+    const child = await getIssue(t.ctx, 'PUB-3');
+    const noDb = new Proxy({} as never, {
+      get: () => {
+        throw new Error('hideTrashedParents queried the database');
+      },
+    });
+    for (const who of [t.ctx, withActor(t.ctx, SYSTEM_ACTOR)])
+      expect(await hideTrashedParents(who, noDb, [child])).toEqual([child]);
   });
 
   describe('in the event log', () => {

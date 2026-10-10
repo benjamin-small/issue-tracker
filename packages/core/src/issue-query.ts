@@ -19,7 +19,7 @@ import {
   SORTABLE_FIELDS,
   type SortSpec,
 } from '@poietic-tech/issues-schema';
-import { readableProjectIds, whereReadable, writableProjectIds } from './access.ts';
+import { readableProjectIds, unrestricted, whereReadable, writableProjectIds } from './access.ts';
 import type { ServiceContext } from './context.ts';
 import { DomainError, validationError } from './errors.ts';
 import { getIssueRow, parseRepoRef } from './refs.ts';
@@ -186,7 +186,7 @@ export async function hideTrashedParents(
   issues: Issue[],
   writable?: 'all' | string[],
 ): Promise<Issue[]> {
-  if (writable === 'all') return issues;
+  if (writable === 'all' || unrestricted(ctx)) return issues;
   const parentIds = [...new Set(issues.flatMap((i) => (i.parentId ? [i.parentId] : [])))];
   if (!parentIds.length) return issues;
   const trashed = new Set(

@@ -18,7 +18,8 @@ export function atLeast(have: AccessLevel, need: AccessLevel): boolean {
   return ORDER[have] >= ORDER[need];
 }
 
-function unrestricted(ctx: ServiceContext): boolean {
+/** Admins and the system actor: every project at `manage`. */
+export function unrestricted(ctx: ServiceContext): boolean {
   return ctx.actor.role === 'admin' || ctx.actor.kind === 'system';
 }
 
