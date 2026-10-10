@@ -4,7 +4,7 @@ import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, DomainError, forbidden, notFound } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { toUserSummary } from '../mappers.ts';
-import { atLeast } from '../access.ts';
+import { atLeast, requireLevel } from '../access.ts';
 import { getIssueAccess, getIssueRow, requireProjectAccess } from '../refs.ts';
 import { type BlobStore, newBlobKey, sha256Hex } from '../storage/blob-store.ts';
 import { sanitizeFilename, sniffContentType } from '../storage/content-type.ts';
@@ -215,8 +215,16 @@ export async function deleteAttachment(
   const deleted = await withWriteTx(ctx.db, async (tx) => {
     const attachment = await loadAttachment(tx, id);
     if (!attachment || attachment.deletedAt) throw notFound('Attachment', id);
-    const { ref, projectId } = await issueRef(tx, attachment.issueId);
-    const { level } = await requireProjectAccess(ctx, tx, projectId, 'write', 'Attachment', id);
+    const { ref, projectId, issueDeleted } = await issueRef(tx, attachment.issueId);
+    const { level } = await requireProjectAccess(ctx, tx, projectId, 'read', 'Attachment', id);
+    // Below write, an attachment of a trashed issue or a deleted comment does not exist (as in getAttachment),
+    // so trying to delete it is NOT_FOUND rather than FORBIDDEN or UNAUTHENTICATED.
+    if (
+      !atLeast(level, 'write') &&
+      (issueDeleted || (await commentDeleted(tx, attachment.commentId)))
+    )
+      throw notFound('Attachment', id);
+    requireLevel(ctx, level, 'write', 'Attachment', id);
     if (attachment.uploader.id !== ctx.actor.id && !atLeast(level, 'manage'))
       throw forbidden('You can only delete your own attachments');
     const now = nowIso(ctx);

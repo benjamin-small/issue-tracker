@@ -12,7 +12,7 @@ import { nowIso, type ServiceContext } from '../context.ts';
 import { conflict, forbidden, notFound, parseInput } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { toComment, toUserSummary } from '../mappers.ts';
-import { atLeast } from '../access.ts';
+import { atLeast, requireLevel } from '../access.ts';
 import { getIssueAccess, getIssueRow, requireProjectAccess } from '../refs.ts';
 
 async function loadComment(db: Tx, id: string): Promise<Comment | undefined> {
@@ -41,12 +41,13 @@ async function issueRefFor(db: Tx, issueId: string) {
   const row = await db
     .selectFrom('issues as i')
     .innerJoin('projects as p', 'p.id', 'i.project_id')
-    .select(['i.id', 'i.number', 'i.title', 'i.project_id', 'p.key'])
+    .select(['i.id', 'i.number', 'i.title', 'i.project_id', 'i.deleted_at', 'p.key'])
     .where('i.id', '=', issueId)
     .executeTakeFirstOrThrow();
   return {
     ref: { id: row.id, key: formatIssueKey(row.key, row.number), title: row.title },
     projectId: row.project_id,
+    issueDeleted: row.deleted_at !== null,
   };
 }
 
@@ -123,8 +124,12 @@ export async function createComment(
 async function editableComment(tx: Tx, ctx: ServiceContext, id: string) {
   const comment = isIdOf('comment', id) ? await loadComment(tx, id) : undefined;
   if (!comment || comment.deletedAt) throw notFound('Comment', id);
-  const { projectId } = await issueRefFor(tx, comment.issueId);
-  const { level } = await requireProjectAccess(ctx, tx, projectId, 'write', 'Comment', id);
+  const { projectId, issueDeleted } = await issueRefFor(tx, comment.issueId);
+  const { level } = await requireProjectAccess(ctx, tx, projectId, 'read', 'Comment', id);
+  // Below write, a trashed issue's comments do not exist (ADR 0021), so a viewer or anonymous caller trying to
+  // change one gets NOT_FOUND rather than FORBIDDEN or UNAUTHENTICATED.
+  if (issueDeleted && !atLeast(level, 'write')) throw notFound('Comment', id);
+  requireLevel(ctx, level, 'write', 'Comment', id);
   if (comment.authorId !== ctx.actor.id && !atLeast(level, 'manage'))
     throw forbidden('You can only change your own comments');
   return comment;

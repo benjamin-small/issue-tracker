@@ -10,7 +10,7 @@ import {
   listAttachments,
   uploadAttachment,
 } from './services/attachments.ts';
-import { createComment, deleteComment, listComments } from './services/comments.ts';
+import { createComment, deleteComment, listComments, updateComment } from './services/comments.ts';
 import { filterEventsForViewer, listEvents } from './services/events.ts';
 import { createLink, listIssueLinks } from './services/links.ts';
 import {
@@ -45,6 +45,7 @@ describe(`deleted content needs write (${testDialect()})`, () => {
   let deletedCommentId: string;
   let onDeletedComment: string;
   let onTrashedIssue: string;
+  let commentOnTrashed: string;
   let removedAttachment: string;
   const blobDir = mkdtempSync(join(tmpdir(), 'del-blobs-'));
   const blobs = new LocalDiskBlobStore(join(blobDir, 'b'));
@@ -89,7 +90,7 @@ describe(`deleted content needs write (${testDialect()})`, () => {
     removedAttachment = (await uploadAttachment(t.ctx, blobs, 'PUB-1', bytes('r'))).id;
     await deleteAttachment(t.ctx, blobs, removedAttachment);
     onTrashedIssue = (await uploadAttachment(t.ctx, blobs, 'PUB-2', bytes('t'))).id;
-    await createComment(t.ctx, 'PUB-2', { body: 'on trashed' });
+    commentOnTrashed = (await createComment(t.ctx, 'PUB-2', { body: 'on trashed' })).id;
     await deleteIssue(t.ctx, 'PUB-2');
     await deleteIssue(t.ctx, 'PRV-1');
   });
@@ -326,5 +327,29 @@ describe(`deleted content needs write (${testDialect()})`, () => {
       const admin = (await listEvents(t.ctx, { limit: 1000 })).data;
       expect(admin).toEqual(allEvents);
     });
+  });
+
+  // Runs last: it writes, and the event log tests above compare against a snapshot.
+  it("treats changes to a trashed issue's comments and attachments as not found below write", async () => {
+    for (const who of readers) {
+      const name = who.actor.handle;
+      await expect(updateComment(who, commentOnTrashed, { body: 'x' }), name).rejects.toMatchObject(
+        notFound,
+      );
+      await expect(deleteComment(who, commentOnTrashed), name).rejects.toMatchObject(notFound);
+      await expect(deleteAttachment(who, blobs, onTrashedIssue), name).rejects.toMatchObject(
+        notFound,
+      );
+      // An attachment of a deleted comment is just as absent.
+      await expect(deleteAttachment(who, blobs, onDeletedComment), name).rejects.toMatchObject(
+        notFound,
+      );
+    }
+    // Writers still can (the manager may change others' comments and attachments).
+    expect((await updateComment(manager, commentOnTrashed, { body: 'edited' })).body).toBe(
+      'edited',
+    );
+    expect((await deleteComment(manager, commentOnTrashed)).deletedAt).not.toBeNull();
+    expect((await deleteAttachment(manager, blobs, onTrashedIssue)).deletedAt).not.toBeNull();
   });
 });
