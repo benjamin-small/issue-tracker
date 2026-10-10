@@ -19,6 +19,23 @@ Give every agent its own user (`poietic-issues user create --kind agent …`), s
 
 Committing a `.poietic-issues.json` (`poietic-issues init --project ENG --server …`) in a repository lets any agent working there find the right project.
 
+### issues.poietic.tech identities
+
+Interactive and unattended agents use separate users, so history shows which one acted and each token can be revoked on its own:
+
+- **`claude`**: Claude sessions a person drives on their own machine. Store its token locally with `poietic-issues auth login --server https://issues.poietic.tech --with-token` (reads stdin), never in CI.
+- **`github-ci`**: GitHub Actions workflows in any `poietic-tech` repository. The org provides its token as the secret `POIETIC_ISSUES_TOKEN` and the server as the variable `POIETIC_ISSUES_SERVER`:
+
+  ```yaml
+  env:
+    POIETIC_ISSUES_SERVER: ${{ vars.POIETIC_ISSUES_SERVER }}
+    POIETIC_ISSUES_TOKEN: ${{ secrets.POIETIC_ISSUES_TOKEN }}
+  ```
+
+  The CLI is not published yet, so a workflow either calls the API with `Authorization: Bearer $POIETIC_ISSUES_TOKEN` or builds the CLI from this repository.
+
+Both agents see only the private projects they are members of.
+
 ## Learn the surface in two calls
 
 ```sh
