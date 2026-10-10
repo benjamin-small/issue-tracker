@@ -175,6 +175,40 @@ export async function loadIssues(db: Exec, ids: string[]): Promise<Issue[]> {
   return ids.map((id) => byId.get(id)).filter((i): i is Issue => i !== undefined);
 }
 
+/**
+ * Cuts a trashed parent (key and title) out of issues shown to an actor below `write` on their project: the
+ * parent itself is NOT_FOUND to them. Writers keep it, since they can open and restore it. A parent is always in
+ * its child's project, so the child's project decides. Pass `writable` to reuse a `writableProjectIds` result.
+ */
+export async function hideTrashedParents(
+  ctx: ServiceContext,
+  db: Exec,
+  issues: Issue[],
+  writable?: 'all' | string[],
+): Promise<Issue[]> {
+  if (writable === 'all') return issues;
+  const parentIds = [...new Set(issues.flatMap((i) => (i.parentId ? [i.parentId] : [])))];
+  if (!parentIds.length) return issues;
+  const trashed = new Set(
+    (
+      await db
+        .selectFrom('issues')
+        .select('id')
+        .where('id', 'in', parentIds)
+        .where('deleted_at', 'is not', null)
+        .execute()
+    ).map((r) => r.id),
+  );
+  if (!trashed.size) return issues;
+  const canWrite = writable ?? (await writableProjectIds(ctx, db));
+  if (canWrite === 'all') return issues;
+  return issues.map((i) =>
+    i.parentId && trashed.has(i.parentId) && !canWrite.includes(i.projectId)
+      ? { ...i, parentId: null, parent: null }
+      : i,
+  );
+}
+
 export async function loadIssue(db: Exec, id: string): Promise<Issue> {
   const [issue] = await loadIssues(db, [id]);
   if (!issue) throw new Error(`Issue ${id} vanished`);
@@ -528,13 +562,15 @@ export async function queryIssues(
   q = q.orderBy('i.id', 'asc');
   if (params.projectId) q = q.where('i.project_id', '=', params.projectId);
   else q = await whereReadable(ctx, db, q, 'i.project_id', readable);
+  let writable: 'all' | string[] | undefined;
   if (params.includeDeleted) {
     // Trashed issues are shown only in projects the actor can write in (deleted content needs write).
-    const writable = await writableProjectIds(ctx, db);
-    if (writable !== 'all')
+    const canWrite = await writableProjectIds(ctx, db);
+    writable = canWrite;
+    if (canWrite !== 'all')
       q = q.where((eb) =>
-        writable.length
-          ? eb.or([eb('i.deleted_at', 'is', null), eb('i.project_id', 'in', writable)])
+        canWrite.length
+          ? eb.or([eb('i.deleted_at', 'is', null), eb('i.project_id', 'in', canWrite)])
           : eb('i.deleted_at', 'is', null),
       );
   } else q = q.where('i.deleted_at', 'is', null);
@@ -550,11 +586,9 @@ export async function queryIssues(
     rows.length > limit && last
       ? encodeCursor({ v: sorts.map((_, k) => last[`s${k}`]), id: last.id })
       : null;
-  return {
-    data: await loadIssues(
-      db,
-      page.map((r) => r.id),
-    ),
-    nextCursor,
-  };
+  const issues = await loadIssues(
+    db,
+    page.map((r) => r.id),
+  );
+  return { data: await hideTrashedParents(ctx, db, issues, writable), nextCursor };
 }

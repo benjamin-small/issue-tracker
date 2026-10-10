@@ -4,9 +4,15 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { testDialect } from '@poietic-tech/issues-db/testing';
 import { ANONYMOUS_ACTOR, type ServiceContext, withActor } from './context.ts';
-import { getAttachment, listAttachments, uploadAttachment } from './services/attachments.ts';
+import {
+  deleteAttachment,
+  getAttachment,
+  listAttachments,
+  uploadAttachment,
+} from './services/attachments.ts';
 import { createComment, deleteComment, listComments } from './services/comments.ts';
-import { listIssueLinks } from './services/links.ts';
+import { filterEventsForViewer, listEvents } from './services/events.ts';
+import { createLink, listIssueLinks } from './services/links.ts';
 import {
   createIssue,
   deleteIssue,
@@ -15,7 +21,10 @@ import {
   listIssueActivity,
   listIssues,
   restoreIssue,
+  updateIssue,
 } from './services/issues.ts';
+import type { TrackerEvent } from '@poietic-tech/issues-schema';
+import { SYSTEM_ACTOR } from './context.ts';
 import { createProject } from './services/projects.ts';
 import { createUser, toActor } from './services/users.ts';
 import { LocalDiskBlobStore } from './storage/blob-store.ts';
@@ -36,6 +45,7 @@ describe(`deleted content needs write (${testDialect()})`, () => {
   let deletedCommentId: string;
   let onDeletedComment: string;
   let onTrashedIssue: string;
+  let removedAttachment: string;
   const blobs = new LocalDiskBlobStore(join(mkdtempSync(join(tmpdir(), 'del-blobs-')), 'b'));
   const bytes = (s: string) => ({ filename: `${s}.txt`, data: new TextEncoder().encode(s) });
 
@@ -63,6 +73,9 @@ describe(`deleted content needs write (${testDialect()})`, () => {
     await createIssue(t.ctx, 'PUB', { title: 'trashed' }); // PUB-2
     await createIssue(t.ctx, 'PUB', { title: 'child of trashed', parent: 'PUB-2' }); // PUB-3
     await createIssue(t.ctx, 'PRV', { title: 'private trashed' }); // PRV-1
+    await createIssue(t.ctx, 'PUB', { title: 'reparented' }); // PUB-4
+    await updateIssue(t.ctx, 'PUB-4', { parent: 'PUB-2' }); // changes.parent names PUB-2
+    await createLink(t.ctx, 'PUB-1', { type: 'relates', target: 'PUB-2' });
 
     const kept = await createComment(t.ctx, 'PUB-1', { body: 'kept' });
     const gone = await createComment(t.ctx, 'PUB-1', { body: 'gone' });
@@ -72,6 +85,8 @@ describe(`deleted content needs write (${testDialect()})`, () => {
     ).id;
     await uploadAttachment(t.ctx, blobs, 'PUB-1', { ...bytes('k'), commentId: kept.id });
     await deleteComment(t.ctx, gone.id);
+    removedAttachment = (await uploadAttachment(t.ctx, blobs, 'PUB-1', bytes('r'))).id;
+    await deleteAttachment(t.ctx, blobs, removedAttachment);
     onTrashedIssue = (await uploadAttachment(t.ctx, blobs, 'PUB-2', bytes('t'))).id;
     await createComment(t.ctx, 'PUB-2', { body: 'on trashed' });
     await deleteIssue(t.ctx, 'PUB-2');
@@ -101,10 +116,10 @@ describe(`deleted content needs write (${testDialect()})`, () => {
         name,
       ).toEqual(['on trashed']);
       expect(await listAttachments(who, 'PUB-2'), name).toHaveLength(1);
-      expect(
-        (await listChildren(who, 'PUB-2')).map((i) => i.key),
-        name,
-      ).toEqual(['PUB-3']);
+      expect((await listChildren(who, 'PUB-2')).map((i) => i.key).sort(), name).toEqual([
+        'PUB-3',
+        'PUB-4',
+      ]);
     }
   });
 
@@ -125,18 +140,23 @@ describe(`deleted content needs write (${testDialect()})`, () => {
         .map((i) => i.key)
         .sort();
     for (const who of readers) {
-      expect(await keys(who, 'PUB'), who.actor.handle).toEqual(['PUB-1', 'PUB-3']);
+      expect(await keys(who, 'PUB'), who.actor.handle).toEqual(['PUB-1', 'PUB-3', 'PUB-4']);
       const all = await keys(who);
       expect(all, who.actor.handle).not.toContain('PUB-2');
       expect(all, who.actor.handle).not.toContain('PRV-1');
     }
     for (const who of [editor, manager]) {
-      expect(await keys(who, 'PUB'), who.actor.handle).toEqual(['PUB-1', 'PUB-2', 'PUB-3']);
+      expect(await keys(who, 'PUB'), who.actor.handle).toEqual([
+        'PUB-1',
+        'PUB-2',
+        'PUB-3',
+        'PUB-4',
+      ]);
       // Write on PUB does not reveal PRV's trash, where they only view.
       expect(await keys(who, 'PRV'), who.actor.handle).toEqual([]);
-      expect(await keys(who), who.actor.handle).toEqual(['PUB-1', 'PUB-2', 'PUB-3']);
+      expect(await keys(who), who.actor.handle).toEqual(['PUB-1', 'PUB-2', 'PUB-3', 'PUB-4']);
     }
-    expect(await keys(t.ctx)).toEqual(['PRV-1', 'PUB-1', 'PUB-2', 'PUB-3']);
+    expect(await keys(t.ctx)).toEqual(['PRV-1', 'PUB-1', 'PUB-2', 'PUB-3', 'PUB-4']);
     // Text search goes through the same listing.
     const search = (who: ServiceContext) =>
       listIssues(who, {
@@ -171,9 +191,136 @@ describe(`deleted content needs write (${testDialect()})`, () => {
     for (const who of writers) {
       const name = who.actor.handle;
       const listed = (await listAttachments(who, 'PUB-1')).map((a) => a.filename).sort();
-      expect(listed, name).toEqual(['c.txt', 'k.txt']);
+      expect(listed, name).toEqual(['c.txt', 'k.txt']); // r.txt is deleted for everyone
       expect((await getAttachment(who, onDeletedComment)).id, name).toBe(onDeletedComment);
       expect((await getAttachment(who, onTrashedIssue)).id, name).toBe(onTrashedIssue);
     }
+  });
+
+  it('cuts a trashed parent out of its live children for readers below write', async () => {
+    for (const who of readers) {
+      const name = who.actor.handle;
+      for (const issue of [
+        await getIssue(who, 'PUB-3'),
+        (await listIssues(who, { project: 'PUB' })).data.find((i) => i.key === 'PUB-3')!,
+        (await listIssues(who, {})).data.find((i) => i.key === 'PUB-3')!,
+      ]) {
+        expect(issue.parent, name).toBeNull();
+        expect(issue.parentId, name).toBeNull();
+      }
+    }
+    for (const who of writers) {
+      const issue = await getIssue(who, 'PUB-3');
+      expect(issue.parent, who.actor.handle).toMatchObject({ key: 'PUB-2', title: 'trashed' });
+      const listed = (await listIssues(who, { project: 'PUB' })).data.find(
+        (i) => i.key === 'PUB-3',
+      );
+      expect(listed!.parent?.key, who.actor.handle).toBe('PUB-2');
+    }
+  });
+
+  describe('in the event log', () => {
+    let trashedId: string;
+    let allEvents: TrackerEvent[];
+    beforeAll(async () => {
+      trashedId = (await getIssue(t.ctx, 'PUB-2')).id;
+      allEvents = (await listEvents(withActor(t.ctx, SYSTEM_ACTOR), { limit: 1000 })).data;
+    });
+
+    const commentEvents = (events: TrackerEvent[], id: string) =>
+      events.filter(
+        (e) => e.type.startsWith('comment.') && (e.data.comment as { id: string }).id === id,
+      );
+    const attachmentIds = (events: TrackerEvent[]) =>
+      events
+        .filter((e) => e.type.startsWith('attachment.'))
+        .map((e) => (e.data.attachment as { id: string }).id);
+    const names = (events: TrackerEvent[], issueId: string) =>
+      events.some((e) => e.issueId === issueId || JSON.stringify(e.data).includes(issueId));
+
+    /** What a reader below write may see of the fixture's deleted content: nothing but deletion markers. */
+    function expectNoDeletedContent(events: TrackerEvent[], name: string) {
+      expect(names(events, trashedId), name).toBe(false);
+      const json = JSON.stringify(events);
+      for (const secret of ['"trashed"', '"gone"', '"on trashed"', 'c.txt', 't.txt', 'r.txt'])
+        expect(json, `${name} ${secret}`).not.toContain(secret);
+      // The deleted comment keeps its events, without the text.
+      const gone = commentEvents(events, deletedCommentId);
+      expect(
+        gone.map((e) => e.type),
+        name,
+      ).toEqual(['comment.created', 'comment.deleted']);
+      for (const e of gone) expect((e.data.comment as { body: string }).body, name).toBe('');
+      expect(attachmentIds(events), name).not.toContain(onDeletedComment);
+      expect(attachmentIds(events), name).not.toContain(onTrashedIssue);
+      expect(attachmentIds(events), name).not.toContain(removedAttachment);
+      expect(
+        events.some((e) => e.type.startsWith('link.')),
+        name,
+      ).toBe(false);
+    }
+
+    it('hides deleted content from readers in GET /events, and matches the live filter', async () => {
+      for (const who of readers) {
+        const name = who.actor.handle;
+        const listed = (await listEvents(who, { limit: 1000 })).data;
+        expect(listed.length, name).toBeGreaterThan(0);
+        expectNoDeletedContent(listed, name);
+        // The kept comment and live issues are untouched.
+        expect(JSON.stringify(listed), name).toContain('"kept"');
+        const child = listed.find(
+          (e) => e.type === 'issue.created' && (e.data.issue as { key: string }).key === 'PUB-3',
+        )!;
+        expect((child.data.issue as { parent: unknown }).parent, name).toBeNull();
+        const reparent = listed.find(
+          (e) => e.type === 'issue.updated' && (e.data.issue as { key: string }).key === 'PUB-4',
+        )!;
+        expect(reparent.data.changes, name).toEqual({ parent: { from: null, to: null } });
+        // Live and replay apply the same rules.
+        expect(await filterEventsForViewer(who, allEvents), name).toEqual(listed);
+      }
+    });
+
+    it('hides deleted content from readers in issue activity', async () => {
+      for (const who of readers) {
+        const activity = (await listIssueActivity(who, 'PUB-1')).data;
+        expectNoDeletedContent(activity, who.actor.handle);
+        expect(
+          activity.some((e) => e.type === 'issue.created'),
+          who.actor.handle,
+        ).toBe(true);
+      }
+    });
+
+    it('shows writers everything in their projects, and only there', async () => {
+      for (const who of [editor, manager]) {
+        const name = who.actor.handle;
+        const listed = (await listEvents(who, { limit: 1000 })).data;
+        expect(names(listed, trashedId), name).toBe(true);
+        const gone = commentEvents(listed, deletedCommentId);
+        expect(
+          gone.map((e) => (e.data.comment as { body: string }).body),
+          name,
+        ).toEqual(['gone', 'gone']);
+        expect(attachmentIds(listed), name).toEqual(
+          expect.arrayContaining([onDeletedComment, onTrashedIssue, removedAttachment]),
+        );
+        expect(
+          listed.some((e) => e.type === 'link.created'),
+          name,
+        ).toBe(true);
+        expect(await filterEventsForViewer(who, allEvents), name).toEqual(listed);
+        const activity = (await listIssueActivity(who, 'PUB-1')).data;
+        expect(
+          activity.some((e) => e.type === 'link.created'),
+          name,
+        ).toBe(true);
+        // In PRV they only view: its trashed issue stays hidden.
+        const prv = (await getIssue(t.ctx, 'PRV-1')).id;
+        expect(names(listed, prv), name).toBe(false);
+      }
+      const admin = (await listEvents(t.ctx, { limit: 1000 })).data;
+      expect(admin).toEqual(allEvents);
+    });
   });
 });

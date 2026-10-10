@@ -5,7 +5,9 @@ import {
   createProject,
   createToken,
   createUser,
+  deleteIssue,
   EventTailer,
+  latestEventSeq,
   listEvents,
   removeMember,
   updateUser,
@@ -382,5 +384,33 @@ describe(`SSE /events/stream (${testDialect()})`, () => {
       requestId: 'req-stream-1',
       err: { message: 'database unavailable' },
     });
+  });
+
+  it("keeps trashed issues out of readers' streams, as GET /events does", async () => {
+    const watch = async (bearer: string | null, n: number) => {
+      // Created before the stream opens, so every event about it is processed after it is trashed or not at all.
+      const doomed = await createIssue(t.ctx, 'PUB', { title: `to be trashed ${n}` });
+      // …and seen by the tailer, so the stream starts after it rather than receiving it live.
+      const created = await latestEventSeq(t.ctx);
+      while (tailer.lastSeq < created) await new Promise((r) => setTimeout(r, 10));
+      const messages = await collect(
+        '?project=PUB',
+        {},
+        sawTitle(`trash marker ${n}`),
+        async () => {
+          await deleteIssue(t.ctx, doomed.key);
+          await createIssue(t.ctx, 'PUB', { title: `trash marker ${n}` });
+        },
+        bearer,
+      );
+      return { messages, doomed };
+    };
+    for (const [n, bearer] of [null, memberToken].entries()) {
+      const { messages, doomed } = await watch(bearer, n);
+      expect(titles(messages)).toEqual([`trash marker ${n}`]);
+      expect(messages.some((m) => m.data?.includes(doomed.id))).toBe(false);
+    }
+    const admin = await watch(token, 9);
+    expect(admin.messages.some((m) => m.event === 'issue.deleted')).toBe(true);
   });
 });

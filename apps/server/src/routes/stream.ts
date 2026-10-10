@@ -5,6 +5,7 @@ import {
   getProjectRow,
   listEvents,
   readableProjectIds,
+  writableProjectIds,
 } from '@poietic-tech/issues-core';
 import type { TrackerEvent } from '@poietic-tech/issues-schema';
 import { streamSSE } from 'hono/streaming';
@@ -107,10 +108,21 @@ export function registerStreamRoute(
       let last = resume ?? tailer.lastSeq;
       stream.onAbort(unsubscribe);
       let readable: Awaited<ReturnType<typeof readableProjectIds>> = [];
-      /** Filters and redacts one live event for this viewer, first catching up on access changes. */
-      const visible = async (e: TrackerEvent) => {
-        if (changesAccess(e)) readable = await readableProjectIds(ctx, ctx.db.kysely);
-        return filterEventsForViewer(ctx, [e], readable);
+      let writable: Awaited<ReturnType<typeof writableProjectIds>> = [];
+      const readAccess = async () => {
+        readable = await readableProjectIds(ctx, ctx.db.kysely);
+        writable = await writableProjectIds(ctx, ctx.db.kysely);
+      };
+      /**
+       * Takes the next run of queued events that share one access state, catching up on access first when the
+       * run starts with an event that changes it, and filters and redacts the run for this viewer in one batch.
+       */
+      const nextVisible = async () => {
+        if (changesAccess(queue[0]!)) await readAccess();
+        let n = 1;
+        while (n < queue.length && !changesAccess(queue[n]!)) n++;
+        const run = queue.splice(0, n);
+        return { run, visible: await filterEventsForViewer(ctx, run, readable, writable) };
       };
 
       const send = async (e: TrackerEvent) => {
@@ -134,7 +146,7 @@ export function registerStreamRoute(
         // Read access only after subscribing: any change committed after this read is queued, and
         // re-reads it before the events that follow are filtered. Replayed events were committed before
         // this read, so it already reflects any access they changed.
-        readable = await readableProjectIds(ctx, ctx.db.kysely);
+        await readAccess();
         if (resume !== undefined) {
           const replay = await listEvents(ctx, {
             after: resume,
@@ -149,11 +161,12 @@ export function registerStreamRoute(
         deps.shutdownSignal?.addEventListener('abort', onShutdown);
         loop: while (!stopping()) {
           while (queue.length) {
-            const e = queue.shift()!;
-            for (const v of await visible(e)) await send(v);
-            // The viewer's role or status changed: end the stream so the client reconnects as who they are now
-            // (or as anonymous), instead of keeping the access it connected with.
-            if (namesViewer(e, ctx.actor.id)) break loop;
+            const { run, visible } = await nextVisible();
+            // The viewer's role or status changed: end the stream after that event so the client reconnects as who
+            // they are now (or as anonymous), instead of keeping the access it connected with.
+            const stop = run.find((e) => namesViewer(e, ctx.actor.id));
+            for (const v of visible) if (!stop || v.seq <= stop.seq) await send(v);
+            if (stop) break loop;
           }
           if (overflowed) {
             await reset();

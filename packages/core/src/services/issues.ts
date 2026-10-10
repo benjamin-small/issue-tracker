@@ -22,9 +22,10 @@ import {
 } from '../custom-field-values.ts';
 import { conflict, DomainError, invalidRelation, parseInput, validationError } from '../errors.ts';
 import { diff, recordEvent } from '../events.ts';
-import { loadIssue, queryIssues } from '../issue-query.ts';
+import { hideTrashedParents, loadIssue, queryIssues } from '../issue-query.ts';
+import { atLeast } from '../access.ts';
 import { requireAdmin } from '../permissions.ts';
-import { getIssueRow, getProjectRow, getStatusRow, getUserRow } from '../refs.ts';
+import { getIssueAccess, getIssueRow, getProjectRow, getStatusRow, getUserRow } from '../refs.ts';
 import { listEvents } from './events.ts';
 import { findRepo } from './repos.ts';
 
@@ -51,8 +52,11 @@ const TRACKED_FIELDS = [
 
 /** Gets an issue by key (`ENG-42`) or id. Issues in the trash are found only by actors with `write`. */
 export async function getIssue(ctx: ServiceContext, ref: string): Promise<Issue> {
-  const row = await getIssueRow(ctx, ctx.db.kysely, ref, 'read');
-  return loadIssue(ctx.db.kysely, row.id);
+  const { row, level } = await getIssueAccess(ctx, ctx.db.kysely, ref, 'read');
+  const issue = await loadIssue(ctx.db.kysely, row.id);
+  if (atLeast(level, 'write')) return issue;
+  const [shown] = await hideTrashedParents(ctx, ctx.db.kysely, [issue], []);
+  return shown!;
 }
 
 export interface ListIssuesInput {
