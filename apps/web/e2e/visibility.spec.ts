@@ -639,3 +639,90 @@ test('the create dialog offers the project repos and projects without repos hide
   await page.goto(`/i/${key}-1`);
   await expect(page.getByRole('link', { name: 'acme/app' })).toBeVisible();
 });
+
+test("a change to the viewer's own account reaches their open page live", async ({
+  page,
+  browser,
+}) => {
+  const key = unique('AC');
+  const handle = `acct${Date.now().toString(36)}`;
+  await post(page.request, '/projects', { key, name: 'Account', visibility: 'public' });
+  await post(page.request, `/projects/${key}/issues`, { title: 'Seen by a member' });
+  await post(page.request, '/users', { handle, name: 'Account Holder', kind: 'human' });
+  const setRole = async (role: 'admin' | 'member') => {
+    const res = await page.request.patch(`/api/v1/users/${handle}`, {
+      data: { role },
+      headers: { origin },
+    });
+    expect(res.ok(), await res.text()).toBe(true);
+  };
+
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: handle },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  const errors: string[] = [];
+  p.on('pageerror', (error) => errors.push(error.message));
+  let streams = 0;
+  p.on('request', (r) => {
+    if (r.url().includes('/events/stream')) streams++;
+  });
+  await p.goto(`${origin}/p/${key}`);
+  await expect(p.getByText('Seen by a member')).toBeVisible();
+  await expect(p.getByTestId('live-indicator')).toHaveAttribute('data-connected', 'true');
+  await expect(p.getByTestId('new-project')).toHaveCount(0);
+  const before = streams;
+
+  // Made an admin: the admin-only controls appear without a reload, and the project stream ends and reconnects as
+  // who they are now.
+  await setRole('admin');
+  await expect(p.getByTestId('new-project')).toBeVisible();
+  await expect(p.getByTestId('nav-webhooks')).toBeVisible();
+  await expect.poll(() => streams, { timeout: 10_000 }).toBeGreaterThan(before);
+  await expect(p.getByTestId('live-indicator')).toHaveAttribute('data-connected', 'true', {
+    timeout: 10_000,
+  });
+
+  // And back: they go again.
+  await setRole('member');
+  await expect(p.getByTestId('new-project')).toHaveCount(0);
+  await expect(p.getByTestId('nav-webhooks')).toHaveCount(0);
+  await expect(p.getByText('Seen by a member')).toBeVisible();
+  expect(errors, 'uncaught errors in the page').toEqual([]);
+  await ctx.close();
+});
+
+test("a demoted writer's open trashed issue refetches live and is gone", async ({
+  page,
+  browser,
+}) => {
+  const key = unique('DM');
+  await post(page.request, '/projects', { key, name: 'Demoted' });
+  await post(page.request, `/projects/${key}/issues`, { title: 'Trashed while open' });
+  await post(page.request, `/projects/${key}/members`, { user: 'grace', role: 'editor' });
+  const trashed = await page.request.delete(`/api/v1/issues/${key}-1`, { headers: { origin } });
+  expect(trashed.ok(), await trashed.text()).toBe(true);
+
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  await p.goto(`${origin}/i/${key}-1`);
+  await expect(p.getByTestId('deleted-banner')).toBeVisible();
+  await expect(p.getByTestId('restore-issue')).toBeVisible();
+  await expect(p.getByTestId('live-indicator')).toHaveAttribute('data-connected', 'true');
+
+  // Demoted to viewer, Grace can no longer see the trash: the open issue refetches and is not found.
+  const demoted = await page.request.patch(`/api/v1/projects/${key}/members/grace`, {
+    data: { role: 'viewer' },
+    headers: { origin },
+  });
+  expect(demoted.ok(), await demoted.text()).toBe(true);
+  await expect(p.getByTestId('issue-error')).toBeVisible();
+  await expect(p.getByTestId('deleted-banner')).toHaveCount(0);
+  await ctx.close();
+});

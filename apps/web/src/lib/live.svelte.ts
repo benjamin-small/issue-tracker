@@ -83,6 +83,13 @@ function handle(qc: QueryClient, event: TrackerEvent, meId: string | undefined) 
     void qc.invalidateQueries({ queryKey: ['project'] });
     void qc.invalidateQueries({ queryKey: keys.projects });
     void qc.invalidateQueries({ queryKey: ['members'] });
+    // The viewer's own role changed: what they may see changed too (a former writer loses the trash), so open
+    // lists and issue pages refetch.
+    const member = (event.data as { member?: { user?: { id?: string } } }).member;
+    if (meId && member?.user?.id === meId) {
+      void qc.invalidateQueries({ queryKey: ['issues'] });
+      void qc.invalidateQueries({ queryKey: ['issue'] });
+    }
     return;
   }
   // Workflow, labels, projects, users: reference data changed (and issue snapshots embed some of it).
@@ -106,7 +113,12 @@ function handle(qc: QueryClient, event: TrackerEvent, meId: string | undefined) 
     void qc.invalidateQueries({ queryKey: ['issues'] });
     void qc.invalidateQueries({ queryKey: ['issue'] });
   } else if (event.type.startsWith('user.')) {
-    void qc.invalidateQueries({ queryKey: keys.users });
+    const user = (event.data as { user?: { id?: string } }).user;
+    // The viewer's own account changed: their global role or status may differ, and with it `me` (admin-only
+    // controls), every project's `myAccess` and what they can read. Refetch everything. The server also ends the
+    // stream after this event; the browser reconnects as who they are now.
+    if (meId && user?.id === meId) void qc.invalidateQueries();
+    else void qc.invalidateQueries({ queryKey: keys.users });
   }
 }
 
