@@ -293,6 +293,39 @@ test('an issue can be linked to one of the project repos and filtered by it', as
   await expect(page.getByRole('link', { name: 'acme/app' })).toHaveCount(0);
 });
 
+test('the repo filter offers "No repository", and nulls from saved views read as it', async ({
+  page,
+}) => {
+  const key = unique('RN');
+  await post(page.request, '/projects', { key, name: 'Repo nulls' });
+  await post(page.request, `/projects/${key}/repos`, { repo: 'acme/app' });
+  await post(page.request, `/projects/${key}/issues`, { title: 'Has a repo', repo: 'acme/app' });
+  await post(page.request, `/projects/${key}/issues`, { title: 'Has no repo' });
+
+  await page.goto(`/p/${key}`);
+  await expect(page.getByTestId('issue-row')).toHaveCount(2);
+  await page.getByTestId('filter-repo').click();
+  await page.getByRole('option', { name: 'No repository' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('issue-row')).toHaveCount(1);
+  await expect(page.getByTestId('issue-row')).toContainText('Has no repo');
+  await expect(page.getByTestId('filter-repo-active')).toContainText('No repository');
+
+  // A saved view (or the CLI) stores "no repository" as null in an `in` list: it reads as the same choice.
+  const view = (await post(page.request, `/projects/${key}/views`, {
+    name: 'Unlinked or app',
+    layout: 'list',
+    shared: true,
+    config: { filter: { conditions: [{ field: 'repo', op: 'in', value: [null, 'acme/app'] }] } },
+  })) as unknown as { id: string };
+  await page.goto(`/p/${key}/v/${view.id}`);
+  await expect(page.getByTestId('issue-row')).toHaveCount(2);
+  await expect(page.getByTestId('filter-repo-active')).toContainText('No repository, acme/app');
+  await page.getByTestId('filter-repo').click();
+  await expect(page.getByRole('option', { name: 'No repository' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'null' })).toHaveCount(0);
+});
+
 test('the create dialog offers the project repos and projects without repos hide the row', async ({
   page,
 }) => {

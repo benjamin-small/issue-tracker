@@ -10,7 +10,10 @@
   import PriorityIcon from './PriorityIcon.svelte';
   import StatusIcon from './StatusIcon.svelte';
 
-  /** Quick filters over the view's IssueFilter: text, then status, assignee, labels and priority (each "is any of" or "is not any of"). */
+  /**
+   * Quick filters over the view's IssueFilter: text, then status, assignee, labels, priority and repository (each
+   * "is any of" or "is not any of"). Other conditions (from saved views, URLs or the CLI) show as removable pills.
+   */
   let {
     filter,
     project,
@@ -47,7 +50,10 @@
       current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
     );
   }
-  /** Picker values are strings; the filter stores null for "no assignee" and numbers for priority. */
+  /**
+   * Picker values are strings; the filter stores null for "no assignee" and "no repository" (`in [null]`, which
+   * the server and the live matcher both read as "is unset"), and numbers for priority.
+   */
   const NONE = '__none__';
   const toKey = (v: Value) => (v === null ? NONE : String(v));
   function fromKey(field: string, key: string): Value {
@@ -162,15 +168,20 @@
     {#snippet item(it)}<PriorityIcon priority={it.p} /><span>{it.label}</span>{/snippet}
   </FilterChip>
 
-  <!-- Values are `owner/name` as the project spells them, which is what `Issue.repo` holds (the live matcher compares them exactly). -->
+  <!--
+    Chosen values are `owner/name` as the project spells them, which is what `Issue.repo` holds (the live matcher
+    compares them exactly). A saved view or the CLI may hold other spellings (a URL, an id, another case) or a repo
+    the project no longer links: those show as their own items, so the chip still states the filter.
+  -->
   {#if project.repos.length || valuesOf('repo').length}
     <FilterChip
       label="Repository"
       plural="repositories"
       items={[
+        { value: NONE, label: 'No repository' },
         ...project.repos.map((r) => ({ value: r.fullName, label: r.fullName })),
-        // A filter from a saved view or the CLI may name a repo the project no longer links.
         ...valuesOf('repo')
+          .filter((v): v is string | number => v !== null)
           .map(String)
           .filter((v) => !project.repos.some((r) => r.fullName === v))
           .map((v) => ({ value: v, label: v })),
