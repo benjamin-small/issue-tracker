@@ -52,4 +52,32 @@ describe(`project members (${testDialect()})`, () => {
       'public',
     );
   });
+
+  it('reports an existing membership as CONFLICT from the unique key', async () => {
+    await createProject(t.ctx, { key: 'DUP', name: 'Dup' });
+    await addMember(t.ctx, 'DUP', { user: '@bot', role: 'viewer' });
+    await expect(addMember(t.ctx, 'DUP', { user: 'bot', role: 'editor' })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: '@bot is already a member of DUP',
+    });
+    // The failed add changed nothing and recorded nothing.
+    expect((await listMembers(t.ctx, 'DUP')).map((x) => [x.user.handle, x.role])).toEqual([
+      ['bot', 'viewer'],
+    ]);
+    const dup = (await getProject(t.ctx, 'DUP')).id;
+    const added = (await listEvents(t.ctx, { types: ['project.member_added'] })).data;
+    expect(added.filter((e) => e.projectId === dup)).toHaveLength(1);
+  });
+
+  it('writes nothing and records no event when the role is unchanged', async () => {
+    await createProject(t.ctx, { key: 'SAME', name: 'Same' });
+    const added = await addMember(t.ctx, 'SAME', { user: '@bot', role: 'editor' });
+    const changed = async () =>
+      (await listEvents(t.ctx, { types: ['project.member_changed'], limit: 1000 })).data.length;
+    const before = await changed();
+    const same = await updateMember(t.ctx, 'SAME', '@bot', { role: 'editor' });
+    expect(same).toEqual(added);
+    expect(await changed()).toBe(before);
+    expect((await listMembers(t.ctx, 'SAME'))[0]!.updatedAt).toBe(added.updatedAt);
+  });
 });

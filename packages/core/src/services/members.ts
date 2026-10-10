@@ -7,7 +7,7 @@ import {
   UpdateProjectMemberInputSchema,
 } from '@poietic-tech/issues-schema';
 import { nowIso, type ServiceContext } from '../context.ts';
-import { conflict, notFound, parseInput } from '../errors.ts';
+import { conflict, isUniqueViolation, notFound, parseInput } from '../errors.ts';
 import { recordEvent } from '../events.ts';
 import { getProjectRow, getUserRow } from '../refs.ts';
 
@@ -54,29 +54,38 @@ export async function addMember(
   input: AddProjectMemberInput,
 ): Promise<ProjectMember> {
   const data = parseInput(AddProjectMemberInputSchema, input);
-  return withWriteTx(ctx.db, async (tx) => {
-    const project = await getProjectRow(ctx, tx, projectRef, 'manage');
-    const user = await getUserRow(ctx, tx, data.user);
-    const existing = await memberRows(tx, project.id, user.id);
-    if (existing.length) throw conflict(`@${user.handle} is already a member of ${project.key}`);
-    const now = nowIso(ctx);
-    await tx
-      .insertInto('project_members')
-      .values({
-        project_id: project.id,
-        user_id: user.id,
-        role: data.role,
-        created_at: now,
-        updated_at: now,
-      })
-      .execute();
-    const [member] = await memberRows(tx, project.id, user.id);
-    await recordEvent(tx, ctx, 'project.member_added', { projectId: project.id, data: { member } });
-    return member!;
-  });
+  let alreadyMember = '';
+  try {
+    return await withWriteTx(ctx.db, async (tx) => {
+      const project = await getProjectRow(ctx, tx, projectRef, 'manage');
+      const user = await getUserRow(ctx, tx, data.user);
+      alreadyMember = `@${user.handle} is already a member of ${project.key}`;
+      const now = nowIso(ctx);
+      await tx
+        .insertInto('project_members')
+        .values({
+          project_id: project.id,
+          user_id: user.id,
+          role: data.role,
+          created_at: now,
+          updated_at: now,
+        })
+        .execute();
+      const [member] = await memberRows(tx, project.id, user.id);
+      await recordEvent(tx, ctx, 'project.member_added', {
+        projectId: project.id,
+        data: { member },
+      });
+      return member!;
+    });
+  } catch (error) {
+    // The (project, user) primary key catches a concurrent add as well as an existing membership.
+    if (isUniqueViolation(error)) throw conflict(alreadyMember);
+    throw error;
+  }
 }
 
-/** Changes a member's role. Managers only. */
+/** Changes a member's role. Managers only. An unchanged role writes nothing and records no event. */
 export async function updateMember(
   ctx: ServiceContext,
   projectRef: string,
@@ -89,6 +98,7 @@ export async function updateMember(
     const user = await getUserRow(ctx, tx, userRef);
     const [before] = await memberRows(tx, project.id, user.id);
     if (!before) throw notFound('Member', userRef);
+    if (before.role === data.role) return before;
     await tx
       .updateTable('project_members')
       .set({ role: data.role, updated_at: nowIso(ctx) })
