@@ -78,6 +78,7 @@ Follow-up hardening after the first release. The text above stays as decided; th
 - **Streams close on `user.updated`.** This replaces "a connection's actor is fixed when it connects": the stream still follows membership and project changes live, and now it also ends after delivering a `user.updated` event about the viewer, including a self-edit, because their role or status may have changed. A `?project=` stream carries that event too (but no other `user.*` events). The client refetches and reconnects; replay after reconnecting runs as the new identity, so it never ends the stream. A connection also holds at most 1,000 pending events; one more sends `reset` and closes it. Errors while reading access are logged.
 - **`requireAdmin`** answers anonymous callers with `UNAUTHENTICATED` (401) and signed-in non-admins with `FORBIDDEN` (403).
 - **Email-only `user.updated` events** are not shown to other non-admin viewers, instead of arriving with empty `changes`.
+- **A move away from a trashed parent keeps its live end.** A parent change from a trashed issue to a live one reaches readers below write as `{ from: null, to }`, rather than being left out. A change to a trashed parent, or from one to no parent, is still left out, because nothing true would be left to show.
 - **Repo references** accept the scheme and host in any case (`HTTPS://GitHub.com/Acme/App`); owner and name keep their case.
 
 ## Consequences

@@ -32,7 +32,7 @@ See [ADR 0021](adr/0021-project-visibility-and-roles.md).
   - events of a trashed issue are dropped, and so are link events with a trashed end;
   - events of a deleted attachment, or of one on a deleted comment, are dropped;
   - events of a deleted comment stay, with the body emptied;
-  - snapshots cut a trashed parent, and a parent change that names a trashed issue is left out of `changes`.
+  - snapshots cut a trashed parent. A parent change to a trashed issue, or from one to no parent, is left out of `changes`; a move from a trashed parent to a live one keeps the live end as `{ from: null, to }`.
 
   Readers do not receive `issue.deleted` or `attachment.deleted` live, so their open views stay stale until they refetch. These rules do not apply in projects the viewer can write in. Admins and webhooks (delivered as the system actor) see every event unchanged; other signed-in viewers, writers included, still have other users' emails hidden in `user.*` events and see link events only when both ends are visible to them.
 

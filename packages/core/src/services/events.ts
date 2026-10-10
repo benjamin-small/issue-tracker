@@ -124,6 +124,11 @@ function contentRefs(e: TrackerEvent, restricted: boolean) {
   return { issues, comments, attachments };
 }
 
+function withoutKey<T extends Record<string, unknown>>(record: T, key: string): T {
+  const { [key]: _dropped, ...rest } = record;
+  return rest as T;
+}
+
 /**
  * The per-viewer rules that depend on the current state of issues, comments and attachments, applied to a batch
  * of already project-filtered events with one lookup per table (shared by `listEvents` and the live stream, so
@@ -136,13 +141,8 @@ function contentRefs(e: TrackerEvent, restricted: boolean) {
  *   deleted comment keep their place in the activity but lose the body; attachment events of a deleted attachment,
  *   or of one on a deleted comment, are dropped (their filename, size and hash identify the file, and there is
  *   nothing left to show); a trashed parent is cut from issue snapshots, and a `changes.parent` that names a
- *   trashed issue is left out of `changes`.
+ *   trashed issue is left out of `changes` (one from a trashed parent to a live one becomes `{ from: null, to }`).
  */
-function withoutKey<T extends Record<string, unknown>>(record: T, key: string): T {
-  const { [key]: _dropped, ...rest } = record;
-  return rest as T;
-}
-
 async function applyContentRules(
   db: Tx,
   events: TrackerEvent[],
@@ -233,19 +233,25 @@ async function applyContentRules(
       const changes = e.data.changes as Record<string, { from: unknown; to: unknown }> | undefined;
       const cutParent = !!issue?.parentId && !visibleIssue(issue.parentId);
       const change = changes?.parent as { from: IssueRef; to: IssueRef } | undefined;
-      const cutChange =
-        !!change &&
-        (hiddenParent(change.from) !== change.from || hiddenParent(change.to) !== change.to);
-      if (!cutParent && !cutChange) return [e];
+      const cutFrom = !!change && hiddenParent(change.from) !== change.from;
+      const cutTo = !!change && hiddenParent(change.to) !== change.to;
+      if (!cutParent && !cutFrom && !cutTo) return [e];
+      // A parent change whose new parent is trashed is left out: with that end cut it would read as a change
+      // that never happened (e.g. "removed the parent"), and so is one from a trashed parent to none. A move from
+      // a trashed parent to a live one keeps the live end as `{ from: null, to }`. The other changes stay.
+      const parentChange =
+        cutTo || (cutFrom && !change!.to)
+          ? withoutKey(changes!, 'parent')
+          : cutFrom
+            ? { ...changes!, parent: { from: null, to: change!.to } }
+            : changes;
       return [
         {
           ...e,
           data: {
             ...e.data,
             ...(cutParent && { issue: { ...issue, parentId: null, parent: null } }),
-            // A parent change naming a trashed issue is left out: with that end cut it would read as a change
-            // that never happened (e.g. "removed the parent"). The other changes stay.
-            ...(cutChange && { changes: withoutKey(changes!, 'parent') }),
+            ...((cutFrom || cutTo) && { changes: parentChange }),
           },
         },
       ];

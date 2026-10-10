@@ -384,4 +384,50 @@ describe(`deleted content needs write (${testDialect()})`, () => {
     await deleteLink(editor, linkToTrashed);
     expect((await listEvents(t.ctx, { types: ['link.deleted'] })).data).toHaveLength(1);
   });
+
+  // Writes too, in a project of its own.
+  it('keeps a move from a trashed parent to a live one as { from: null, to } below write', async () => {
+    const project = await createProject(t.ctx, {
+      key: 'REP',
+      name: 'Reparent',
+      visibility: 'public',
+    });
+    await grant(t, 'REP', viewer, 'viewer');
+    await grant(t, 'REP', editor, 'editor');
+    const old = await createIssue(t.ctx, 'REP', { title: 'old parent' });
+    const next = await createIssue(t.ctx, 'REP', { title: 'new parent' });
+    const moved = await createIssue(t.ctx, 'REP', { title: 'moved', parent: old.key });
+    const orphaned = await createIssue(t.ctx, 'REP', { title: 'orphaned', parent: old.key });
+    const adopted = await createIssue(t.ctx, 'REP', { title: 'adopted' });
+    await updateIssue(t.ctx, moved.key, { parent: next.key });
+    await updateIssue(t.ctx, orphaned.key, { parent: null });
+    await updateIssue(t.ctx, adopted.key, { parent: old.key });
+    await deleteIssue(t.ctx, old.key);
+
+    /** `changes` of the one `issue.updated` event of `key`, as `who` sees it in the log and in the activity. */
+    const changesOf = async (who: ServiceContext, key: string) => {
+      const listed = (
+        await listEvents(who, { project: project.id, types: ['issue.updated'] })
+      ).data.filter((e) => (e.data.issue as { key: string }).key === key);
+      expect(listed, `${who.actor.handle} ${key}`).toHaveLength(1);
+      const activity = (await listIssueActivity(who, key)).data.filter(
+        (e) => e.type === 'issue.updated',
+      );
+      expect(activity.map((e) => e.data.changes)).toEqual([listed[0]!.data.changes]);
+      return listed[0]!.data.changes;
+    };
+    const ref = (issue: { id: string; key: string }) =>
+      expect.objectContaining({ id: issue.id, key: issue.key });
+    for (const who of readers) {
+      // The live end of the move stays; the trashed one is cut.
+      expect(await changesOf(who, moved.key)).toEqual({ parent: { from: null, to: ref(next) } });
+      // From a trashed parent to none, or to a trashed one, there is nothing left to tell.
+      expect(await changesOf(who, orphaned.key)).toEqual({});
+      expect(await changesOf(who, adopted.key)).toEqual({});
+    }
+    expect(await changesOf(editor, moved.key)).toEqual({
+      parent: { from: ref(old), to: ref(next) },
+    });
+    expect(await changesOf(editor, orphaned.key)).toEqual({ parent: { from: ref(old), to: null } });
+  });
 });
