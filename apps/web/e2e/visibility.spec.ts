@@ -123,6 +123,45 @@ test('signed out, grouping by a person field keeps every issue on the board', as
   await anon.close();
 });
 
+test('a role change reaches the member live: controls and the member list update', async ({
+  page,
+  browser,
+}) => {
+  const key = unique('LV');
+  await post(page.request, '/projects', { key, name: 'Live roles' });
+  await post(page.request, `/projects/${key}/issues`, { title: 'Watched live' });
+  await post(page.request, `/projects/${key}/members`, { user: 'grace', role: 'viewer' });
+
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  await p.goto(`${origin}/p/${key}`);
+  await expect(p.getByText('Watched live')).toBeVisible();
+  await expect(p.getByTestId('live-indicator')).toHaveAttribute('data-connected', 'true');
+  await expect(p.getByRole('link', { name: 'Settings' })).toHaveCount(0);
+  await expect(p.getByRole('button', { name: /new issue/i })).toHaveCount(0);
+
+  // A manager promotes Grace: her page gains the editing controls without a reload.
+  const promoted = await page.request.patch(`/api/v1/projects/${key}/members/grace`, {
+    data: { role: 'editor' },
+    headers: { origin },
+  });
+  expect(promoted.ok(), await promoted.text()).toBe(true);
+  await expect(p.getByRole('link', { name: 'Settings' })).toBeVisible();
+  await expect(p.getByRole('button', { name: /new issue/i }).first()).toBeVisible();
+
+  // On the settings page, a member added elsewhere shows up live.
+  await p.getByRole('link', { name: 'Settings' }).click();
+  await expect(p.getByTestId('settings-editor-note')).toBeVisible();
+  await expect(p.getByTestId('live-indicator')).toHaveAttribute('data-connected', 'true');
+  await post(page.request, `/projects/${key}/members`, { user: 'member', role: 'viewer' });
+  await expect(p.getByTestId('settings-access').getByText('@member')).toBeVisible();
+  await ctx.close();
+});
+
 test('a manager makes a project public, adds a repo and a member', async ({ page }) => {
   const key = unique('CF');
   await post(page.request, '/projects', { key, name: 'Config' });

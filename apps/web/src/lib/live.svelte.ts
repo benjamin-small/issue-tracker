@@ -77,6 +77,14 @@ function handle(qc: QueryClient, event: TrackerEvent, meId: string | undefined) 
     }
     return;
   }
+  // Membership changed: the viewer's own level (`myAccess`) may differ, so refetch it (the controls that depend on
+  // it follow) and the members list. Nothing else about the project changed.
+  if (event.type.startsWith('project.member_')) {
+    void qc.invalidateQueries({ queryKey: ['project'] });
+    void qc.invalidateQueries({ queryKey: keys.projects });
+    void qc.invalidateQueries({ queryKey: ['members'] });
+    return;
+  }
   // Workflow, labels, projects, users: reference data changed (and issue snapshots embed some of it).
   if (
     event.type.startsWith('status.') ||
@@ -88,6 +96,10 @@ function handle(qc: QueryClient, event: TrackerEvent, meId: string | undefined) 
     void qc.invalidateQueries({ queryKey: keys.projects });
     void qc.invalidateQueries({ queryKey: ['project'] });
     void qc.invalidateQueries({ queryKey: ['issues'] });
+    // A visibility change can change the viewer's level too (the project and projects refetch above).
+    if (event.type === 'project.updated') void qc.invalidateQueries({ queryKey: ['members'] });
+    // Issues that named an unlinked repo lose it, open issue pages included.
+    if (event.type === 'project.repo_removed') void qc.invalidateQueries({ queryKey: ['issue'] });
   } else if (event.type.startsWith('field.')) {
     // Field definitions changed: refetch them and anything embedding custom field values.
     void qc.invalidateQueries({ queryKey: ['fields'] });
@@ -147,6 +159,11 @@ export function connectLive(qc: QueryClient, projectKey: string): () => void {
     'attachment.deleted',
     'project.created',
     'project.updated',
+    'project.member_added',
+    'project.member_changed',
+    'project.member_removed',
+    'project.repo_added',
+    'project.repo_removed',
     'status.created',
     'status.updated',
     'status.deleted',
