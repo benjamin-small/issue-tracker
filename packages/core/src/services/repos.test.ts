@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { testDialect } from '@poietic-tech/issues-db/testing';
-import { addRepo, parseRepoRef, removeRepo } from './repos.ts';
+import { parseRepoRef } from '../refs.ts';
+import { addRepo, removeRepo } from './repos.ts';
 import { createProject, getProject } from './projects.ts';
 import {
   createIssue,
@@ -19,11 +20,20 @@ describe('parseRepoRef', () => {
     ['https://github.com/acme/app', { owner: 'acme', name: 'app' }],
     ['https://github.com/acme/app.git', { owner: 'acme', name: 'app' }],
     ['github.com/acme/app/pull/12', { owner: 'acme', name: 'app' }],
+    // Scheme and host in any case; owner and name keep theirs.
+    ['HTTPS://GitHub.com/Acme/App', { owner: 'Acme', name: 'App' }],
+    ['Http://WWW.GITHUB.COM/Acme/App.git', { owner: 'Acme', name: 'App' }],
+    ['GITHUB.COM/acme/App', { owner: 'acme', name: 'App' }],
+    ['Acme/App', { owner: 'Acme', name: 'App' }],
   ])('parses %s', (input, expected) => expect(parseRepoRef(input)).toEqual(expected));
-  it.each(['acme', 'https://gitlab.com/acme/app', 'acme/app/extra?x', '-bad/app', 'acme/ap p'])(
-    'rejects %s',
-    (input) => expect(() => parseRepoRef(input)).toThrow(/repository/i),
-  );
+  it.each([
+    'acme',
+    'https://gitlab.com/acme/app',
+    'HTTPS://GitLab.com/acme/app',
+    'acme/app/extra?x',
+    '-bad/app',
+    'acme/ap p',
+  ])('rejects %s', (input) => expect(() => parseRepoRef(input)).toThrow(/repository/i));
 });
 
 describe(`repo links (${testDialect()})`, () => {

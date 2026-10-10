@@ -22,8 +22,7 @@ import {
 import { readableProjectIds, whereReadable, writableProjectIds } from './access.ts';
 import type { ServiceContext } from './context.ts';
 import { DomainError, validationError } from './errors.ts';
-import { getIssueRow } from './refs.ts';
-import { parseRepoRef } from './services/repos.ts';
+import { getIssueRow, parseRepoRef } from './refs.ts';
 import {
   customFieldSql,
   loadCustomFieldValues,

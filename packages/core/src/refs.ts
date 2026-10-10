@@ -2,7 +2,7 @@ import type { Kysely, Database, Selectable } from '@poietic-tech/issues-db';
 import { isIdOf, parseIssueKey } from '@poietic-tech/issues-schema';
 import { type AccessLevel, atLeast, projectLevel, requireLevel } from './access.ts';
 import type { ServiceContext } from './context.ts';
-import { notFound } from './errors.ts';
+import { notFound, validationError } from './errors.ts';
 
 type Exec = Kysely<Database>;
 type Need = Exclude<AccessLevel, 'none'>;
@@ -131,4 +131,29 @@ export async function getStatusRow(db: Exec, projectId: string, ref: string) {
   const row = await findStatus(db, projectId, ref);
   if (!row) throw notFound('Status', ref);
   return row;
+}
+
+const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+const NAME = /^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$/;
+
+/**
+ * `owner/name`, or any github.com URL under the repository, reduced to owner and name. The scheme and host
+ * match in any case (`HTTPS://GitHub.com/…`); owner and name keep the case they were given.
+ */
+export function parseRepoRef(input: string): { owner: string; name: string } {
+  const trimmed = input
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '');
+  const urlForm = trimmed.toLowerCase().startsWith('github.com/');
+  if (/^[^/]+\.[^/]+\//.test(trimmed) && !urlForm)
+    throw validationError(`Not a GitHub repository: "${input}"`);
+  const path = urlForm ? trimmed.slice('github.com/'.length).split(/[?#]/)[0]! : trimmed;
+  const [owner, rawName, ...rest] = path.split('/');
+  const name = rawName?.replace(/\.git$/, '');
+  if (!owner || !name || !OWNER.test(owner) || !NAME.test(name) || (!urlForm && rest.length))
+    throw validationError(
+      `Not a GitHub repository: "${input}" (expected owner/name or a github.com URL)`,
+    );
+  return { owner, name };
 }
