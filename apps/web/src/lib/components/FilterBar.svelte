@@ -3,7 +3,8 @@
   import X from '@lucide/svelte/icons/x';
   import GitBranch from '@lucide/svelte/icons/git-branch';
   import { FieldRegistry, type IssueFilter } from '@poietic-tech/issues-schema';
-  import { PRIORITY_LABELS, PRIORITY_ORDER } from '../format.ts';
+  import type { Issue } from '../api.ts';
+  import { PRIORITY_LABELS, PRIORITY_ORDER, unknownUserLabel } from '../format.ts';
   import type { ProjectData } from '../project-data.svelte.ts';
   import Avatar from './Avatar.svelte';
   import FilterChip from './FilterChip.svelte';
@@ -17,8 +18,15 @@
   let {
     filter,
     project,
+    issues = [],
     onchange,
-  }: { filter: IssueFilter; project: ProjectData; onchange: (f: IssueFilter) => void } = $props();
+  }: {
+    filter: IssueFilter;
+    project: ProjectData;
+    /** The issues in view: signed out, they are the only source of people for the assignee filter. */
+    issues?: Issue[];
+    onchange: (f: IssueFilter) => void;
+  } = $props();
 
   type Value = string | number | null;
   const QUICK = ['status', 'assignee', 'labels', 'priority', 'repo'];
@@ -60,6 +68,28 @@
     if (key === NONE) return null;
     return field === 'priority' ? Number(key) : key;
   }
+
+  type Person = Issue['creator'];
+  /**
+   * People the assignee filter offers: the user directory, plus the assignees embedded in the issues (all a
+   * signed-out visitor gets). Assignees once seen are kept, so narrowing the list doesn't drop them from the menu.
+   */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a memo filled while deriving `people`, never read reactively
+  const seen = new Map<string, Person>();
+  const people = $derived.by(() => {
+    for (const i of issues) if (i.assignee) seen.set(i.assignee.id, i.assignee);
+    const directory = new Set(project.users.map((u) => u.id));
+    const extra = [...seen.values()]
+      .filter((p) => !directory.has(p.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return [...project.users, ...extra] as Person[];
+  });
+  /** Chosen assignees nobody describes (from a saved view, or a removed user) still get an item. */
+  const unknownAssignees = $derived(
+    valuesOf('assignee').filter(
+      (v): v is string => typeof v === 'string' && v !== 'me' && !people.some((p) => p.id === v),
+    ),
+  );
 
   const registry = $derived(new FieldRegistry(project.customFields));
   const OPS: Record<string, string> = {
@@ -139,7 +169,8 @@
     plural="people"
     items={[
       { value: NONE, label: 'No assignee', u: null },
-      ...project.users.map((u) => ({ value: u.id, label: u.name, keywords: [u.handle], u })),
+      ...people.map((u) => ({ value: u.id, label: u.name, keywords: [u.handle], u })),
+      ...unknownAssignees.map((id) => ({ value: id, label: unknownUserLabel(id), u: null })),
     ]}
     {...chipProps('assignee')}
     testid="filter-assignee"

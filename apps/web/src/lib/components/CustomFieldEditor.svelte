@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useQueryClient } from '@tanstack/svelte-query';
   import type { CustomField, Issue, User } from '../api.ts';
+  import { findPerson, unknownUserLabel } from '../format.ts';
   import { updateIssue } from '../issues.ts';
   import Avatar from './Avatar.svelte';
   import DateInput from './DateInput.svelte';
@@ -69,7 +70,7 @@
       ></span>{it.label}{/snippet}
   </Picker>
 {:else if field.type === 'user'}
-  {@const u = users.find((x) => x.id === value) ?? null}
+  {@const u = findPerson(value, users, [issue.assignee, issue.creator]) ?? null}
   <Picker
     items={[
       { value: NONE, label: 'None', u: null },
@@ -80,9 +81,12 @@
     triggerLabel={field.name}
     testid="cf-{field.key}"
   >
-    {#snippet trigger()}<Avatar user={u} size={16} />{#if u}{u.name}{:else}<span
-          class="text-fg-subtle">{setLabel}</span
-        >{/if}{/snippet}
+    {#snippet trigger()}<Avatar
+        user={u}
+        size={16}
+      />{#if u}{u.name}{:else if typeof value === 'string'}<span title={value}
+          >{unknownUserLabel(value)}</span
+        >{:else}<span class="text-fg-subtle">{setLabel}</span>{/if}{/snippet}
     {#snippet item(it)}<Avatar user={it.u} size={16} />{it.label}{/snippet}
   </Picker>
 {:else if field.type === 'boolean'}

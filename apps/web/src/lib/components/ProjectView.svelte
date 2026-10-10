@@ -110,6 +110,7 @@
       <FilterBar
         filter={config.filter}
         {project}
+        issues={issues.data}
         onchange={(filter) => setConfig({ ...config, filter })}
       />
     </div>

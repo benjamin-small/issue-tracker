@@ -123,6 +123,60 @@ test('signed out, grouping by a person field keeps every issue on the board', as
   await anon.close();
 });
 
+test('signed out, people come from the issues, and the sign-in page leads back', async ({
+  page,
+  browser,
+}) => {
+  const key = unique('PO');
+  await post(page.request, '/projects', { key, name: 'People out', visibility: 'public' });
+  await post(page.request, `/projects/${key}/fields`, {
+    key: 'owner',
+    name: 'Owner',
+    type: 'user',
+  });
+  const graces = await post(page.request, `/projects/${key}/issues`, {
+    title: 'Grace owns it',
+    assignee: 'grace',
+    customFields: { owner: 'grace' },
+  });
+  const mias = await post(page.request, `/projects/${key}/issues`, {
+    title: 'Mia owns it',
+    customFields: { owner: 'member' },
+  });
+
+  const anon = await browser.newContext();
+  const p = await anon.newPage();
+  const errors: string[] = [];
+  p.on('pageerror', (error) => errors.push(error.message));
+  await p.goto(`${origin}/p/${key}`);
+  await expect(p.getByTestId('issue-row')).toHaveCount(2);
+
+  // The user directory needs sign-in; the assignee filter offers the people the issues name.
+  await p.getByTestId('filter-assignee').click();
+  await p.getByRole('option', { name: 'Grace Hopper' }).click();
+  await p.keyboard.press('Escape');
+  await expect(p.getByTestId('issue-row')).toHaveCount(1);
+  await expect(p.getByTestId('issue-row')).toContainText('Grace owns it');
+  await expect(p.getByTestId('filter-assignee-active')).toContainText('Grace Hopper');
+
+  // A person field names whoever the issue embeds, else says the user is unknown (with the id).
+  await p.goto(`${origin}/i/${graces.key}`);
+  await expect(p.locator('[data-cf="owner"]')).toContainText('Grace Hopper');
+  await p.goto(`${origin}/i/${mias.key}`);
+  await expect(p.locator('[data-cf="owner"]')).toContainText('Unknown user');
+  await expect(p.locator('[data-cf="owner"]')).toHaveAttribute('title', /Owner: usr_/);
+
+  // The sign-in page has a way back for visitors who only want to read.
+  await p.goto(`${origin}/p/${key}`);
+  await p.getByRole('button', { name: 'Sign in' }).click();
+  await expect(p).toHaveURL(/\/login\?next=/);
+  await p.getByRole('link', { name: 'Continue without signing in' }).click();
+  await expect(p).toHaveURL(new RegExp(`/p/${key}$`));
+  await expect(p.getByTestId('issue-row')).toHaveCount(2);
+  expect(errors, 'uncaught errors in the page').toEqual([]);
+  await anon.close();
+});
+
 test('a role change reaches the member live: controls and the member list update', async ({
   page,
   browser,

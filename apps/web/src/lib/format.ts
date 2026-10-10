@@ -37,3 +37,21 @@ export function repoUrl(repos: { fullName: string; url: string }[], fullName: st
   const linked = repos.find((r) => r.fullName.toLowerCase() === fullName.toLowerCase());
   return linked?.url ?? `https://github.com/${fullName}`;
 }
+
+/** Label for a user id that no directory or embedded summary describes (signed out, or a removed user). */
+export function unknownUserLabel(id: string): string {
+  return `Unknown user (${id.slice(-4)})`;
+}
+
+/** A person by id: from the user directory, else from summaries embedded in issues (all signed-out visitors get). */
+export function findPerson<P extends { id: string }>(
+  id: unknown,
+  ...sources: ReadonlyArray<ReadonlyArray<P | null | undefined>>
+): P | undefined {
+  if (typeof id !== 'string') return undefined;
+  for (const source of sources) {
+    const found = source.find((p) => p?.id === id);
+    if (found) return found;
+  }
+  return undefined;
+}

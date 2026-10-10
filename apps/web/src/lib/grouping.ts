@@ -1,5 +1,5 @@
 import type { Issue } from './api.ts';
-import { PRIORITY_LABELS, PRIORITY_ORDER } from './format.ts';
+import { PRIORITY_LABELS, PRIORITY_ORDER, unknownUserLabel } from './format.ts';
 import type { ProjectData } from './project-data.svelte.ts';
 
 export type GroupHeaderSpec =
@@ -55,11 +55,7 @@ function userGroups(
   ]
     .sort()
     .map((id) =>
-      group(
-        id,
-        { kind: 'user', label: `Unknown user (${id.slice(-4)})`, user: null },
-        (i) => value(i) === id,
-      ),
+      group(id, { kind: 'user', label: unknownUserLabel(id), user: null }, (i) => value(i) === id),
     );
   return [...known, ...unknown];
 }

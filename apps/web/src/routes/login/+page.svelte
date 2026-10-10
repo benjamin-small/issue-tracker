@@ -1,7 +1,7 @@
 <script lang="ts">
   import { btn, input } from '$lib/styles.ts';
   import { asset } from '$app/paths';
-  import { current, navigate, shareUrl } from '$lib/nav.ts';
+  import { current, href, navigate, shareUrl } from '$lib/nav.ts';
 
   const DEMO = import.meta.env.POIETIC_ISSUES_DEMO;
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -17,11 +17,13 @@
   let busy = $state(false);
 
   const next = $derived(current().params.get('next') ?? '/');
+  /** Where to go afterwards: an app path only (never another origin). */
+  const back = $derived(next.startsWith('/') && !next.startsWith('//') ? next : '/');
 
   async function finish() {
     // Signed-out browsing may have cached what an anonymous visitor sees (empty lists, not-found projects).
     qc.clear();
-    await navigate(next.startsWith('/') && !next.startsWith('//') ? next : '/');
+    await navigate(back);
   }
 
   async function tokenLogin(event: SubmitEvent) {
@@ -185,5 +187,11 @@
       </form>
     {/if}
     {#if error}<p class="mt-3 text-sm text-danger" role="alert">{error}</p>{/if}
+    <!-- Public projects can be read signed out: a visitor who came here by mistake goes back to where they were. -->
+    <p class="mt-6 text-center text-sm">
+      <a href={href(back)} class="text-fg-muted hover:text-fg hover:underline"
+        >Continue without signing in</a
+      >
+    </p>
   </div>
 </main>
