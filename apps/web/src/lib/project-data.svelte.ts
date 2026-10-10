@@ -79,7 +79,10 @@ export function useProjectData(key: () => string): ProjectData {
     queryFn: () => fetchers.fields(key()),
     enabled: !!key(),
   }));
-  const queries = [project, statuses, labels, users, views, fields];
+  /** What `loaded` waits for; a failure here is the project's error. */
+  const required = [project, statuses, labels, users, fields];
+  /** Also retried, but optional: saved views failing to load leaves the project usable without them. */
+  const queries = [...required, views];
   return {
     get key() {
       return key();
@@ -129,7 +132,7 @@ export function useProjectData(key: () => string): ProjectData {
     },
     get error() {
       // Read data and error of every query (no short-circuit), for the same reason as `loaded`.
-      const failures = queries.map((q) => [q.data, q.error] as const);
+      const failures = required.map((q) => [q.data, q.error] as const);
       const failed = failures.find(
         ([data, error]) =>
           data === undefined && error && !(error instanceof ApiError && error.status === 404),

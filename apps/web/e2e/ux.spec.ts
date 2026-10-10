@@ -157,6 +157,25 @@ test('a project that fails to load says so, with a retry, in the view and in set
   await expect(page.getByTestId('settings-statuses')).toBeVisible();
 });
 
+test('saved views that fail to load do not block the project', async ({ page }) => {
+  let attempts = 0;
+  await page.route(/\/api\/v1\/projects\/ENG\/views(\?.*)?$/, (route) => {
+    attempts++;
+    return route.fulfill({
+      status: 500,
+      contentType: 'application/problem+json',
+      body: JSON.stringify({ title: 'Internal error', status: 500, code: 'INTERNAL' }),
+    });
+  });
+  await page.goto('/p/ENG');
+  await expect(page.getByTestId('issue-row').first()).toBeVisible();
+  // Server errors are retried twice (1s, then 2s); once the views query has given up, the project still shows.
+  await expect.poll(() => attempts, { timeout: 10_000 }).toBe(3);
+  await page.waitForTimeout(500); // let the last failure settle before checking it is not shown
+  await expect(page.getByTestId('project-error')).toHaveCount(0);
+  await expect(page.getByTestId('issue-row').first()).toBeVisible();
+});
+
 test('a missing project shows only the not-found state, without the view header', async ({
   page,
 }) => {
