@@ -522,8 +522,8 @@ describe(`project access commands without manage (${testDialect()})`, () => {
     };
 
     for (const actor of ['member', 'bot']) {
-      const run = asActor(actor);
-      const add = await run([
+      const as = asActor(actor);
+      const add = await as([
         'project',
         'members',
         'add',
@@ -536,7 +536,7 @@ describe(`project access commands without manage (${testDialect()})`, () => {
       expect(add.code, `${actor} adding`).toBe(5);
       expect(add.stderr).toMatch(/Only project managers can do this/);
       expect(add.stdout).toBe('');
-      const json = await run([
+      const json = await as([
         'project',
         'members',
         'add',
@@ -550,12 +550,12 @@ describe(`project access commands without manage (${testDialect()})`, () => {
       expect(json.code).toBe(5);
       expect(JSON.parse(json.stderr)).toMatchObject({ code: 'FORBIDDEN' });
       expect(
-        (await run(['project', 'members', 'set', '@bot', '--role', 'manager', '-P', 'CLIB'])).code,
+        (await as(['project', 'members', 'set', '@bot', '--role', 'manager', '-P', 'CLIB'])).code,
       ).toBe(5);
-      expect((await run(['project', 'members', 'remove', '@member', '-P', 'CLIB'])).code).toBe(5);
-      expect((await run(['project', 'repo', 'add', 'acme/guarded', '-P', 'CLIB'])).code).toBe(5);
+      expect((await as(['project', 'members', 'remove', '@member', '-P', 'CLIB'])).code).toBe(5);
+      expect((await as(['project', 'repo', 'add', 'acme/guarded', '-P', 'CLIB'])).code).toBe(5);
       // Readers can still look.
-      expect((await run(['project', 'members', 'list', '-P', 'CLIB', '-q'])).stdout).toBe(
+      expect((await as(['project', 'members', 'list', '-P', 'CLIB', '-q'])).stdout).toBe(
         'bot\nmember\n',
       );
     }

@@ -71,14 +71,17 @@ describe(`project members (${testDialect()})`, () => {
   });
 
   it('writes nothing and records no event when the role is unchanged', async () => {
-    await createProject(t.ctx, { key: 'SAME', name: 'Same' });
+    const project = await createProject(t.ctx, { key: 'SAME', name: 'Same' });
     const added = await addMember(t.ctx, 'SAME', { user: '@bot', role: 'editor' });
-    const changed = async () =>
-      (await listEvents(t.ctx, { types: ['project.member_changed'], limit: 1000 })).data.length;
-    const before = await changed();
+    // Every membership event of the project, so the add shows the query would see a change if there were one.
+    const memberEvents = async () =>
+      (await listEvents(t.ctx, { project: project.id, limit: 1000 })).data
+        .filter((e) => e.type.startsWith('project.member_'))
+        .map((e) => e.type);
+    expect(await memberEvents()).toEqual(['project.member_added']);
     const same = await updateMember(t.ctx, 'SAME', '@bot', { role: 'editor' });
     expect(same).toEqual(added);
-    expect(await changed()).toBe(before);
+    expect(await memberEvents()).toEqual(['project.member_added']);
     expect((await listMembers(t.ctx, 'SAME'))[0]!.updatedAt).toBe(added.updatedAt);
   });
 
