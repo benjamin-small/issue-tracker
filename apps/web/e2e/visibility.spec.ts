@@ -216,6 +216,23 @@ test('signed out, people come from the issues, and the sign-in page leads back',
   await anon.close();
 });
 
+test('the sign-in page only leads back to this origin', async ({ browser }) => {
+  const anon = await browser.newContext();
+  const p = await anon.newPage();
+  const back = p.getByRole('link', { name: 'Continue without signing in' });
+  for (const next of ['/\\evil.com', '/\t/evil.com', '//evil.com', 'https://evil.com']) {
+    await p.goto(`${origin}/login?next=${encodeURIComponent(next)}`);
+    const target = new URL((await back.getAttribute('href'))!, p.url());
+    expect(target.origin, next).toBe(origin);
+    expect(target.pathname, next).toBe('/');
+  }
+  await p.goto(`${origin}/login?next=${encodeURIComponent('/p/ENG?x=1')}`);
+  await expect(back).toHaveAttribute('href', '/p/ENG?x=1');
+  await back.click();
+  await expect(p).toHaveURL(`${origin}/p/ENG?x=1`);
+  await anon.close();
+});
+
 test('a role change reaches the member live: controls and the member list update', async ({
   page,
   browser,
