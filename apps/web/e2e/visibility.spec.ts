@@ -494,6 +494,71 @@ test('an issue can be linked to one of the project repos and filtered by it', as
   await page.getByRole('button', { name: 'Repository' }).click();
   await page.getByRole('option', { name: 'No repository' }).click();
   await expect(page.getByRole('link', { name: 'acme/app' })).toHaveCount(0);
+  // The cleared link is saved, not just gone from the page.
+  await expect
+    .poll(
+      async () =>
+        ((await (await page.request.get(`/api/v1/issues/${key}-1`)).json()) as { repo: unknown })
+          .repo,
+    )
+    .toBeNull();
+  await page.reload();
+  await expect(page.getByTestId('issue-title')).toHaveValue('Needs a repo');
+  await expect(page.getByRole('button', { name: 'Repository' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'acme/app' })).toHaveCount(0);
+});
+
+test('the list groups by repository, and an unlinked repo’s issues move to "No repository"', async ({
+  page,
+}) => {
+  const key = unique('GR');
+  await post(page.request, '/projects', { key, name: 'Group repos' });
+  await post(page.request, `/projects/${key}/repos`, { repo: 'acme/app' });
+  await post(page.request, `/projects/${key}/repos`, { repo: 'acme/docs' });
+  const app = await post(page.request, `/projects/${key}/issues`, {
+    title: 'In app',
+    repo: 'acme/app',
+  });
+  const docs = await post(page.request, `/projects/${key}/issues`, {
+    title: 'In docs',
+    repo: 'acme/docs',
+  });
+  const none = await post(page.request, `/projects/${key}/issues`, { title: 'In no repo' });
+
+  await page.goto(`/p/${key}`);
+  await expect(page.getByTestId('issue-row')).toHaveCount(3);
+  await page.getByTestId('display-options').click();
+  await choose(page, 'Group by', 'Repository');
+  await page.keyboard.press('Escape');
+  /** Issue keys under each group header, in page order. */
+  const groups = () =>
+    page.locator('[data-testid="list-group"], [data-testid="issue-row"]').evaluateAll((els) => {
+      const out: Record<string, string[]> = {};
+      let current = '';
+      for (const el of els as HTMLElement[]) {
+        if (el.dataset.testid === 'list-group') out[(current = el.dataset.group ?? '')] = [];
+        else out[current]?.push(el.dataset.key ?? '');
+      }
+      return out;
+    });
+  await expect
+    .poll(groups)
+    .toEqual({ 'No repository': [none.key], 'acme/app': [app.key], 'acme/docs': [docs.key] });
+  await expect(page.getByTestId('live-indicator')).toHaveAttribute('data-connected', 'true');
+
+  // Unlinked elsewhere: its issue loses the repo (live), and the group goes with it.
+  const unlinked = await page.request.delete(
+    `/api/v1/projects/${key}/repos/${encodeURIComponent('acme/docs')}`,
+    { headers: { origin } },
+  );
+  expect(unlinked.ok(), await unlinked.text()).toBe(true);
+  const after = { 'No repository': [docs.key, none.key].sort(), 'acme/app': [app.key] };
+  const sorted = async () =>
+    Object.fromEntries(Object.entries(await groups()).map(([g, k]) => [g, k.sort()]));
+  await expect.poll(sorted).toEqual(after);
+  await page.reload();
+  await expect(page.getByTestId('issue-row')).toHaveCount(3);
+  await expect.poll(sorted).toEqual(after);
 });
 
 test('the repo filter offers "No repository", and nulls from saved views read as it', async ({

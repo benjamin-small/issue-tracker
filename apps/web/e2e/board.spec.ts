@@ -139,3 +139,39 @@ test('customizes card fields, saves them as a view, and reproduces it by URL', a
   await page.goto('/p/ENG/board');
   await expect(card(page, key).locator('[data-field="estimate"]')).toHaveCount(0);
 });
+
+test('a viewer can’t drag cards and has no settings link', async ({ page, browser }) => {
+  const origin = `http://127.0.0.1:${process.env.E2E_PORT ?? 3100}`;
+  const key = `VB${Date.now().toString(36).toUpperCase().slice(-6)}`;
+  const seed = async (path: string, data: Record<string, unknown>) => {
+    const res = await page.request.post(`/api/v1${path}`, { data, headers: { origin } });
+    expect(res.ok(), await res.text()).toBe(true);
+    return (await res.json()) as { key: string };
+  };
+  await seed('/projects', { key, name: 'Viewer board' });
+  const issue = await seed(`/projects/${key}/issues`, { title: 'Stays put', status: 'Backlog' });
+  await seed(`/projects/${key}/members`, { user: 'grace', role: 'viewer' });
+
+  const ctx = await browser.newContext();
+  const login = await ctx.request.post(`${origin}/api/v1/auth/dev-login`, {
+    data: { user: 'grace' },
+  });
+  expect(login.ok()).toBe(true);
+  const p = await ctx.newPage();
+  const writes: string[] = [];
+  p.on('request', (r) => {
+    if (r.method() !== 'GET') writes.push(`${r.method()} ${r.url()}`);
+  });
+  await p.goto(`${origin}/p/${key}/board`);
+  await expect(card(p, issue.key)).toBeVisible();
+  await expect(p.getByRole('link', { name: 'Settings' })).toHaveCount(0);
+  await expect(p.getByRole('button', { name: /^New issue in/ })).toHaveCount(0);
+
+  await drag(p, card(p, issue.key), column(p, 'In Review'));
+  await p.waitForTimeout(300);
+  await expect(column(p, 'Backlog').locator(`[data-key="${issue.key}"]`)).toBeVisible();
+  await expect(column(p, 'In Review').locator(`[data-key="${issue.key}"]`)).toHaveCount(0);
+  expect(writes).toEqual([]);
+  expect((await statusOf(page, issue.key)).status.name).toBe('Backlog');
+  await ctx.close();
+});

@@ -8,8 +8,8 @@
   import Avatar from './Avatar.svelte';
   import DateInput from './DateInput.svelte';
   import LabelPicker from './LabelPicker.svelte';
-  import RepoPicker from './RepoPicker.svelte';
   import PriorityPicker from './PriorityPicker.svelte';
+  import RepoPicker from './RepoPicker.svelte';
   import StatusPicker from './StatusPicker.svelte';
   import type { Snippet } from 'svelte';
 
