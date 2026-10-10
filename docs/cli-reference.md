@@ -55,7 +55,7 @@ Aliases: `ls`
 | `--limit <n>` | page size (1-200) |
 | `--cursor <cursor>` | continue from a previous page |
 | `--all` | fetch every page |
-| `--include-deleted` | include issues in the trash |
+| `--include-deleted` | include issues in the trash (only in projects you can write in; ignored elsewhere) |
 | `--all-projects` | search across all projects |
 
 ### `tracker issue view <issue>`

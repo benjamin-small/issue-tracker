@@ -109,7 +109,7 @@
         {
           "flags": "--include-deleted",
           "name": "includeDeleted",
-          "description": "include issues in the trash",
+          "description": "include issues in the trash (only in projects you can write in; ignored elsewhere)",
           "required": false,
           "takesValue": false
         },

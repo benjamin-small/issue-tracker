@@ -121,7 +121,10 @@ export function issueCommand(io: CliIO): Command {
     .option('--limit <n>', 'page size (1-200)', parseIntStrict('--limit'))
     .option('--cursor <cursor>', 'continue from a previous page')
     .option('--all', 'fetch every page')
-    .option('--include-deleted', 'include issues in the trash')
+    .option(
+      '--include-deleted',
+      'include issues in the trash (only in projects you can write in; ignored elsewhere)',
+    )
     .option('--all-projects', 'search across all projects')
     .action(
       act(async (rt, _args, o) => {

@@ -38,6 +38,7 @@ Every change is appended to the `events` table in the same transaction as the ch
 - `seq` increases in commit order. Rolled-back transactions may leave gaps, but an event never appears _behind_ one you have already seen. Resume with `after=<last seq>`.
 - `data` always holds the resource snapshot after the change, so consumers never need to refetch.
 - `data.changes` holds `{ field: { from, to } }` for updates.
+- `GET /events` and the live stream show each viewer only what they may see: readers below `write` on a project do not get events of trashed issues or deleted attachments, and deleted comments arrive with an empty body ([security.md](security.md#project-access)). Webhooks deliver the raw events.
 - `data.requestId` identifies the API request that caused the change. The web app uses it to ignore echoes of its own writes.
 
 | Type                                                                | `data`                                                                          |
