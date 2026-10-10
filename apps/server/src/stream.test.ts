@@ -5,16 +5,24 @@ import {
   createProject,
   createToken,
   createUser,
+  deleteAttachment,
   deleteIssue,
   EventTailer,
   latestEventSeq,
   listEvents,
+  LocalDiskBlobStore,
   removeMember,
+  updateIssue,
+  updateProject,
   updateUser,
+  uploadAttachment,
 } from '@poietic-tech/issues-core';
 import type { TrackerEvent } from '@poietic-tech/issues-schema';
 import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
 import { testDialect } from '@poietic-tech/issues-db/testing';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import { pino } from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -79,31 +87,45 @@ async function collect(
   const messages: Message[] & { ended?: boolean } = [];
   let buffer = '';
   let acting: Promise<void> | undefined;
+  // A failing `act` ends the wait at once and is reported as such, rather than as a stream that went quiet.
+  let actError: Error | undefined;
+  let actFailed!: (error: Error) => void;
+  const failure = new Promise<never>((_, reject) => (actFailed = reject));
+  failure.catch(() => {}); // reported through `actError` once the loop is done with it
   const deadline = Date.now() + 5000;
-  while (!done(messages) && Date.now() < deadline) {
-    const { value, done: end } = await reader.read();
-    if (end) {
-      messages.ended = true;
-      break;
-    }
-    buffer += decoder.decode(value, { stream: true });
-    let idx;
-    while ((idx = buffer.indexOf('\n\n')) >= 0) {
-      const block = buffer.slice(0, idx);
-      buffer = buffer.slice(idx + 2);
-      const msg: Message = {};
-      for (const line of block.split('\n')) {
-        const [k, ...rest] = line.split(':');
-        const v = rest.join(':').replace(/^ /, '');
-        if (k === 'id' || k === 'event' || k === 'data') msg[k] = v;
+  try {
+    while (!done(messages) && Date.now() < deadline) {
+      const { value, done: end } = await Promise.race([reader.read(), failure]);
+      if (end) {
+        messages.ended = true;
+        break;
       }
-      if (msg.event || msg.data) messages.push(msg);
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) >= 0) {
+        const block = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const msg: Message = {};
+        for (const line of block.split('\n')) {
+          const [k, ...rest] = line.split(':');
+          const v = rest.join(':').replace(/^ /, '');
+          if (k === 'id' || k === 'event' || k === 'data') msg[k] = v;
+        }
+        if (msg.event || msg.data) messages.push(msg);
+      }
+      if (!acting && messages.some((m) => m.event === 'ready') && act)
+        acting = act(messages).catch((error: unknown) => {
+          actError = new Error(`the test's act failed: ${String(error)}`, { cause: error });
+          actFailed(actError);
+        });
     }
-    if (!acting && messages.some((m) => m.event === 'ready') && act) acting = act(messages);
+    // An act still running when the stream ended can fail after the loop; that is still the test's failure.
+    await acting;
+    if (actError) throw actError;
+  } finally {
+    controller.abort();
+    await reader.cancel().catch(() => {});
   }
-  controller.abort();
-  await reader.cancel().catch(() => {});
-  await acting;
   return messages;
 }
 
@@ -243,7 +265,12 @@ describe(`SSE /events/stream (${testDialect()})`, () => {
       racingApp,
     );
     expect(titles(messages)).toEqual(['setup marker']);
-    expect(messages.some((m) => m.event === 'project.member_removed')).toBe(false);
+    // The removal itself is after the stream's position: it arrives, without content.
+    expect(
+      messages
+        .filter((m) => m.event === 'project.member_removed')
+        .map((m) => JSON.parse(m.data!).data),
+    ).toEqual([{ member: { user: { id: t.member.actor.id } } }]);
   });
 
   it('drops its subscription when setting up the stream fails', async () => {
@@ -425,10 +452,11 @@ describe(`SSE /events/stream (${testDialect()})`, () => {
     });
   });
 
-  it("keeps trashed issues out of readers' streams, as GET /events does", async () => {
+  it('gives readers a content-free tombstone for a trashed issue, live and on replay', async () => {
     const watch = async (bearer: string | null, n: number) => {
       // Created before the stream opens, so every event about it is processed after it is trashed or not at all.
       const doomed = await createIssue(t.ctx, 'PUB', { title: `to be trashed ${n}` });
+      await updateIssue(t.ctx, doomed.key, { title: `renamed then trashed ${n}` });
       // …and seen by the tailer, so the stream starts after it rather than receiving it live.
       const created = await latestEventSeq(t.ctx);
       while (tailer.lastSeq < created) await new Promise((r) => setTimeout(r, 10));
@@ -442,14 +470,159 @@ describe(`SSE /events/stream (${testDialect()})`, () => {
         },
         bearer,
       );
-      return { messages, doomed };
+      return { messages, doomed, created };
     };
     for (const [n, bearer] of [null, memberToken].entries()) {
-      const { messages, doomed } = await watch(bearer, n);
+      const { messages, doomed, created } = await watch(bearer, n);
       expect(titles(messages)).toEqual([`trash marker ${n}`]);
-      expect(messages.some((m) => m.data?.includes(doomed.id))).toBe(false);
+      const about = messages.filter((m) => m.data?.includes(doomed.id));
+      // Only the deletion arrives, with the id and key the client needs to drop the row, and nothing else.
+      expect(about.map((m) => m.event)).toEqual(['issue.deleted']);
+      expect(JSON.parse(about[0]!.data!).data).toEqual({
+        issue: { id: doomed.id, key: doomed.key },
+      });
+      // A reconnect replays the same.
+      const replayed = await collect(
+        '?project=PUB',
+        { 'last-event-id': String(created) },
+        sawTitle(`trash marker ${n}`),
+        undefined,
+        bearer,
+      );
+      expect(
+        replayed.filter((m) => m.data?.includes(doomed.id)).map((m) => [m.event, m.data]),
+      ).toEqual(about.map((m) => [m.event, m.data]));
     }
     const admin = await watch(token, 9);
-    expect(admin.messages.some((m) => m.event === 'issue.deleted')).toBe(true);
+    const deleted = admin.messages.filter((m) => m.event === 'issue.deleted');
+    expect(deleted).toHaveLength(1);
+    expect(JSON.parse(deleted[0]!.data!).data.issue.title).toBe('renamed then trashed 9');
+  });
+
+  it('gives readers a content-free tombstone for a deleted attachment', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sse-blobs-'));
+    try {
+      const blobs = new LocalDiskBlobStore(dir);
+      const issue = await createIssue(t.ctx, 'PUB', { title: 'has a file' });
+      const upload = await uploadAttachment(t.ctx, blobs, issue.key, {
+        filename: 'secret-name.txt',
+        data: new TextEncoder().encode('bytes'),
+      });
+      for (const bearer of [null, memberToken, token]) {
+        const file =
+          bearer === null
+            ? upload
+            : await uploadAttachment(t.ctx, blobs, issue.key, {
+                filename: 'secret-name.txt',
+                data: new TextEncoder().encode('bytes'),
+              });
+        const marker = `attachment marker ${String(bearer)}`;
+        const messages = await collect(
+          '?project=PUB',
+          {},
+          sawTitle(marker),
+          async () => {
+            await deleteAttachment(t.ctx, blobs, file.id);
+            await createIssue(t.ctx, 'PUB', { title: marker });
+          },
+          bearer,
+        );
+        const deleted = messages.filter((m) => m.event === 'attachment.deleted');
+        expect(deleted).toHaveLength(1);
+        const data = JSON.parse(deleted[0]!.data!).data;
+        if (bearer === token) expect(data.attachment.filename).toBe('secret-name.txt');
+        else
+          expect(data).toEqual({
+            issue: { id: issue.id, key: issue.key },
+            attachment: { id: file.id },
+          });
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('tells a viewer removed from a private project, without content, and ends a stream on it', async () => {
+    await createProject(t.ctx, { key: 'GONE', name: 'Gone' });
+    await addMember(t.ctx, 'GONE', { user: 'member', role: 'viewer' });
+    const memberId = t.member.actor.id;
+    const messages = await collect(
+      '?project=GONE',
+      {},
+      () => false,
+      async () => {
+        await createIssue(t.ctx, 'GONE', { title: 'while a member' });
+        await removeMember(t.ctx, 'GONE', 'member');
+        await createIssue(t.ctx, 'GONE', { title: 'after the removal' });
+      },
+      memberToken,
+    );
+    expect(messages.ended).toBe(true);
+    expect(titles(messages)).toEqual(['while a member']);
+    const removed = messages.filter((m) => m.event === 'project.member_removed');
+    expect(removed).toHaveLength(1);
+    expect(JSON.parse(removed[0]!.data!).data).toEqual({ member: { user: { id: memberId } } });
+    expect(messages.at(-1)!.event).toBe('project.member_removed');
+  });
+
+  it('keeps an unfiltered stream open after the viewer loses a project, and says so once', async () => {
+    await createProject(t.ctx, { key: 'GONE2', name: 'Gone too' });
+    await addMember(t.ctx, 'GONE2', { user: 'member', role: 'viewer' });
+    await addMember(t.ctx, 'GONE2', { user: 'bot', role: 'viewer' });
+    const messages = await collect(
+      '',
+      {},
+      sawTitle('still streaming'),
+      async (seen) => {
+        await removeMember(t.ctx, 'GONE2', 'bot'); // someone else: the viewer can still read it
+        // Access is read as of when the stream handles a membership event, so let this one arrive first.
+        await delivered(seen, (m) => m.some((x) => x.event === 'project.member_removed'));
+        await removeMember(t.ctx, 'GONE2', 'member');
+        await createIssue(t.ctx, 'GONE2', { title: 'hidden now' });
+        await createIssue(t.ctx, 'PUB', { title: 'still streaming' });
+      },
+      memberToken,
+    );
+    expect(titles(messages)).toEqual(['still streaming']);
+    const removed = messages
+      .filter((m) => m.event === 'project.member_removed')
+      .map(
+        (m) => JSON.parse(m.data!).data as { member: { user: { id: string; handle?: string } } },
+      );
+    // Bot's removal is visible in full; the viewer's own one arrives without content.
+    expect(removed.map((d) => d.member.user.handle)).toEqual(['bot', undefined]);
+    expect(removed[1]).toEqual({ member: { user: { id: t.member.actor.id } } });
+  });
+
+  it('tells anonymous viewers when a public project goes private, without content, and ends the stream', async () => {
+    await createProject(t.ctx, { key: 'SHUT', name: 'Shutting', visibility: 'public' });
+    const messages = await collect(
+      '?project=SHUT',
+      {},
+      () => false,
+      async () => {
+        await createIssue(t.ctx, 'SHUT', { title: 'while public' });
+        await updateProject(t.ctx, 'SHUT', { visibility: 'private', name: 'Secret name' });
+        await createIssue(t.ctx, 'SHUT', { title: 'while private' });
+      },
+      null,
+    );
+    expect(messages.ended).toBe(true);
+    expect(titles(messages)).toEqual(['while public']);
+    const updated = messages.filter((m) => m.event === 'project.updated');
+    expect(updated).toHaveLength(1);
+    expect(JSON.parse(updated[0]!.data!).data).toEqual({});
+    expect(messages.some((m) => m.data?.includes('Secret name'))).toBe(false);
+  });
+
+  it('reports a failing act as the failure', async () => {
+    await expect(
+      collect(
+        '?project=PUB',
+        {},
+        () => false,
+        () => Promise.reject(new Error('boom')),
+      ),
+    ).rejects.toThrow("the test's act failed: Error: boom");
   });
 });

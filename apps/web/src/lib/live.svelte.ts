@@ -44,13 +44,49 @@ export function applyIssueSnapshot(
   }
 }
 
+/**
+ * Removes an issue from every cached list of its project and refetches its page, for a deletion that came without
+ * a snapshot to apply: a reader's tombstone, or a permanent delete.
+ */
+export function removeIssue(qc: QueryClient, issue: IssueRef) {
+  for (const [key, list] of qc.getQueriesData<Issue[]>({
+    queryKey: keys.issueLists(projectKeyOf(issue.key)),
+  })) {
+    if (list?.some((i) => i.id === issue.id))
+      qc.setQueryData(
+        key,
+        list.filter((i) => i.id !== issue.id),
+      );
+  }
+  void qc.invalidateQueries({ queryKey: keys.issue(issue.key) });
+  void qc.invalidateQueries({ queryKey: ['children'] });
+}
+
 function handle(qc: QueryClient, event: TrackerEvent, meId: string | undefined) {
   const data = event.data as {
     requestId?: string;
     issue?: Issue | IssueRef;
     link?: { source: IssueRef; target: IssueRef };
+    permanent?: boolean;
   };
   const own = data.requestId !== undefined && ownRequestIds.has(data.requestId);
+
+  // A project event without content: it ended the viewer's access to that project (it was made private), and the
+  // server sends nothing more about it. Refetch everything; its open pages now report not found.
+  if (event.type.startsWith('project.') && Object.keys(data).length === 0) {
+    void qc.invalidateQueries();
+    return;
+  }
+  // A deletion without a snapshot: readers below write get only the issue's id and key (a tombstone), and a
+  // permanent delete has nothing left to show either way.
+  if (
+    event.type === 'issue.deleted' &&
+    data.issue &&
+    (!('status' in data.issue) || data.permanent)
+  ) {
+    removeIssue(qc, data.issue);
+    return;
+  }
 
   if (event.type.startsWith('issue.') && data.issue && 'status' in data.issue) {
     const issue = data.issue;

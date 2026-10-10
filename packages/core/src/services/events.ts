@@ -98,7 +98,9 @@ function linkEnds(event: TrackerEvent): string[] {
   return [link?.source?.id, link?.target?.id].filter((id): id is string => typeof id === 'string');
 }
 
-type Access = 'all' | string[];
+/** Project ids from `readableProjectIds` / `writableProjectIds`: `'all'` or a list. */
+export type ProjectIdSet = 'all' | string[];
+type Access = ProjectIdSet;
 type IssueRef = { id?: string } | null | undefined;
 
 /** Ids an event's content depends on, looked up in one batch per table by `applyContentRules`. */
@@ -130,6 +132,25 @@ function withoutKey<T extends Record<string, unknown>>(record: T, key: string): 
 }
 
 /**
+ * A content-free `issue.deleted` or `attachment.deleted`: the issue's id and key, and the attachment's id, which is
+ * all a client needs to drop the row from an open view. Dropped when the ids are missing.
+ */
+function tombstone(e: TrackerEvent): TrackerEvent[] {
+  const issue = e.data.issue as { id?: string; key?: string } | undefined;
+  const attachment = (e.data.attachment as IssueRef)?.id;
+  if (!issue?.id || !issue.key || (e.type === 'attachment.deleted' && !attachment)) return [];
+  return [
+    {
+      ...e,
+      data: {
+        issue: { id: issue.id, key: issue.key },
+        ...(e.type === 'attachment.deleted' && { attachment: { id: attachment } }),
+      },
+    },
+  ];
+}
+
+/**
  * The per-viewer rules that depend on the current state of issues, comments and attachments, applied to a batch
  * of already project-filtered events with one lookup per table (shared by `listEvents` and the live stream, so
  * replay and live agree):
@@ -142,12 +163,16 @@ function withoutKey<T extends Record<string, unknown>>(record: T, key: string): 
  *   or of one on a deleted comment, are dropped (their filename, size and hash identify the file, and there is
  *   nothing left to show); a trashed parent is cut from issue snapshots, and a `changes.parent` that names a
  *   trashed issue is left out of `changes` (one from a trashed parent to a live one becomes `{ from: null, to }`).
+ * - With `tombstones` (the live stream), the dropped `issue.deleted` and `attachment.deleted` events arrive instead
+ *   as tombstones that carry only ids and the issue key, so readers' open views can drop the row. An
+ *   `attachment.deleted` of a trashed issue is still dropped: that issue's own tombstone covers it.
  */
 async function applyContentRules(
   db: Tx,
   events: TrackerEvent[],
   readable: Access,
   writable: Access,
+  tombstones = false,
 ): Promise<TrackerEvent[]> {
   if (readable === 'all' && writable === 'all') return events;
   const canRead = (projectId: string) => readable === 'all' || readable.includes(projectId);
@@ -208,10 +233,12 @@ async function applyContentRules(
       if (ends.length !== 2 || !ends.every(ok)) return [];
     }
     if (canWrite(e.projectId)) return [e];
-    if (e.issueId && !visibleIssue(e.issueId)) return [];
+    if (e.issueId && !visibleIssue(e.issueId))
+      return tombstones && e.type === 'issue.deleted' ? tombstone(e) : [];
     if (e.type.startsWith('attachment.')) {
       const id = (e.data.attachment as IssueRef)?.id;
-      return id && liveAttachments.has(id) ? [e] : [];
+      if (id && liveAttachments.has(id)) return [e];
+      return tombstones && e.type === 'attachment.deleted' ? tombstone(e) : [];
     }
     if (e.type.startsWith('comment.')) {
       const comment = e.data.comment as { id?: string; deletedAt?: string | null } | undefined;
@@ -261,27 +288,94 @@ async function applyContentRules(
 }
 
 /**
+ * Shares `applyContentRules` between viewers with the same readable and writable projects. The live stream hands
+ * every event to every connection, so many viewers with the same access (anonymous visitors of a public project,
+ * say) filter the same run of events at the same moment; with a memo they share one set of lookups instead of each
+ * running their own.
+ *
+ * Only lookups still in flight are shared: an entry is dropped as soon as it settles, so a viewer who gets to a
+ * run later reads the current state again, exactly as it would without the memo.
+ */
+export class ContentRulesMemo {
+  readonly #inFlight = new Map<string, Promise<TrackerEvent[]>>();
+
+  /** `applyContentRules` for project events (they do not depend on the viewer beyond their access). */
+  apply(
+    db: Tx,
+    events: TrackerEvent[],
+    readable: Access,
+    writable: Access,
+    tombstones: boolean,
+  ): Promise<TrackerEvent[]> {
+    const ids = (access: Access) => (access === 'all' ? 'all' : [...access].sort().join(','));
+    const key = [tombstones, ids(readable), ids(writable), events.map((e) => e.seq).join(',')].join(
+      '|',
+    );
+    const shared = this.#inFlight.get(key);
+    if (shared) return shared;
+    const run = applyContentRules(db, events, readable, writable, tombstones);
+    this.#inFlight.set(key, run);
+    const settle = () => this.#inFlight.delete(key);
+    run.then(settle, settle);
+    return run;
+  }
+
+  /** Lookups in flight (for tests). */
+  get size(): number {
+    return this.#inFlight.size;
+  }
+}
+
+export interface EventFilterOptions {
+  /** `readableProjectIds` of the viewer, to reuse a result already read; read here when left out. */
+  readable?: ProjectIdSet | undefined;
+  /** `writableProjectIds` of the viewer, likewise. */
+  writable?: ProjectIdSet | undefined;
+  /**
+   * Readers below write receive `issue.deleted` and `attachment.deleted` as tombstones (see `applyContentRules`)
+   * instead of not at all. The live stream sets this; `GET /events` and issue activity do not.
+   */
+  tombstones?: boolean | undefined;
+  /** Shares the content lookups with other viewers of the same access (`ContentRulesMemo`). */
+  memo?: ContentRulesMemo | undefined;
+}
+
+/**
  * Applies `listEvents`' per-viewer rules to events read some other way (the live stream reads every event as
  * the system actor and fans it out): only readable projects, project-less (`user.*`) events only for signed-in
  * viewers, link events only when both issues are readable, user events redacted, and deleted content only for
- * writers (`applyContentRules`). Pass `readable` and `writable` to reuse `readableProjectIds` and
- * `writableProjectIds` results.
+ * writers (`applyContentRules`).
  */
 export async function filterEventsForViewer(
   ctx: ServiceContext,
   events: TrackerEvent[],
-  readable?: Access,
-  writable?: Access,
+  options: EventFilterOptions = {},
 ): Promise<TrackerEvent[]> {
-  const access = readable ?? (await readableProjectIds(ctx, ctx.db.kysely));
+  const access = options.readable ?? (await readableProjectIds(ctx, ctx.db.kysely));
   const redacted = forViewer(ctx, events);
   if (access === 'all') return redacted;
   const signedIn = !isAnonymous(ctx);
   const visible = redacted.filter((e) =>
     e.projectId === null ? signedIn : access.includes(e.projectId),
   );
-  const canWrite = writable ?? (await writableProjectIds(ctx, ctx.db.kysely));
-  return applyContentRules(ctx.db.kysely, visible, access, canWrite);
+  const canWrite = options.writable ?? (await writableProjectIds(ctx, ctx.db.kysely));
+  const tombstones = options.tombstones ?? false;
+  if (!options.memo) return applyContentRules(ctx.db.kysely, visible, access, canWrite, tombstones);
+  // The content rules pass project-less (`user.*`) events through, and those are the only ones redacted per viewer,
+  // so the project events alone go through the shared memo and the viewer's own `user.*` events are merged back.
+  const ruled = await options.memo.apply(
+    ctx.db.kysely,
+    visible.filter((e) => e.projectId !== null),
+    access,
+    canWrite,
+    tombstones,
+  );
+  const bySeq = new Map(ruled.map((e) => [e.seq, e]));
+  return visible.flatMap((e) => {
+    if (e.projectId === null) return [e];
+    const kept = bySeq.get(e.seq);
+    return kept ? [kept] : [];
+  });
 }
 
 /** Loads events by seq (in seq order); missing seqs are skipped. */
@@ -293,11 +387,13 @@ export async function getEventsBySeq(db: Tx, seqs: number[]): Promise<TrackerEve
 
 /**
  * Reads the event log in commit order. `seq` increases in commit order (ADR 0003), so polling
- * `after=<last seq seen>` never misses an event. `nextCursor` is the last seq as a string.
+ * `after=<last seq seen>` never misses an event. `nextCursor` is the last seq as a string. The live stream's
+ * replay passes `tombstones`, so it matches what the stream delivers live.
  */
 export async function listEvents(
   ctx: ServiceContext,
   input: ListEventsInput = {},
+  options: Pick<EventFilterOptions, 'tombstones'> = {},
 ): Promise<Page<TrackerEvent>> {
   const limit = Math.min(Math.max(input.limit ?? 100, 1), 1000);
   if (input.after !== undefined && (!Number.isInteger(input.after) || input.after < 0))
@@ -344,6 +440,7 @@ export async function listEvents(
             events,
             readable,
             await writableProjectIds(ctx, ctx.db.kysely),
+            options.tombstones ?? false,
           ),
     nextCursor: rows.length > limit ? String(page.at(-1)!.seq) : null,
   };
