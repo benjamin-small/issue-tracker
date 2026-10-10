@@ -8,10 +8,13 @@ import {
   EventTailer,
   listEvents,
   removeMember,
+  updateUser,
 } from '@poietic-tech/issues-core';
 import type { TrackerEvent } from '@poietic-tech/issues-schema';
 import { createTestContext, type TestContext } from '@poietic-tech/issues-core/testing';
 import { testDialect } from '@poietic-tech/issues-db/testing';
+import { Writable } from 'node:stream';
+import { pino } from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
 
@@ -61,13 +64,16 @@ async function collect(
   expect(res.headers.get('content-type')).toContain('text/event-stream');
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
-  const messages: Message[] = [];
+  const messages: Message[] & { ended?: boolean } = [];
   let buffer = '';
   let acted = false;
   const deadline = Date.now() + 5000;
   while (!done(messages) && Date.now() < deadline) {
     const { value, done: end } = await reader.read();
-    if (end) break;
+    if (end) {
+      messages.ended = true;
+      break;
+    }
     buffer += decoder.decode(value, { stream: true });
     let idx;
     while ((idx = buffer.indexOf('\n\n')) >= 0) {
@@ -263,5 +269,118 @@ describe(`SSE /events/stream (${testDialect()})`, () => {
       null,
     );
     expect(titles(messages)).toEqual(['anonymous live']);
+  });
+
+  /** A tailer the test drives by hand: `emit` delivers events synchronously to every subscriber. */
+  function manualTailer(lastSeq = 0) {
+    const listeners = new Set<(e: TrackerEvent) => void>();
+    const tailer = {
+      lastSeq,
+      subscribe(l: (e: TrackerEvent) => void) {
+        listeners.add(l);
+        return () => listeners.delete(l);
+      },
+    };
+    const emit = (events: TrackerEvent[]) => {
+      for (const e of events) {
+        tailer.lastSeq = Math.max(tailer.lastSeq, e.seq);
+        for (const l of listeners) l(e);
+      }
+    };
+    return { tailer: tailer as unknown as EventTailer, emit, listeners };
+  }
+
+  it('sends reset and closes when more than 1000 events are pending', async () => {
+    const template = (await listEvents(t.ctx, { limit: 1 })).data[0]!;
+    const { tailer: manual, emit, listeners } = manualTailer(10_000);
+    const flooded = createApp({ db: t.db, tailer: manual });
+    const events = Array.from({ length: 1001 }, (_, k) => ({ ...template, seq: 10_001 + k }));
+    const messages = await collect(
+      '',
+      {},
+      () => false,
+      async () => emit(events), // synchronously: nothing is drained in between
+      token,
+      flooded,
+    );
+    expect(messages.ended).toBe(true);
+    const reset = messages.filter((m) => m.event === 'reset');
+    expect(reset).toHaveLength(1);
+    // Same shape as the replay reset: resume after the newest seq, then refetch.
+    expect(reset[0]!.id).toBe('11001');
+    expect(JSON.parse(reset[0]!.data!)).toEqual({ seq: 11001 });
+    expect(messages.at(-1)!.event).toBe('reset');
+    expect(listeners.size).toBe(0);
+  });
+
+  it('keeps streaming when 1000 events are pending', async () => {
+    const template = (await listEvents(t.ctx, { limit: 1 })).data[0]!;
+    const { tailer: manual, emit } = manualTailer(20_000);
+    const app1000 = createApp({ db: t.db, tailer: manual });
+    const events = Array.from({ length: 1000 }, (_, k) => ({ ...template, seq: 20_001 + k }));
+    const messages = await collect(
+      '',
+      {},
+      (m) => m.filter((x) => x.id?.startsWith('2')).length >= 1000,
+      async () => emit(events),
+      token,
+      app1000,
+    );
+    expect(messages.some((m) => m.event === 'reset')).toBe(false);
+    expect(messages.filter((m) => m.event === template.type)).toHaveLength(1000);
+  });
+
+  it("closes the viewer's stream when a user.updated event names them", async () => {
+    const messages = await collect(
+      '',
+      {},
+      () => false,
+      async () => {
+        await updateUser(t.ctx, 'bot', { name: 'Bot renamed' });
+        await updateUser(t.ctx, 'member', { name: 'Member renamed' });
+      },
+      memberToken,
+    );
+    expect(messages.ended).toBe(true);
+    const updates = messages
+      .filter((m) => m.event === 'user.updated')
+      .map((m) => JSON.parse(m.data!).data.user.handle);
+    // Someone else's update streams on; the viewer's own is delivered, then the stream ends.
+    expect(updates).toEqual(['bot', 'member']);
+    expect(messages.at(-1)!.event).toBe('user.updated');
+  });
+
+  it('logs a failed access read with the request id before closing', async () => {
+    const lines: Record<string, unknown>[] = [];
+    const sink = new Writable({
+      write(chunk: Buffer, _enc, done) {
+        for (const line of chunk.toString().split('\n'))
+          if (line) lines.push(JSON.parse(line) as Record<string, unknown>);
+        done();
+      },
+    });
+    const broken = new Proxy(t.db, {
+      get(target, prop, receiver) {
+        if (prop === 'kysely') throw new Error('database unavailable');
+        return Reflect.get(target, prop, receiver) as unknown;
+      },
+    });
+    const { tailer: manual } = manualTailer();
+    const logged = createApp({
+      db: broken,
+      tailer: manual,
+      logger: pino({ level: 'error' }, sink),
+    });
+    const res = await logged.request('http://t/api/v1/events/stream', {
+      headers: { 'x-request-id': 'req-stream-1' },
+    });
+    const reader = res.body!.getReader();
+    while (!(await reader.read()).done);
+    const errors = lines.filter((l) => l.level === 50);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({
+      requestId: 'req-stream-1',
+      err: { message: 'database unavailable' },
+    });
   });
 });
