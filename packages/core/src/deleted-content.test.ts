@@ -12,7 +12,7 @@ import {
 } from './services/attachments.ts';
 import { createComment, deleteComment, listComments, updateComment } from './services/comments.ts';
 import { filterEventsForViewer, listEvents } from './services/events.ts';
-import { createLink, listIssueLinks } from './services/links.ts';
+import { createLink, deleteLink, listIssueLinks } from './services/links.ts';
 import {
   createIssue,
   deleteIssue,
@@ -355,9 +355,14 @@ describe(`deleted content needs write (${testDialect()})`, () => {
   });
 
   // Runs last: it writes, and the event log tests above compare against a snapshot.
-  it("treats changes to a trashed issue's comments and attachments as not found below write", async () => {
+  it("treats changes to a trashed issue's comments, attachments and links as not found below write", async () => {
+    // Link lists leave out links to trashed issues; the link's id is in its event.
+    const linkToTrashed = (
+      (await listEvents(t.ctx, { types: ['link.created'] })).data[0]!.data.link as { id: string }
+    ).id;
     for (const who of readers) {
       const name = who.actor.handle;
+      await expect(deleteLink(who, linkToTrashed), name).rejects.toMatchObject(notFound);
       await expect(updateComment(who, commentOnTrashed, { body: 'x' }), name).rejects.toMatchObject(
         notFound,
       );
@@ -376,5 +381,7 @@ describe(`deleted content needs write (${testDialect()})`, () => {
     );
     expect((await deleteComment(manager, commentOnTrashed)).deletedAt).not.toBeNull();
     expect((await deleteAttachment(manager, blobs, onTrashedIssue)).deletedAt).not.toBeNull();
+    await deleteLink(editor, linkToTrashed);
+    expect((await listEvents(t.ctx, { types: ['link.deleted'] })).data).toHaveLength(1);
   });
 });
